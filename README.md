@@ -45,13 +45,14 @@ LocalSubsidies_SupervisedLearning/
 ## 사전 준비 (사용자)
 
 1. 외부 데이터 루트 생성 후 raw CSV 배치  
-   예: `C:\Users\lky94\LocalSubsidies_ML_Data\raw\`
-2. 설정 복사:
+   예: `...\LocalSubsidies_ML_Data\raw\`
+   (LocalSubsidies_ML_Data 폴더는 본 프로젝트의 폴더와 같은위치에 생성 권장)
+3. 설정 복사:
    ```text
    copy configs\local.yaml.example configs\local.yaml
    ```
    `data_root`를 본인 PC 경로로 수정
-3. Python 가상환경 및 패키지:
+4. Python 가상환경 및 패키지:
    ```text
    python -m venv .venv
    .venv\Scripts\activate

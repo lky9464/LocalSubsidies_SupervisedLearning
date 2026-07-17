@@ -67,7 +67,8 @@ LocalSubsidies_SupervisedLearning/
 ## 사전 준비 (사용자)
 
 1. 외부 데이터 루트 생성 후 raw CSV(EUC-KR) 8개 배치  
-   예: `C:\Users\<사용자>\LocalSubsidies_ML_Data\raw\`
+   예: `...\LocalSubsidies_ML_Data\raw\`  
+   (`LocalSubsidies_ML_Data` 폴더는 본 프로젝트 폴더와 **같은 위치**(형제 경로)에 두는 것을 권장)
 2. 설정 복사:
    ```text
    copy configs\local.yaml.example configs\local.yaml

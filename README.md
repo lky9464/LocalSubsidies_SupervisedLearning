@@ -44,7 +44,7 @@ LocalSubsidies_SupervisedLearning/
 
 ## 사전 준비 (사용자)
 
-1. 외부 데이터 루트 생성 후 raw CSV(EUC-KR) 8개 배치  
+1. 외부 데이터 루트 생성 후 raw CSV 배치  
    예: `C:\Users\lky94\LocalSubsidies_ML_Data\raw\`
 2. 설정 복사:
    ```text

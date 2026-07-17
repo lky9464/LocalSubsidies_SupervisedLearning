@@ -1,0 +1,146 @@
+# 공통 설정 (커밋 가능). 절대경로는 local.yaml에만 둔다.
+
+project_name: LocalSubsidies_SupervisedLearning
+random_seed: 42
+
+# data_root 하위 상대 경로
+# - raw/interim/processed: 알고리즘 공통(1벌)
+# - algorithms/{algo}/: 알고리즘별 학습·평가·점수 (5개 폴더)
+paths:
+  raw: raw
+  interim: interim
+  processed: processed
+  algorithms: algorithms
+  # 워크스페이스 상대 (repo 내부)
+  reports: outputs/reports
+  reports_comparison: outputs/reports/comparison
+
+encoding: EUC-KR
+csv_sep: ","
+
+# 시계열 분할 (CRTR_YM, YYYYMM)
+split:
+  train_start: "202401"
+  train_end: "202506"
+  test_start: "202507"
+  test_end: "202512"
+  # Train 끝부분 validation (조기중단·튜닝용, Test와 분리)
+  valid_start: "202504"
+  valid_end: "202506"
+
+target_column: TAET_YN
+positive_label: "Y"
+negative_label: "N"
+
+# 키 컬럼 (피처 제외, 품질점검·조인용)
+key_columns:
+  - CRTR_YM
+  - PFM_BIZ_ID
+  - INST_ID
+
+# Feature에서 반드시 제외
+exclude_features:
+  # 타겟 및 타겟 수정에 사용한 플래그
+  - TAET_YN
+  - ISDP_RGSTR_YN
+  - ISRC_DSCL_YN
+  - PMBZ_CFMTN_YN
+  # 식별자
+  - PFM_BIZ_ID
+  - INST_ID
+  - LCL_AID_BIZ_ID
+  # PII / 명칭
+  - AID_BZR_RRNO
+  - AID_BZR_BNO
+  - PFM_BIZ_NM
+  - INST_NM
+  - LAF_NM
+  - DEPT_NM
+  - LCL_AID_BIZ_NM
+  - NTS_BT_CD_NM
+  - RPRSV_HSHD_DV_CD_NM
+  - AID_BIZ_EXE_TY_CD_NM
+  - FLD_CD_NM
+  - SECT_CD_NM
+  # 시스템 감사
+  - FRST_RGSTR_USR_ID
+  - FRST_RGSTR_DT
+  - LAST_MDFCN_USR_ID
+  - LAST_MDFCN_DT
+  # 사후·결과성 (점수 시점 비가용 가능성 — 기본 제외)
+  - RDP_TRGT_SUM_AMT
+  - CUMU_NACK_CNT
+  - CUMU_NACK_SUM_AMT
+  - CLCN_NACK_AMT_EXI_YN
+  - DTCT_MART_PTN_RLVT_YN
+
+# 타겟 수정 규칙 (착수 후 사용자 규칙으로 교체)
+# any_of_y: 나열된 컬럼 중 하나라도 Y이면 TAET_YN=Y
+label_rule:
+  mode: any_of_y
+  source_columns:
+    - ISDP_RGSTR_YN
+    - ISRC_DSCL_YN
+    - PMBZ_CFMTN_YN
+
+# 위험도 점수
+scoring:
+  min_score: 0
+  max_score: 1000
+
+# 평가
+evaluation:
+  top_k_percents: [1, 5, 10]
+  score_bins: 10
+  min_cell_count: 5  # 리포트 셀 n<5 마스킹
+
+# Feature 중요도 TOP-N
+feature_importance:
+  top_n: 10
+  permutation_sample_size: 8000
+  permutation_repeats: 2
+
+# 메모리 관련 (16GB RAM 환경)
+memory:
+  sklearn_encoding: ordinal  # onehot 사용 금지
+  n_jobs: 2
+  transform_dtype: float32
+
+# 알고리즘 (로컬 학습 대상)
+algorithms:
+  - catboost
+  - stacked_ensemble
+  - easy_ensemble
+  - gradient_boosting
+  - random_forest
+
+# CatBoost 범주형으로 다룰 후보 (실제 존재 컬럼만 사용)
+categorical_candidates:
+  - AID_BZR_CAP_CD
+  - NTS_BT_CD
+  - INST_TY_CD
+  - RPRSV_HSHD_DV_CD
+  - RPRSV_AGGP_DV_CD
+  - RPRSV_DSCRD_YN
+  - ODN_CAPT_DV_CD
+  - OPCT_YN
+  - AID_BIZ_EXE_TY_CD
+  - PBAC_TY_DV_CD
+  - CONT_BIZ_YN
+  - AID_BIZ_DPI_DV_CD
+  - PRIV_AID_BIZ_CGP_YN
+  - PRIV_AID_BZR_YN
+  - BIZ_ENFC_ZON_DV_CD
+  - LBST_EXE_RT_DV_CD
+  - VNCL_GOEM_VRSC_YN
+  - NTN_DRCT_BIZ_YN
+  - LSA_MNG_CMMT_DLBR_YN
+  - EVENT_FSTV_YN
+  - CB_YN
+  - AID_BIZ_DV_CD
+  - FLD_CD
+  - SECT_CD
+  - ACNT_DV_CD
+  - LAF_CD
+  - DEPT_CD
+  - FYR

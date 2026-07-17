@@ -1,0 +1,26 @@
+﻿# 로컬 절대경로 설정 (인덱싱·Agent 컨텍스트 제외)
+configs/local.yaml
+
+# 실수로 들어온 데이터·모델 산출물
+*.parquet
+*.feather
+*.pkl
+*.pickle
+*.joblib
+*.cbm
+*.onnx
+*.h5
+*.pt
+*.pth
+
+# CSV는 레이아웃만 허용
+*.csv
+!TLS4902R_Layout.csv
+
+# 가상환경
+.venv/
+venv/
+
+# 외부 데이터 루트
+LocalSubsidies_ML_Data/
+../LocalSubsidies_ML_Data/

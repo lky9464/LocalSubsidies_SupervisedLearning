@@ -1,0 +1,57 @@
+# 로컬 절대경로·민감 설정
+configs/local.yaml
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+dist/
+build/
+.venv/
+venv/
+.env
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# 실수로 워크스페이스에 들어온 데이터·모델 (레이아웃 CSV는 예외)
+*.csv
+!TLS4902R_Layout.csv
+*.parquet
+*.feather
+*.pkl
+*.pickle
+*.joblib
+*.cbm
+*.onnx
+*.h5
+*.pt
+*.pth
+
+# 로그·임시
+*.log
+tmp/
+temp/
+.cache/
+
+# 리포트 원본 중 행단위가 섞일 수 있는 경로 (집계 리포트는 커밋 가능)
+outputs/models/
+outputs/scores/
+outputs/tmp/
+# 레거시 경로(이전 models/scores 평면 구조) 실수 커밋 방지 — repo 루트만
+/models/
+/scores/
+# src/models 패키지는 커밋 대상 (위 /models/ 와 구분)
+!src/models/

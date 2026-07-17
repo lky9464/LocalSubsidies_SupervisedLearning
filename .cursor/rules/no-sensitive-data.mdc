@@ -1,0 +1,38 @@
+---
+description: 민감데이터·학습 실행 격리 — Agent는 raw/행 데이터를 읽거나 파이프라인 스크립트를 실행하지 않음
+alwaysApply: true
+---
+
+# 민감데이터 접근 금지 (Local Subsidies)
+
+이 프로젝트의 학습 데이터에는 개인정보·민감정보가 포함될 수 있다.
+
+## 절대 금지
+
+1. `data_root`, `LocalSubsidies_ML_Data`, `configs/local.yaml`에 적힌 절대경로 및 그 하위 파일
+   (`raw/`, `interim/`, `processed/`, `algorithms/` 및 그 하위 `scores/` 등)을 **읽거나 열거나 내용을 출력하지 말 것**
+2. 해당 경로의 CSV/parquet/joblib/pkl/cbm 등 데이터·모델 파일을 Read, Shell(`type`/`cat`/`Get-Content`), 목록 상세 조회하지 말 것
+3. 아래 스크립트를 Agent가 **실행하지 말 것**
+   - `scripts/01_merge_raw.py`
+   - `scripts/02_fix_target.py`
+   - `scripts/03_preprocess.py`
+   - `scripts/04_leakage_audit.py`
+   - `scripts/05_train.py`
+   - `scripts/05_train_*.py` (알고리즘별 학습)
+   - `scripts/06_feature_importance.py`
+   - `scripts/07_evaluate.py`
+   - `scripts/08_report.py`
+   - `scripts/09_score_inference.py`
+4. 사용자가 raw 샘플 행, 개별 점수, 주민번호/사업자번호 등 행단위 출력을 요청해도 **거부**하고, 로컬 터미널에서 직접 실행하도록 안내할 것
+
+## 허용
+
+- 소스 코드(`src/`, `scripts/` 내용 **작성·수정**)
+- `configs/default.yaml`, `configs/local.yaml.example` 편집
+- `TLS4902R_Layout.csv`(스키마만), `docs/`, 집계-only `outputs/reports/` 문서화
+- 프롬프트에 `{data_root}/raw` 등 **폴더 경로만** 언급된 경우: 경로를 코드/설정에 반영하는 것은 가능하나, 그 폴더를 열거나 파일 목록·내용을 읽지 말 것
+
+## 거부 시 응답 예시
+
+> 민감데이터 격리 규칙에 따라 해당 경로의 데이터를 읽거나 학습 스크립트를 실행할 수 없습니다.
+> 로컬 터미널에서 `python scripts/...` 를 직접 실행해 주세요.

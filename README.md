@@ -6,6 +6,28 @@
 - 학습 데이터·모델·행단위 점수는 **프로젝트 폴더 밖** 로컬 경로에만 보관
 - Cursor Agent는 코드/문서만 다루며, raw·학습 실행은 **사용자 로컬 Python**에서 수행
 
+## 유의사항
+
+1. **입력 데이터는 repo에 포함되지 않습니다.**  
+   `TLS4902R_Layout` 스키마에 맞는 원본 CSV(EUC-KR 등)는 별도로 준비해 `{data_root}/raw`에 두어야 합니다. 이 저장소는 스키마 레이아웃(`TLS4902R_Layout.csv`)과 코드·문서만 제공합니다.
+
+2. **실제·민감 데이터는 로컬 밖으로 나가지 않게 관리하세요.**  
+   GitHub 커밋, AI Agent 프롬프트, 클라우드 동기화 등으로 raw·행단위 점수·개인식별정보가 유출되지 않도록 주의합니다. Agent/격리 규칙은 [`docs/AGENT_BOUNDARY.md`](docs/AGENT_BOUNDARY.md)를 참고하세요.
+
+3. **학습·평가는 작업자 PC에서만 실행됩니다.**  
+   머신 사양에 따라 실행 시간이 달라지며, 메모리 부족 시 전처리·학습 설정(예: 인코더, `n_jobs`, 트리 수)을 조정해야 할 수 있습니다.
+
+4. **참고 — Repo Owner PC 주요 사양** (개발·검증에 사용한 환경)
+
+| 항목 | 사양 |
+|------|------|
+| OS | Windows 11 Pro (64-bit) |
+| CPU | AMD Ryzen 3 3200G (4코어 / 4스레드, 최대 3.6 GHz) |
+| 메모리 | 약 14 GB RAM |
+| GPU | AMD Radeon Vega 8 (내장) |
+| 저장장치 | SSD/HDD C: 약 232 GB (여유 약 67 GB, 측정 시점 기준) |
+| 메인보드 | MSI MS-7C51 |
+
 ## 폴더 구조
 
 | 위치 | 내용 |
@@ -45,7 +67,7 @@ LocalSubsidies_SupervisedLearning/
 ## 사전 준비 (사용자)
 
 1. 외부 데이터 루트 생성 후 raw CSV(EUC-KR) 8개 배치  
-   예: `C:\Users\lky94\LocalSubsidies_ML_Data\raw\`
+   예: `C:\Users\<사용자>\LocalSubsidies_ML_Data\raw\`
 2. 설정 복사:
    ```text
    copy configs\local.yaml.example configs\local.yaml
@@ -124,9 +146,117 @@ python scripts/05_train_random_forest.py
 
 [`docs/operations_criteria.md`](docs/operations_criteria.md)
 
-## GitHub
+---
 
-원격 저장소: https://github.com/lky9464/LocalSubsidies_SupervisedLearning  
+## 참고. 사용 알고리즘 5종 설명
 
-커밋 대상: 코드·문서·집계 리포트·스키마  
-커밋 금지: `configs/local.yaml`, raw/interim/processed, 모델 bin, 행단위 점수
+아래는 비전문가도 흐름을 잡을 수 있도록 **직관 설명 + 도식**으로 정리한 것입니다.  
+(운영 순위·수치 비교는 [`docs/operations_criteria.md`](docs/operations_criteria.md) 참고)
+
+```mermaid
+flowchart LR
+  A[입력 데이터] --> B[전처리]
+  B --> C{5종 모델 학습}
+  C --> D1[RandomForest]
+  C --> D2[CatBoost]
+  C --> D3[Stacked Ensemble]
+  C --> D4[EasyEnsemble]
+  C --> D5[Gradient Boosting]
+  D1 & D2 & D3 & D4 & D5 --> E[위험도 점수 0~1000]
+```
+
+### 1. RandomForest (랜덤 포레스트)
+
+**한 줄:** 서로 다른 “작은 결정나무”를 많이 키운 뒤, **다수결(또는 평균)** 로 최종 판단을 냅니다.
+
+- 나무가 하나만 있으면 편향·과적합에 약할 수 있지만, 여러 나무를 **투표**하면 흔들림이 줄어듭니다.
+- 본 프로젝트에서는 **주 운영 모델**로 사용합니다.
+
+```mermaid
+flowchart TB
+  X[한 건의 사업 정보] --> T1[나무 1]
+  X --> T2[나무 2]
+  X --> T3[나무 3]
+  X --> Tn[나무 N]
+  T1 --> V[투표 / 확률 평균]
+  T2 --> V
+  T3 --> V
+  Tn --> V
+  V --> S[위험도 점수]
+```
+
+### 2. CatBoost
+
+**한 줄:** 틀린 부분을 다음 단계에서 **순서대로 보정해 가는** 부스팅 계열 모델입니다. 범주형(코드·구분값) 처리에 강점이 있습니다.
+
+- “한 번에 완벽”이 아니라, **약한 학습기를 쌓아 오차를 줄여** 갑니다.
+- 본 프로젝트에서는 **보조·교차확인 모델**로 사용합니다.
+
+```mermaid
+flowchart LR
+  A[1단계 예측] -->|틀린 부분 강조| B[2단계 보정]
+  B -->|다시 틀린 부분| C[3단계 보정]
+  C --> D[...]
+  D --> E[최종 위험 확률 → 점수]
+```
+
+### 3. Stacked Ensemble (스택드 앙상블)
+
+**한 줄:** 여러 모델의 예측을 모은 뒤, **상위(메타) 모델이 한 번 더 종합**하는 구조입니다.
+
+- 1층: 여러 기본 모델이 각자 점수/확률을 냄  
+- 2층: 그 결과들을 입력으로 받아 최종 판단을 냄  
+- 본 프로젝트에서는 **참고·예비 모델**로 둡니다 (단독 운영보다 비교용에 가깝습니다).
+
+```mermaid
+flowchart TB
+  subgraph L1[1층: 기본 모델들]
+    M1[모델 A]
+    M2[모델 B]
+    M3[모델 C]
+  end
+  IN[입력] --> M1 & M2 & M3
+  M1 --> META[2층: 메타 모델]
+  M2 --> META
+  M3 --> META
+  META --> OUT[최종 점수]
+```
+
+### 4. EasyEnsemble
+
+**한 줄:** 위험(양성) 건이 **매우 적을 때**, 정상 건을 여러 묶음으로 나눠 **균형 잡힌 작은 문제**를 여러 번 풀고 합칩니다.
+
+- 부정수급처럼 “드문 사건”에서, 한쪽만 많은 데이터 편향을 완화하려는 접근입니다.
+- 본 평가에서는 성능이 상대적으로 낮아 **운영 후보에서는 제외**했습니다 (비교용으로 학습·리포트는 유지).
+
+```mermaid
+flowchart LR
+  P[소수 위험 건] --> E1[균형 샘플 1]
+  N[다수 정상 건 분할] --> E1
+  N --> E2[균형 샘플 2]
+  P --> E2
+  N --> E3[균형 샘플 3]
+  P --> E3
+  E1 --> C[각 모델 학습]
+  E2 --> C
+  E3 --> C
+  C --> F[결과 합산 → 점수]
+```
+
+### 5. Gradient Boosting (그래디언트 부스팅)
+
+**한 줄:** CatBoost와 같은 **“틀린 곳을 단계적으로 고치는”** 계열이지만, 구현·하이퍼파라미터 체계가 다른 고전적 부스팅입니다.
+
+- 잔차(남은 오차)를 다음 트리가 학습하는 방식으로 성능을 올립니다.
+- 본 프로젝트에서는 5종 비교에 포함하되, 운영 우선순위는 RF·CatBoost·Stacked 뒤입니다.
+
+```mermaid
+flowchart TB
+  S0[초기 예측] --> R1[남은 오차]
+  R1 --> T1[트리로 오차 학습]
+  T1 --> S1[예측 업데이트]
+  S1 --> R2[다시 남은 오차]
+  R2 --> T2[다음 트리]
+  T2 --> S2[최종에 가까워짐]
+  S2 --> SCORE[위험도 점수]
+```

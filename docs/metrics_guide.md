@@ -41,7 +41,8 @@
 
 위험도 점수가 높은 상위 1%, 5%, 10%를 “우선 점검 대상”으로 볼 때:
 
-- **양성 비율**: 그 구간 안에 실제 타겟이 얼마나 있는지
+- **양성 비율** (= precision@topK): 그 구간 안에 실제 타겟이 얼마나 있는지
+- **양성 포착 비율** (= recall@topK): 전체 타겟 중 상위 K%에 포함된 비중
 - **리프트**: (그 구간 양성 비율) ÷ (전체 양성 비율)  
   - 예: 리프트 5 → 무작위보다 5배 더 많이 타겟을 포함
 
@@ -62,5 +63,5 @@
 자세한 수치는 `outputs/reports/comparison/model_evaluation_comparison.xlsx` 및
 `outputs/reports/{알고리즘}/evaluation.xlsx`를 확인하세요.
 
-관련 산출 스크립트: `06_feature_importance.py` → `07_evaluate.py` → `08_report.py`.  
+관련 산출 스크립트: `06_feature_importance.py` → `07_evaluate.py` → `08_update_ranking.py` → `09_report.py`.
 점수 파일·컬럼 순서: `docs/pipeline.md`.

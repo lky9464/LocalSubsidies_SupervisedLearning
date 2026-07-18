@@ -1,19 +1,19 @@
 """
-[로컬 전용] 시계열 분할 + 전처리 객체/피처목록 저장 → data_root/processed/
+[로컬 전용] 분할 + 전처리 객체/피처목록 저장 → data_root/processed/
 
-메모리: One-Hot 미사용(Ordinal). 대행수 대비 16GB RAM 환경 대응.
-Cursor Agent는 이 스크립트를 실행하지 마세요.
+분할: run_config.split.mode = time | random
+메모리: OrdinalEncoder. Cursor Agent는 실행하지 마세요.
 """
 
 from __future__ import annotations
 
 import gc
 import json
+import os
 import sys
 from pathlib import Path
 
 import joblib
-import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -22,36 +22,69 @@ from src.features.preprocess import (  # noqa: E402
     build_feature_lists,
     encode_target,
     fit_preprocessor,
+    random_split_masks,
     time_split_masks,
 )
 from src.io.banner import print_banner  # noqa: E402
 from src.io.config import load_config, resolve_data_path  # noqa: E402
+from src.io.encoding_util import read_csv_auto  # noqa: E402
+from src.pipeline.run_config import load_run_config  # noqa: E402
 
 
 def main() -> None:
     print_banner()
     cfg = load_config()
+    run_id = os.environ.get("LSL_RUN_ID", "")
+    run_cfg = load_run_config(cfg, run_id) if run_id else {}
+
+    # run별 추가 제외 피처
+    extra_ex = list(run_cfg.get("exclude_features_extra") or [])
+    if extra_ex:
+        cfg = dict(cfg)
+        excl = list(cfg.get("exclude_features", []))
+        for c in extra_ex:
+            if c not in excl:
+                excl.append(c)
+        cfg["exclude_features"] = excl
+        print(f"[preprocess] 추가 제외 피처 {len(extra_ex)}개 적용")
+
     interim = resolve_data_path(cfg, "interim")
     processed = resolve_data_path(cfg, "processed")
     processed.mkdir(parents=True, exist_ok=True)
-    encoding = cfg.get("encoding", "EUC-KR")
 
     src = interim / "labeled.csv"
     if not src.exists():
         raise FileNotFoundError(f"{src} 없음. 먼저 02_fix_target.py를 실행하세요.")
 
     print("[preprocess] labeled.csv 로드 중...")
-    df = pd.read_csv(src, encoding=encoding, dtype=str, low_memory=False)
-    split = cfg["split"]
-    train_m, test_m = time_split_masks(
-        df,
-        period_col="CRTR_YM",
-        train_start=split["train_start"],
-        train_end=split["train_end"],
-        test_start=split["test_start"],
-        test_end=split["test_end"],
-    )
-    print(f"[preprocess] train={int(train_m.sum()):,} / test={int(test_m.sum()):,}")
+    df, used = read_csv_auto(src, candidates=cfg.get("encoding_candidates"))
+    print(f"[preprocess] encoding={used}")
+
+    split_cfg = run_cfg.get("split") or cfg.get("split", {})
+    mode = split_cfg.get("mode", "time")
+    if mode == "random":
+        train_m, test_m = random_split_masks(
+            df,
+            test_size=float(split_cfg.get("test_size", 0.3)),
+            random_state=int(split_cfg.get("random_state", cfg.get("random_seed", 42))),
+        )
+        print(
+            f"[preprocess] 분할=random test_size={split_cfg.get('test_size', 0.3)} "
+            f"train={int(train_m.sum()):,} / test={int(test_m.sum()):,}"
+        )
+    else:
+        train_m, test_m = time_split_masks(
+            df,
+            period_col="CRTR_YM",
+            train_start=str(split_cfg.get("train_start", "202401")),
+            train_end=str(split_cfg.get("train_end", "202506")),
+            test_start=str(split_cfg.get("test_start", "202507")),
+            test_end=str(split_cfg.get("test_end", "202512")),
+        )
+        print(
+            f"[preprocess] 분할=time "
+            f"train={int(train_m.sum()):,} / test={int(test_m.sum()):,}"
+        )
 
     features, categorical, numeric = build_feature_lists(df, cfg)
     target = cfg.get("target_column", "TAET_YN")
@@ -62,7 +95,6 @@ def main() -> None:
     train_pos = float(y_train.mean()) if len(y_train) else None
     test_pos = float(y_test.mean()) if len(y_test) else None
 
-    # Train 피처만 복사 후 원본 df 해제 → 피크 메모리 감소
     X_train = df.loc[train_m, features].copy()
     del df
     gc.collect()
@@ -82,9 +114,9 @@ def main() -> None:
             "numeric": numeric,
             "preprocessor_sklearn": pre_sk,
             "preprocessor_catboost": pre_cb,
-            "split": split,
+            "split": split_cfg,
             "random_seed": cfg.get("random_seed", 42),
-            "sklearn_encoding": "ordinal",  # 메모리 절약 모드
+            "sklearn_encoding": "ordinal",
         },
         processed / "preprocess_bundle.joblib",
     )
@@ -98,6 +130,7 @@ def main() -> None:
         "train_positive_rate": train_pos,
         "test_positive_rate": test_pos,
         "sklearn_encoding": "ordinal",
+        "split_mode": mode,
         "features": features,
         "categorical": categorical,
         "numeric": numeric,
@@ -110,12 +143,6 @@ def main() -> None:
         processed / "split_masks.joblib",
     )
     print(f"[preprocess] 저장 완료: {processed}")
-    print(
-        f"[preprocess] train_positive_rate={train_pos:.6f} / "
-        f"test_positive_rate={test_pos:.6f}"
-        if train_pos is not None and test_pos is not None
-        else "[preprocess] 완료"
-    )
 
 
 if __name__ == "__main__":

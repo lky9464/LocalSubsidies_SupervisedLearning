@@ -6,6 +6,8 @@ from .config import (
     resolve_data_path,
     resolve_algo_dir,
     resolve_algo_scores_dir,
+    resolve_algo_score_csv,
+    resolve_algo_score_top_xlsx,
     resolve_algo_report_dir,
     ensure_algo_dirs,
 )
@@ -19,6 +21,8 @@ __all__ = [
     "resolve_data_path",
     "resolve_algo_dir",
     "resolve_algo_scores_dir",
+    "resolve_algo_score_csv",
+    "resolve_algo_score_top_xlsx",
     "resolve_algo_report_dir",
     "ensure_algo_dirs",
     "merge_raw_csvs",

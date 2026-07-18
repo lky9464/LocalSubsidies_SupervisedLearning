@@ -15,15 +15,29 @@ paths:
   reports: outputs/reports
   reports_comparison: outputs/reports/comparison
 
+# raw 읽기 시 우선 시도 인코딩 (실패하면 encoding_candidates로 자동 폴백)
 encoding: EUC-KR
+encoding_candidates:
+  - utf-8-sig
+  - utf-8
+  - EUC-KR
+  - cp949
+  - latin-1
+# interim/labeled 등 중간 CSV 저장 인코딩
+interim_encoding: utf-8-sig
 csv_sep: ","
 
-# 시계열 분할 (CRTR_YM, YYYYMM)
+# 분할 (run_config로 오버라이드 가능)
+# mode: time | random
 split:
+  mode: time
   train_start: "202401"
   train_end: "202506"
   test_start: "202507"
   test_end: "202512"
+  # random 모드
+  test_size: 0.3
+  random_state: 42
   # Train 끝부분 validation (조기중단·튜닝용, Test와 분리)
   valid_start: "202504"
   valid_end: "202506"
@@ -83,6 +97,14 @@ label_rule:
     - ISRC_DSCL_YN
     - PMBZ_CFMTN_YN
 
+# 추론(raw_inference): 레이아웃은 학습 raw와 동일하나 아래 컬럼은 사용하지 않음
+inference:
+  ignore_columns:
+    - TAET_YN
+    - ISDP_RGSTR_YN
+    - ISRC_DSCL_YN
+    - PMBZ_CFMTN_YN
+
 # 위험도 점수
 scoring:
   min_score: 0
@@ -99,6 +121,15 @@ feature_importance:
   top_n: 10
   permutation_sample_size: 8000
   permutation_repeats: 2
+
+# 주·보 상위% 구간 A~D (4×4). Test=타겟 포착 분포(10), 추론=점검 우선순위표
+# A: 상위 a% / B: a~b% / C: b~c% / D: c% 초과. 우선순위=주등급 우선·보조는 동등급 내 정렬
+ops_queue:
+  primary_algo: random_forest
+  aux_algo: catboost
+  a_top_pct: 1
+  b_top_pct: 5
+  c_top_pct: 10
 
 # 메모리 관련 (16GB RAM 환경)
 memory:

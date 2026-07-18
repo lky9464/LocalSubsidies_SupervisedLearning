@@ -2,6 +2,6 @@
   "verdict": "PASS_직접누수징후_약함_고생능은신호강할가능성",
   "suspect_count": 0,
   "forbidden_in_features": [],
-  "base_rate": 0.0035243440804072577,
+  "base_rate": 0.0032454653636724245,
   "suspect_features": []
 }

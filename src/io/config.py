@@ -73,9 +73,59 @@ def resolve_algo_dir(cfg: dict[str, Any], algo: str) -> Path:
     return resolve_data_path(cfg, "algorithms") / algo
 
 
-def resolve_algo_scores_dir(cfg: dict[str, Any], algo: str) -> Path:
-    """알고리즘별 행단위 점수 폴더 (로컬 전용)."""
-    return resolve_algo_dir(cfg, algo) / "scores"
+def resolve_algo_scores_dir(
+    cfg: dict[str, Any],
+    algo: str,
+    kind: str = "test",
+) -> Path:
+    """
+    알고리즘별 행단위 점수 폴더 (로컬 전용).
+    kind: test | inference
+    → {data_root}/algorithms/{algo}/scores/{kind}/
+    """
+    k = kind if kind in ("test", "inference") else "test"
+    return resolve_algo_dir(cfg, algo) / "scores" / k
+
+
+def resolve_algo_score_csv(
+    cfg: dict[str, Any],
+    algo: str,
+    kind: str = "test",
+) -> Path:
+    """
+    점수 CSV 경로 (신규 우선, 구 평면 경로 호환).
+    신규: scores/{kind}/{algo}_{kind}_scores.csv
+    구:   scores/{algo}_{kind}_scores.csv 또는 scores/inference_scores.csv
+    """
+    k = kind if kind in ("test", "inference") else "test"
+    primary = resolve_algo_scores_dir(cfg, algo, k) / f"{algo}_{k}_scores.csv"
+    if primary.exists():
+        return primary
+    flat = resolve_algo_dir(cfg, algo) / "scores"
+    legacy = flat / f"{algo}_{k}_scores.csv"
+    if legacy.exists():
+        return legacy
+    if k == "inference":
+        old_inf = flat / "inference_scores.csv"
+        if old_inf.exists():
+            return old_inf
+    return primary
+
+
+def resolve_algo_score_top_xlsx(
+    cfg: dict[str, Any],
+    algo: str,
+    kind: str = "test",
+) -> Path:
+    """상위1%/5% Excel 경로 (신규 우선)."""
+    k = kind if kind in ("test", "inference") else "test"
+    primary = resolve_algo_scores_dir(cfg, algo, k) / f"{algo}_{k}_scores_top.xlsx"
+    if primary.exists():
+        return primary
+    legacy = resolve_algo_dir(cfg, algo) / "scores" / f"{algo}_{k}_scores_top.xlsx"
+    if legacy.exists():
+        return legacy
+    return primary
 
 
 def resolve_algo_report_dir(cfg: dict[str, Any], algo: str) -> Path:
@@ -88,7 +138,8 @@ def ensure_algo_dirs(cfg: dict[str, Any], algorithms: list[str] | None = None) -
     algos = algorithms or cfg.get("algorithms", [])
     for algo in algos:
         d = resolve_algo_dir(cfg, algo)
-        (d / "scores").mkdir(parents=True, exist_ok=True)
+        (d / "scores" / "test").mkdir(parents=True, exist_ok=True)
+        (d / "scores" / "inference").mkdir(parents=True, exist_ok=True)
         resolve_algo_report_dir(cfg, algo).mkdir(parents=True, exist_ok=True)
     resolve_repo_path(cfg, "reports_comparison").mkdir(parents=True, exist_ok=True)
 

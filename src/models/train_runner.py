@@ -27,8 +27,6 @@ def load_train_context(cfg: dict[str, Any] | None = None) -> dict[str, Any]:
     cfg = cfg or load_config()
     interim = resolve_data_path(cfg, "interim")
     processed = resolve_data_path(cfg, "processed")
-    encoding = cfg.get("encoding", "EUC-KR")
-
     labeled = interim / "labeled.csv"
     bundle_path = processed / "preprocess_bundle.joblib"
     masks_path = processed / "split_masks.joblib"
@@ -37,7 +35,10 @@ def load_train_context(cfg: dict[str, Any] | None = None) -> dict[str, Any]:
             raise FileNotFoundError(f"{p} 없음. 01~03(전처리) 단계를 먼저 실행하세요.")
 
     print("[train] labeled.csv 로드...")
-    df = pd.read_csv(labeled, encoding=encoding, dtype=str, low_memory=False)
+    from src.io.encoding_util import read_csv_auto
+
+    df, used = read_csv_auto(labeled, candidates=cfg.get("encoding_candidates"))
+    print(f"[train] encoding={used}")
     bundle = joblib.load(bundle_path)
     masks = joblib.load(masks_path)
     train_m = masks["train_mask"]

@@ -12,13 +12,12 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-import pandas as pd
-
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from src.io.banner import print_banner  # noqa: E402
 from src.io.config import load_config, resolve_data_path  # noqa: E402
+from src.io.encoding_util import read_csv_auto  # noqa: E402
 from src.io.label import apply_label_rule  # noqa: E402
 from src.io.merge import save_interim_csv  # noqa: E402
 from src.io.quality import print_summary, summarize_quality  # noqa: E402
@@ -28,12 +27,12 @@ def main() -> None:
     print_banner()
     cfg = load_config()
     interim = resolve_data_path(cfg, "interim")
-    encoding = cfg.get("encoding", "EUC-KR")
     src = interim / "merged.csv"
     if not src.exists():
         raise FileNotFoundError(f"{src} 없음. 먼저 01_merge_raw.py를 실행하세요.")
 
-    df = pd.read_csv(src, encoding=encoding, dtype=str, low_memory=False)
+    df, used = read_csv_auto(src, candidates=cfg.get("encoding_candidates"))
+    print(f"[label] 로드 encoding={used}")
     df = apply_label_rule(
         df,
         rule=cfg.get("label_rule", {}),
@@ -45,7 +44,8 @@ def main() -> None:
     print_summary(summary)
 
     out = interim / "labeled.csv"
-    save_interim_csv(df, out, encoding=encoding)
+    out_enc = cfg.get("interim_encoding", "utf-8-sig")
+    save_interim_csv(df, out, encoding=out_enc)
     print("[label] 완료. 규칙이 다르면 configs/default.yaml의 label_rule을 수정 후 재실행하세요.")
 
 

@@ -24,9 +24,14 @@ def main() -> None:
     cfg = load_config()
     raw_dir = resolve_data_path(cfg, "raw")
     interim_dir = resolve_data_path(cfg, "interim")
-    encoding = cfg.get("encoding", "EUC-KR")
-
-    df = merge_raw_csvs(raw_dir, encoding=encoding)
+    # encoding: 우선 시도값(실패 시 utf-8/EUC-KR/cp949 등 자동 폴백)
+    preferred = cfg.get("encoding")
+    candidates = cfg.get("encoding_candidates")
+    df = merge_raw_csvs(
+        raw_dir,
+        encoding=preferred,
+        candidates=list(candidates) if candidates else None,
+    )
     key_info = check_keys(df, cfg.get("key_columns", []))
     print(f"[merge] 키점검: {key_info}")
 
@@ -34,7 +39,9 @@ def main() -> None:
     print_summary(summary)
 
     out = interim_dir / "merged.csv"
-    save_interim_csv(df, out, encoding=encoding)
+    # 중간파일은 UTF-8로 통일 (이후 단계는 read_csv_auto 권장)
+    out_enc = cfg.get("interim_encoding", "utf-8-sig")
+    save_interim_csv(df, out, encoding=out_enc)
 
     meta_path = interim_dir / "merged_quality.json"
     with open(meta_path, "w", encoding="utf-8") as f:

@@ -58,7 +58,6 @@ def main() -> None:
     cfg = load_config()
     algorithms = cfg.get("algorithms", [])
     ensure_algo_dirs(cfg, algorithms)
-    encoding = cfg.get("encoding", "EUC-KR")
     top_n = int(cfg.get("feature_importance", {}).get("top_n", 10))
 
     interim = resolve_data_path(cfg, "interim")
@@ -70,7 +69,12 @@ def main() -> None:
     comments = load_column_comments(layout_path)
 
     print("[fi] 데이터·전처리 로드...")
-    df = pd.read_csv(interim / "labeled.csv", encoding=encoding, dtype=str, low_memory=False)
+    from src.io.encoding_util import read_csv_auto
+
+    df, used = read_csv_auto(
+        interim / "labeled.csv", candidates=cfg.get("encoding_candidates")
+    )
+    print(f"[fi] encoding={used}")
     bundle = joblib.load(processed / "preprocess_bundle.joblib")
     masks = joblib.load(processed / "split_masks.joblib")
     test_m = masks["test_mask"]

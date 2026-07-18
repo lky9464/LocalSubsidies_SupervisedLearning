@@ -48,6 +48,24 @@ def time_split_masks(
     return train, test
 
 
+def random_split_masks(
+    df: pd.DataFrame,
+    *,
+    test_size: float = 0.3,
+    random_state: int = 42,
+) -> tuple[pd.Series, pd.Series]:
+    """행 단위 랜덤 Train/Test 마스크 (겹치지 않음)."""
+    from sklearn.model_selection import train_test_split
+
+    idx = df.index.to_numpy()
+    train_idx, test_idx = train_test_split(
+        idx, test_size=float(test_size), random_state=int(random_state), shuffle=True
+    )
+    train = df.index.isin(train_idx)
+    test = df.index.isin(test_idx)
+    return pd.Series(train, index=df.index), pd.Series(test, index=df.index)
+
+
 def _to_numeric_frame(df: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
     out = pd.DataFrame(index=df.index)
     for c in cols:

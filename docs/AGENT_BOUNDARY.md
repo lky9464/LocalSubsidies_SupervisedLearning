@@ -9,25 +9,26 @@
 
 1. `data_root` / `LocalSubsidies_ML_Data` 하위 파일 읽기·목록 상세 조회
    (`raw/`, `interim/`, `processed/`, `algorithms/**/scores/` 포함)
-2. `scripts/01_*.py` ~ `09_*.py` 등 데이터 입출력 스크립트 실행
-3. raw·행단위 점수·PII 내용을 채팅에 출력
+2. `scripts/01_*.py` ~ `11_*.py`, `run_web.ps1` / Streamlit 등 데이터 입출력·웹 실행
+3. raw·행단위 점수·타겟 포착/점검 우선순위표·운영 DB(`ops.sqlite`)·PII 내용을 채팅에 출력
 
 ## 사용자가 로컬에서 실행하는 순서
 
 ```text
+# CLI
 python scripts/01_merge_raw.py
-python scripts/02_fix_target.py
-python scripts/03_preprocess.py
-python scripts/04_leakage_audit.py
-python scripts/05_train.py
-python scripts/06_feature_importance.py
+...
 python scripts/07_evaluate.py
-python scripts/08_report.py
-python scripts/09_score_inference.py      # 운영 추론
+python scripts/08_update_ranking.py
+python scripts/09_report.py
+python scripts/10_ops_queue.py
+python scripts/11_score_inference.py --algo random_forest
+# 또는 웹 UI (127.0.0.1 only)
+.\RunWeb.bat
 ```
 
-Test 점수 파일(로컬 전용): `{data_root}/algorithms/{algo}/scores/{algo}_test_scores.csv`,  
-`{algo}_test_scores_top.xlsx` — 컬럼·순서 상세는 `docs/pipeline.md`.
+상세: `docs/pipeline.md`, `docs/web_local.md`  
+운영 DB: `{data_root}/ops/ops.sqlite` (런·순위·타겟 포착·점검 우선순위 조회 / **raw 미포함**)
 
 ## 프롬프트 허용/금지
 

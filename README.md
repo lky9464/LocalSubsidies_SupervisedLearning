@@ -48,7 +48,9 @@ LocalSubsidies_ML_Data/                 # 프로젝트 밖
     │   ├── model.joblib
     │   ├── train_meta.json
     │   ├── eval_metrics.json
-    │   └── scores/                     # {algo}_test_scores.csv 등 (로컬 전용)
+    │   └── scores/
+    │       ├── test/                   # {algo}_test_scores.csv 등
+    │       └── inference/              # {algo}_inference_scores.csv 등
     ├── stacked_ensemble/
     ├── easy_ensemble/
     ├── gradient_boosting/
@@ -92,9 +94,15 @@ python scripts/04_leakage_audit.py      # 누수점검 (학습 전)
 python scripts/05_train.py              # 모델 학습
 python scripts/06_feature_importance.py # Feature TOP10 (evaluate 전에 필수)
 python scripts/07_evaluate.py           # 평가·점수 (명칭/금액/TOP10피처값 포함)
-python scripts/08_report.py             # 집계 리포트
+python scripts/08_update_ranking.py     # 모델 순위 (eval 기반)
+python scripts/09_report.py             # 집계 리포트
+python scripts/10_ops_queue.py          # 타겟 포착 분포 Test (주/보 A~D · 4×4)
 # 운영 추론 (라벨 미지 데이터, 예: 2026)
-python scripts/09_score_inference.py --algo random_forest
+python scripts/11_score_inference.py --algo random_forest
+
+# 로컬 웹 UI (127.0.0.1 only) — 상세 docs/web_local.md
+# 더블클릭: RunWeb.bat  /  터미널: .\scripts\run_web.ps1
+.\RunWeb.bat
 ```
 
 > 의심 피처가 있으면 Feature 제외 후 `03`부터 다시 실행하고, `04` PASS 후 `05`로 진행합니다.
@@ -119,9 +127,11 @@ python scripts/05_train_random_forest.py
 
 - 집계 결과: `outputs/reports/comparison/`, `outputs/reports/{algo}/`
 - 행단위 점수: `{data_root}/algorithms/{algo}/scores/` (GitHub 금지)  
-  - `{algo}_test_scores.csv`: 키·명칭/금액 → 위험도점수·양성확률·예측/실제라벨 → 기여도TOP10  
-  - 같은 폴더에 `{algo}_test_scores_top.xlsx` (시트 `상위1%` / `상위5%`, 동일 컬럼 순서)  
-  - `01`~`08` 순차 실행만으로 부가 컬럼이 채워진 점수 파일이 생성됨 (`06`→`07` 의존)
+  - `test/{algo}_test_scores.csv` · `test/{algo}_test_scores_top.xlsx`  
+  - `inference/{algo}_inference_scores.csv` · `inference/{algo}_inference_scores_top.xlsx`  
+  - 컬럼: 키·명칭/금액 → 위험도점수·양성확률·예측/실제라벨 → 기여도TOP10  
+  - 타겟 포착 분포(Test): `{data_root}/algorithms/operations/ops_queue_test.*` (`10`)  
+  - 점검 우선순위표(추론): `{data_root}/algorithms/operations/ops_queue_inference.*`
 
 ## 타겟(TAET_YN) 규칙
 
@@ -143,7 +153,7 @@ python scripts/05_train_random_forest.py
 
 [`docs/pipeline.md`](docs/pipeline.md) — 스크립트 순서, 점수 파일명·컬럼 순서, GitHub 허용/금지
 
-## 운영 기준 (모델 1~3위·점검 컷오프)
+## 운영 기준 (모델 1~3위·타겟 포착·점검 우선순위)
 
 [`docs/operations_criteria.md`](docs/operations_criteria.md)
 

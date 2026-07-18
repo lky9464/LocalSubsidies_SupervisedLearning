@@ -77,8 +77,6 @@ def main() -> None:
     processed = resolve_data_path(cfg, "processed")
     reports = resolve_repo_path(cfg, "reports_comparison")
     reports.mkdir(parents=True, exist_ok=True)
-    encoding = cfg.get("encoding", "EUC-KR")
-
     labeled = interim / "labeled.csv"
     bundle_path = processed / "preprocess_bundle.joblib"
     masks_path = processed / "split_masks.joblib"
@@ -87,7 +85,10 @@ def main() -> None:
             raise FileNotFoundError(f"{p} 없음.")
 
     print("[leakage] labeled/전처리 번들 로드 (행 내용은 출력하지 않음)...")
-    df = pd.read_csv(labeled, encoding=encoding, dtype=str, low_memory=False)
+    from src.io.encoding_util import read_csv_auto
+
+    df, used = read_csv_auto(labeled, candidates=cfg.get("encoding_candidates"))
+    print(f"[leakage] encoding={used}")
     bundle = joblib.load(bundle_path)
     masks = joblib.load(masks_path)
     train_m = masks["train_mask"]
@@ -267,6 +268,11 @@ def main() -> None:
             indent=2,
         )
     print(f"[leakage] 요약 JSON: {meta_path}")
+
+    # 하드 FAIL(제외 컬럼이 Feature에 잔존) 시 파이프라인 Job 중단 → UI에서 제외 후 03부터 재개
+    if hard_fail:
+        print("[leakage] FAIL — 제외 목록 반영 후 03 전처리부터 재실행하세요.")
+        sys.exit(1)
 
 
 if __name__ == "__main__":

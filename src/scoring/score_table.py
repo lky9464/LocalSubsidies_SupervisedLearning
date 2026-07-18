@@ -270,7 +270,7 @@ def write_top_pct_score_excel(
 ) -> Path:
     """
     상위 K% 점수 행을 시트별 1개 Excel로 저장.
-    기본: 시트 '상위1%', '상위5%' → {algo}_test_scores_top.xlsx
+    기본: 시트 '상위1%', '상위5%' → scores/{test|inference}/{algo}_*_scores_top.xlsx
     """
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with pd.ExcelWriter(out_path, engine="openpyxl") as writer:

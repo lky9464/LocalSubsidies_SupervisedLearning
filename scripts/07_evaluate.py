@@ -1,8 +1,8 @@
 """
 [로컬 전용] Test 평가 + 위험도점수
 → {data_root}/algorithms/{algo}/eval_metrics.json
-→ {data_root}/algorithms/{algo}/scores/{algo}_test_scores.csv
-→ {data_root}/algorithms/{algo}/scores/{algo}_test_scores_top.xlsx
+→ {data_root}/algorithms/{algo}/scores/test/{algo}_test_scores.csv
+→ {data_root}/algorithms/{algo}/scores/test/{algo}_test_scores_top.xlsx
    (시트: 상위1%, 상위5% — 위험도점수 기준)
 
 컬럼 순서:
@@ -77,7 +77,12 @@ def main() -> None:
     eval_cfg = cfg.get("evaluation", {})
     top_n = int(cfg.get("feature_importance", {}).get("top_n", 10))
 
-    df = pd.read_csv(interim / "labeled.csv", encoding=encoding, dtype=str, low_memory=False)
+    from src.io.encoding_util import read_csv_auto
+
+    df, used = read_csv_auto(
+        interim / "labeled.csv", candidates=cfg.get("encoding_candidates")
+    )
+    print(f"[evaluate] encoding={used}")
     bundle = joblib.load(processed / "preprocess_bundle.joblib")
     masks = joblib.load(processed / "split_masks.joblib")
     test_m = masks["test_mask"]
@@ -154,7 +159,7 @@ def main() -> None:
             top_extra_df=top_df,
         )
 
-        scores_dir = resolve_algo_scores_dir(cfg, algo)
+        scores_dir = resolve_algo_scores_dir(cfg, algo, "test")
         scores_dir.mkdir(parents=True, exist_ok=True)
         score_path = scores_dir / f"{algo}_test_scores.csv"
         out_scores.to_csv(score_path, index=False, encoding=encoding)

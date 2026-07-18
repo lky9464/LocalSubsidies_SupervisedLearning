@@ -1,4 +1,4 @@
-"""EUC-KR raw CSV 다건 통합 (행 내용은 로그에 출력하지 않음)."""
+"""raw CSV 다건 통합 (인코딩 자동 판별, 행 내용은 로그에 출력하지 않음)."""
 
 from __future__ import annotations
 
@@ -7,22 +7,29 @@ from typing import Any
 
 import pandas as pd
 
+from src.io.encoding_util import DEFAULT_ENCODING_CANDIDATES, read_csv_auto
+
 
 def merge_raw_csvs(
     raw_dir: Path,
-    encoding: str = "EUC-KR",
+    encoding: str | None = None,
     pattern: str = "*.csv",
+    candidates: list[str] | None = None,
 ) -> pd.DataFrame:
-    """raw_dir 내 CSV를 세로 결합한다. 파일명·건수만 요약한다."""
+    """raw_dir 내 CSV를 세로 결합한다. 파일명·건수·감지 인코딩만 요약한다."""
     files = sorted(raw_dir.glob(pattern))
     if not files:
         raise FileNotFoundError(f"CSV가 없습니다: {raw_dir} (pattern={pattern})")
 
     frames: list[pd.DataFrame] = []
     print(f"[merge] 파일 수: {len(files)}")
+    cand = candidates or list(DEFAULT_ENCODING_CANDIDATES)
     for fp in files:
-        df = pd.read_csv(fp, encoding=encoding, dtype=str, low_memory=False)
-        print(f"[merge] 읽음: {fp.name} / 행수={len(df):,} / 컬럼수={df.shape[1]}")
+        df, used = read_csv_auto(fp, encoding=encoding, candidates=cand)
+        print(
+            f"[merge] 읽음: {fp.name} / 행수={len(df):,} / 컬럼수={df.shape[1]} "
+            f"/ encoding={used}"
+        )
         frames.append(df)
 
     merged = pd.concat(frames, axis=0, ignore_index=True)
@@ -30,10 +37,11 @@ def merge_raw_csvs(
     return merged
 
 
-def save_interim_csv(df: pd.DataFrame, path: Path, encoding: str = "EUC-KR") -> None:
+def save_interim_csv(df: pd.DataFrame, path: Path, encoding: str = "utf-8-sig") -> None:
+    """중간 산출은 UTF-8(BOM)로 저장해 이후 단계·엑셀 호환을 맞춘다."""
     path.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(path, index=False, encoding=encoding)
-    print(f"[merge] 저장 완료: {path} (행수={len(df):,})")
+    print(f"[merge] 저장 완료: {path} (행수={len(df):,}, encoding={encoding})")
 
 
 def check_keys(df: pd.DataFrame, key_columns: list[str]) -> dict[str, Any]:

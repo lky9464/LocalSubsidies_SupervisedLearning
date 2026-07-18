@@ -63,9 +63,15 @@ def top_k_lift(
         idx = order[:k]
         rate = float(y_true[idx].mean()) if k else 0.0
         lift = rate / base if base > 0 else None
+        pos_in_top = float(y_true[idx].sum()) if k else 0.0
+        total_pos = float(y_true.sum()) if n else 0.0
+        recall_at = (pos_in_top / total_pos) if total_pos > 0 else None
         result[f"상위{pct}%건수(top_{pct}pct_count)"] = k
+        # 상위 K% 안에서의 양성 비중 (= precision@topK)
         result[f"상위{pct}%양성비율(top_{pct}pct_positive_rate)"] = rate
         result[f"상위{pct}%리프트(top_{pct}pct_lift)"] = lift
+        # 전체 양성 중 상위 K%에 포함된 비중 (= recall@topK)
+        result[f"상위{pct}%양성포착비율(top_{pct}pct_recall)"] = recall_at
     return result
 
 

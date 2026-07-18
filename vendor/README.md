@@ -20,4 +20,4 @@ vendor/wheels/*.whl
 powershell -ExecutionPolicy Bypass -File .\scripts\build_offline_wheels.ps1
 ```
 
-상세: [`docs/offline_setup.md`](../docs/offline_setup.md)
+상세(오프라인 사용법): [`docs/offline_setup.md`](../docs/offline_setup.md)

@@ -28,17 +28,33 @@
 - 상세: [`docs/web_local.md`](docs/web_local.md) · [`docs/user_guide.md`](docs/user_guide.md) · PDF [`docs/user_guide.pdf`](docs/user_guide.pdf)
 - 소개 자료: [`docs/project_introduction.md`](docs/project_introduction.md) · [PDF](docs/project_introduction.pdf) · [PPT](docs/project_introduction.pptx)
 
-## 오프라인 PC 설치 (인터넷 없음)
+## 오프라인 사용법
 
-소스 ZIP만으로는 `pip install`이 되지 않습니다. **Release의 wheel 묶음**을 함께 씁니다.
+인터넷이 없는 PC에서는 소스 ZIP만으로 `pip install`이 되지 않습니다.  
+**소스 + Release wheel 묶음**을 USB로 옮긴 뒤 설치합니다.
 
-1. 이 저장소 소스 + [Releases](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases)의 `wheels-win-amd64-py312.zip`
-2. zip을 풀어 `vendor\wheels\*.whl` 이 되게 함
-3. 대상 PC에 **Python 3.12 x64** 설치 후 **`SetupOffline.bat`**
-4. `configs\local.yaml`의 `data_root` 수정 → (선택) **`InitDataRoot.bat`** → raw 배치 → **`RunWeb.bat`**
+### GitHub에서 받을 것 (온라인 PC)
 
-상세: [`docs/offline_setup.md`](docs/offline_setup.md)  
-관리자(온라인)가 wheel을 다시 만들 때: `scripts\build_offline_wheels.ps1`
+| # | 받을 것 | 위치 |
+|---|---------|------|
+| 1 | 소스 ZIP | 초록 **Code** → **Download ZIP** |
+| 2 | 패키지 묶음 | [Releases → v0.2.0](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases/tag/v0.2.0) → **`wheels-win-amd64-py312.zip`** |
+| 3 | (필요 시) | Python **3.12 x64** 설치 파일 ([python.org](https://www.python.org/downloads/windows/)) |
+
+raw CSV는 GitHub에 없습니다. 학습·추론 데이터는 사용자가 별도로 준비합니다.
+
+### 오프라인 PC 순서
+
+1. 소스 ZIP 압축 해제  
+2. `wheels-win-amd64-py312.zip`을 풀어 **`vendor\wheels\*.whl`** 이 되게 함  
+3. Python 3.12 x64 설치 (“Add to PATH” 권장)  
+4. **`SetupOffline.bat`** 더블클릭 (1회)  
+5. `notepad configs\local.yaml` → `data_root` 경로 수정  
+6. **`InitDataRoot.bat`** → raw를 `{data_root}\raw\` (추론은 `raw_inference\`)에 배치  
+7. **`RunWeb.bat`** → 브라우저 `http://127.0.0.1:8501` (콘솔 창 유지)
+
+**전체 단계·폴더 구조·문제 해결:** [`docs/offline_setup.md`](docs/offline_setup.md)  
+(화면 안내·USB 체크리스트·wheel 재배포 방법 포함)
 
 ## 유의사항
 
@@ -206,7 +222,7 @@ python scripts/05_train_random_forest.py
 | [`docs/pipeline.md`](docs/pipeline.md) | 스크립트 순서, 점수 파일명·컬럼, GitHub 허용/금지 |
 | [`docs/operations_criteria.md`](docs/operations_criteria.md) | 모델 순위·타겟 포착·점검 우선순위 (4×4) |
 | [`docs/metrics_guide.md`](docs/metrics_guide.md) | 평가 지표 해설 |
-| [`docs/offline_setup.md`](docs/offline_setup.md) | 오프라인 PC 설치 · Release wheel 사용 |
+| [`docs/offline_setup.md`](docs/offline_setup.md) | **오프라인 사용법** (GitHub 다운로드 → 설치 → 실행) |
 | [`docs/AGENT_BOUNDARY.md`](docs/AGENT_BOUNDARY.md) | Cursor Agent / 민감데이터 격리 |
 
 ---

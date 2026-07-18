@@ -108,10 +108,12 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build_offline_wheels.ps1
 업로드 예:
 
 ```powershell
-gh release upload v0.2.0 .\dist\wheels-win-amd64-py312.zip --clobber
+# 최초 1회: gh auth login
+powershell -ExecutionPolicy Bypass -File .\scripts\upload_wheels_release.ps1
 ```
 
-또는 GitHub 웹 → Releases → 해당 태그 → Edit → Attach binaries.
+또는 GitHub 웹 → Releases → `v0.2.0` → Edit → **Attach binaries**에  
+`dist\wheels-win-amd64-py312.zip` 드래그.
 
 ## 동봉하지 않는 것
 

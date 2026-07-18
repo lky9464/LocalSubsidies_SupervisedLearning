@@ -1,10 +1,32 @@
 # 지방보조금 부정수급 위험도 — 지도학습
 
-지방보조금 부정수급 **위험도 점수(0~1000)** 측정을 위한 지도학습 파이프라인입니다.
+[![Release v0.2.0](https://img.shields.io/github/v/tag/lky9464/LocalSubsidies_SupervisedLearning?label=v0.2.0)](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases/tag/v0.2.0)
 
+지방보조금 부정수급 **위험도 점수(0~1000)** 측정을 위한 지도학습 파이프라인 + **로컬 웹 UI**입니다.
+
+- **v0.2** — Streamlit 웹 UI(`127.0.0.1`), 백그라운드 Job, 운영 DB(`ops.sqlite`), 추론 결과 조회
+- **v0.1** — CLI 전용 파이프라인 ([`v0.1.0`](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases/tag/v0.1.0))
 - 알고리즘: CatBoost, Stacked Ensemble, EasyEnsemble, Gradient Boosting, RandomForest
-- 학습 데이터·모델·행단위 점수는 **프로젝트 폴더 밖** 로컬 경로에만 보관
+- 학습 데이터·모델·행단위 점수는 **프로젝트 폴더 밖** `{data_root}`에만 보관
 - Cursor Agent는 코드/문서만 다루며, raw·학습 실행은 **사용자 로컬 Python**에서 수행
+
+## 빠른 시작 (웹 UI — 권장)
+
+1. [`configs/local.yaml.example`](configs/local.yaml.example) → `configs/local.yaml` 복사 후 `data_root` 설정
+2. 가상환경 + `pip install -r requirements.txt`
+3. **`RunWeb.bat`** 더블클릭 (또는 `.\scripts\run_web.ps1`) → 브라우저 `http://127.0.0.1:8501`
+
+| 메뉴 | 기능 |
+|------|------|
+| 대시보드 | 모델 평가(순위·타겟 포착 4×4) + 추론(점검 우선 4×4) |
+| 데이터 등록 | 학습 raw + 추론 raw |
+| ▼ 모델 학습 및 평가 | 학습 파이프라인 / 모델 비교·평가 / 타겟 포착 분포 |
+| ▼ 추론 | 추론 실행 / 결과 확인(점검 우선순위표·Excel) |
+| Run 이력 · PC 사양 · 가이드 · 설정 | Run 메타·리소스·문서·경로 |
+
+- 파이프라인은 **백그라운드 Job**으로 실행 — 메뉴를 바꿔도 계속 진행, 상단 배너에서 진행률 확인
+- 상세: [`docs/web_local.md`](docs/web_local.md) · [`docs/user_guide.md`](docs/user_guide.md) · PDF [`docs/user_guide.pdf`](docs/user_guide.pdf)
+- 소개 자료: [`docs/project_introduction.md`](docs/project_introduction.md) · [PDF](docs/project_introduction.pdf) · [PPT](docs/project_introduction.pptx)
 
 ## 유의사항
 
@@ -32,18 +54,27 @@
 
 | 위치 | 내용 |
 |------|------|
-| 이 repo | 소스, 설정 템플릿, 스키마, 집계 리포트 |
+| 이 repo | `app/` 웹 UI, `src/`·`scripts/`, 설정 템플릿, 스키마, 집계 리포트 |
 | `{data_root}/raw`, `interim`, `processed` | **공통** 입력·통합·전처리 (1벌) |
+| `{data_root}/raw_inference/` | 추론용 raw (라벨 미지, 예: 2026) |
 | `{data_root}/algorithms/{algo}/` | **알고리즘별** 모델·평가·행단위 점수 (5폴더) |
+| `{data_root}/algorithms/operations/` | 타겟 포착·점검 우선순위표 (`ops_queue_test.*`, `ops_queue_inference.*`) |
+| `{data_root}/ops/ops.sqlite` | Run 이력·운영 큐 메타 (raw 미포함, GitHub 금지) |
 | `outputs/reports/comparison/` | 5종 비교 집계 리포트 (공통) |
 | `outputs/reports/{algo}/` | 알고리즘별 집계 리포트 |
 
 ```text
-LocalSubsidies_ML_Data/                 # 프로젝트 밖
-├── raw/                                # 공통
+LocalSubsidies_ML_Data/                 # 프로젝트 밖 ({data_root})
+├── raw/                                # 학습·평가 raw
+├── raw_inference/                      # 추론 raw (선택)
 ├── interim/
 ├── processed/
+├── ops/
+│   └── ops.sqlite                      # Run·운영 큐 메타 (웹 UI)
 └── algorithms/
+    ├── operations/
+    │   ├── ops_queue_test.xlsx         # 타겟 포착 분포 (Test)
+    │   └── ops_queue_inference.xlsx    # 점검 우선순위표 (추론)
     ├── catboost/
     │   ├── model.joblib
     │   ├── train_meta.json
@@ -56,7 +87,9 @@ LocalSubsidies_ML_Data/                 # 프로젝트 밖
     ├── gradient_boosting/
     └── random_forest/
 
-LocalSubsidies_SupervisedLearning/
+LocalSubsidies_SupervisedLearning/      # 이 repo
+├── app/                                # Streamlit 웹 UI (v0.2)
+├── RunWeb.bat                          # 웹 UI 실행 (더블클릭)
 └── outputs/reports/
     ├── comparison/                     # 5종 비교 Excel/PDF
     ├── catboost/
@@ -84,7 +117,9 @@ LocalSubsidies_SupervisedLearning/
    ```
    (`tqdm`이 있으면 진행바, 없으면 텍스트 진행률로 자동 대체됩니다.)
 
-## 로컬 실행 순서
+## CLI 실행 순서 (터미널)
+
+웹 UI **「학습 파이프라인」** 메뉴와 동일한 단계입니다. 스크립트를 직접 실행할 때 참고하세요.
 
 ```text
 python scripts/01_merge_raw.py
@@ -99,13 +134,10 @@ python scripts/09_report.py             # 집계 리포트
 python scripts/10_ops_queue.py          # 타겟 포착 분포 Test (주/보 A~D · 4×4)
 # 운영 추론 (라벨 미지 데이터, 예: 2026)
 python scripts/11_score_inference.py --algo random_forest
-
-# 로컬 웹 UI (127.0.0.1 only) — 상세 docs/web_local.md
-# 더블클릭: RunWeb.bat  /  터미널: .\scripts\run_web.ps1
-.\RunWeb.bat
 ```
 
-> 의심 피처가 있으면 Feature 제외 후 `03`부터 다시 실행하고, `04` PASS 후 `05`로 진행합니다.
+> 의심 피처가 있으면 Feature 제외 후 `03`부터 다시 실행하고, `04` PASS 후 `05`로 진행합니다.  
+> 웹 UI에서는 누수 FAIL 시 **「제외 반영 후 03부터 재개」** 로 동일하게 처리합니다.
 
 ### 학습(05) — 일괄 / 개별
 
@@ -130,8 +162,15 @@ python scripts/05_train_random_forest.py
   - `test/{algo}_test_scores.csv` · `test/{algo}_test_scores_top.xlsx`  
   - `inference/{algo}_inference_scores.csv` · `inference/{algo}_inference_scores_top.xlsx`  
   - 컬럼: 키·명칭/금액 → 위험도점수·양성확률·예측/실제라벨 → 기여도TOP10  
-  - 타겟 포착 분포(Test): `{data_root}/algorithms/operations/ops_queue_test.*` (`10`)  
-  - 점검 우선순위표(추론): `{data_root}/algorithms/operations/ops_queue_inference.*`
+  - 타겟 포착 분포(Test): `{data_root}/algorithms/operations/ops_queue_test.*` (`10`) — 웹 **타겟 포착 분포**  
+  - 점검 우선순위표(추론): `{data_root}/algorithms/operations/ops_queue_inference.*` — 웹 **추론 → 결과 확인**
+
+### Test vs 추론 (요약)
+
+| 구분 | 데이터 | 목적 | 웹 메뉴 |
+|------|--------|------|---------|
+| **Test(평가)** | 라벨 있는 hold-out | 타겟 **포착 품질** (4×4 + 실제 타겟 분포) | 타겟 포착 분포 |
+| **추론** | 라벨 미지 운영 데이터 | **점검 우선순위** 선정 (4×4) | 추론 → 결과 확인 |
 
 ## 타겟(TAET_YN) 규칙
 
@@ -145,17 +184,17 @@ python scripts/05_train_random_forest.py
 - `LocalSubsidies_ML_Data`를 Cursor 워크스페이스에 **추가하지 마세요**
 - 프롬프트에 **폴더 경로**만 언급하는 것은 가능, raw 파일 내용 요청은 금지
 
-## 지표 해설
+## 문서
 
-[`docs/metrics_guide.md`](docs/metrics_guide.md)
-
-## 파이프라인·점수 산출물
-
-[`docs/pipeline.md`](docs/pipeline.md) — 스크립트 순서, 점수 파일명·컬럼 순서, GitHub 허용/금지
-
-## 운영 기준 (모델 1~3위·타겟 포착·점검 우선순위)
-
-[`docs/operations_criteria.md`](docs/operations_criteria.md)
+| 문서 | 내용 |
+|------|------|
+| [`docs/user_guide.md`](docs/user_guide.md) | 웹 UI 사용법 (PDF: [`user_guide.pdf`](docs/user_guide.pdf)) |
+| [`docs/web_local.md`](docs/web_local.md) | Streamlit 실행·보안 원칙 |
+| [`docs/project_introduction.md`](docs/project_introduction.md) | 프로젝트 소개 (PDF/PPT 동봉) |
+| [`docs/pipeline.md`](docs/pipeline.md) | 스크립트 순서, 점수 파일명·컬럼, GitHub 허용/금지 |
+| [`docs/operations_criteria.md`](docs/operations_criteria.md) | 모델 순위·타겟 포착·점검 우선순위 (4×4) |
+| [`docs/metrics_guide.md`](docs/metrics_guide.md) | 평가 지표 해설 |
+| [`docs/AGENT_BOUNDARY.md`](docs/AGENT_BOUNDARY.md) | Cursor Agent / 민감데이터 격리 |
 
 ---
 

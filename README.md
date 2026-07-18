@@ -28,6 +28,18 @@
 - 상세: [`docs/web_local.md`](docs/web_local.md) · [`docs/user_guide.md`](docs/user_guide.md) · PDF [`docs/user_guide.pdf`](docs/user_guide.pdf)
 - 소개 자료: [`docs/project_introduction.md`](docs/project_introduction.md) · [PDF](docs/project_introduction.pdf) · [PPT](docs/project_introduction.pptx)
 
+## 오프라인 PC 설치 (인터넷 없음)
+
+소스 ZIP만으로는 `pip install`이 되지 않습니다. **Release의 wheel 묶음**을 함께 씁니다.
+
+1. 이 저장소 소스 + [Releases](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases)의 `wheels-win-amd64-py312.zip`
+2. zip을 풀어 `vendor\wheels\*.whl` 이 되게 함
+3. 대상 PC에 **Python 3.12 x64** 설치 후 **`SetupOffline.bat`**
+4. `configs\local.yaml`의 `data_root` 수정 → (선택) **`InitDataRoot.bat`** → raw 배치 → **`RunWeb.bat`**
+
+상세: [`docs/offline_setup.md`](docs/offline_setup.md)  
+관리자(온라인)가 wheel을 다시 만들 때: `scripts\build_offline_wheels.ps1`
+
 ## 유의사항
 
 1. **입력 데이터는 repo에 포함되지 않습니다.**  
@@ -194,6 +206,7 @@ python scripts/05_train_random_forest.py
 | [`docs/pipeline.md`](docs/pipeline.md) | 스크립트 순서, 점수 파일명·컬럼, GitHub 허용/금지 |
 | [`docs/operations_criteria.md`](docs/operations_criteria.md) | 모델 순위·타겟 포착·점검 우선순위 (4×4) |
 | [`docs/metrics_guide.md`](docs/metrics_guide.md) | 평가 지표 해설 |
+| [`docs/offline_setup.md`](docs/offline_setup.md) | 오프라인 PC 설치 · Release wheel 사용 |
 | [`docs/AGENT_BOUNDARY.md`](docs/AGENT_BOUNDARY.md) | Cursor Agent / 민감데이터 격리 |
 
 ---

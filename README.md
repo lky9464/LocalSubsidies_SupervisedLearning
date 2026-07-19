@@ -10,54 +10,81 @@
 - 학습 데이터·모델·행단위 점수는 **프로젝트 폴더 밖** `{data_root}`에만 보관
 - Cursor Agent는 코드/문서만 다루며, raw·학습 실행은 **사용자 로컬 Python**에서 수행
 
-## 빠른 시작 (웹 UI — 권장)
+## 일반 사용자 — 오프라인 PC 설치·사용 (권장)
 
-1. [`configs/local.yaml.example`](configs/local.yaml.example) → `configs/local.yaml` 복사 후 `data_root` 설정
-2. 가상환경 + `pip install -r requirements.txt`
-3. (최초) Node.js PC에서 **`scripts/build_web.bat`** → `web/out/` 생성  
-   (오프라인 사용자는 Release의 **`web-out.zip`** 을 `web/out/`에 풀어도 됨)
-4. **`RunWebNext.bat`** 더블클릭 → `http://127.0.0.1:8600`
+대상: Windows 10/11 x64 · 인터넷이 없는 업무 PC ·  
+온라인에서는 **소스 ZIP + [Release v0.3.0](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases/tag/v0.3.0) 자산만** 받은 뒤 USB로 옮김.  
+(학습·추론 raw CSV는 사용자가 별도 준비. Node.js·개발 환경 불필요.)
+
+### A. 온라인 PC에서 받을 것 (USB에 복사)
+
+| # | 파일 | 받는 곳 |
+|---|------|---------|
+| 1 | **소스 ZIP** | [Release v0.3.0](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases/tag/v0.3.0) → **Source code (zip)** (권장) |
+| 2 | **`wheels-win-amd64-py312.zip`** | 같은 Release → Assets |
+| 3 | **`web-out.zip`** | 같은 Release → Assets (**필수** — UI 화면) |
+| 4 | Python **3.12 x64** 설치파일 (오프라인 PC에 Python 없을 때) | [python.org](https://www.python.org/downloads/windows/) · `amd64` |
+
+### B. 오프라인 PC 설치 순서 (1회)
+
+1. 소스 ZIP 압축 해제 → 예: `C:\work\LocalSubsidies_SupervisedLearning\`  
+   (`SetupOffline.bat`, `RunWebNext.bat`이 보이는 폴더가 프로젝트 루트)
+2. **`wheels-win-amd64-py312.zip`** 안의 `.whl` 파일들을  
+   **`vendor\wheels\`** 바로 아래에 둠  
+   (`vendor\wheels\wheels\*.whl` 처럼 한 겹 더 있으면 안 됨)
+3. **`web-out.zip`** 을 풀어 **`web\out\`** 이 되게 함  
+   → `web\out\index.html` 이 있어야 함  
+   (zip 안이 `index.html`, `_next\` … 이면 `web\out\` 폴더를 만든 뒤 그 안에 풀기)
+4. Python 3.12 x64 설치 (“Add python.exe to PATH” 권장) → `py -3.12 --version` 확인
+5. 프로젝트 루트에서 **`SetupOffline.bat`** 더블클릭 (인터넷 불필요 · `.venv` 생성·패키지 설치)
+6. `notepad configs\local.yaml` → `data_root` 를 본인 PC 경로로 수정  
+   예: `data_root: "C:/work/LocalSubsidies_ML_Data"` (프로젝트와 **형제 폴더** 권장)
+7. **`InitDataRoot.bat`** → 학습 raw는 `{data_root}\raw\`, 추론 raw는 `{data_root}\raw_inference\`  
+   (스키마: 루트의 [`TLS4902R_Layout.csv`](TLS4902R_Layout.csv), 보통 EUC-KR)
+8. **`RunWebNext.bat`** 더블클릭 → 브라우저 **`http://127.0.0.1:8600`**  
+   (**검은 콘솔 창을 닫지 마세요** — 서버·Job이 함께 종료됩니다)
+
+설치·폴더 그림·문제 해결 상세: [`docs/offline_setup.md`](docs/offline_setup.md)
+
+### C. 일상 사용 (웹 UI)
+
+| 순서 | 메뉴 | 할 일 |
+|------|------|--------|
+| 1 | Run ID 발급 | 새 Run 발급·선택 |
+| 2 | 데이터 등록 | 학습 raw / 추론 raw 업로드 (메타만 DB 기록) |
+| 3 | 학습 실행 | 분할·알고리즘 선택 후 파이프라인 Job 실행 (상단 배너로 진행률) |
+| 4 | 모델 비교·평가 / 타겟 포착 | 순위·Test 4×4 확인 |
+| 5 | 추론 실행 → 결과 확인 | 학습된 모델로 추론 · 점검 우선 4×4·Excel |
 
 | 메뉴 | 기능 |
 |------|------|
 | 대시보드 | 모델 평가(순위·타겟 포착 4×4) + 추론(점검 우선 4×4) |
 | 데이터 등록 | 학습 raw + 추론 raw |
-| ▼ 모델 학습 및 평가 | 학습 파이프라인 / 모델 비교·평가 / 타겟 포착 분포 |
+| ▼ 모델 학습 및 평가 | 학습 실행 / 모델 비교·평가 / 타겟 포착 분포 |
 | ▼ 추론 | 추론 실행 / 결과 확인(점검 우선순위표·Excel) |
 | Run 이력 · PC 사양 · 가이드 · 설정 | Run 메타·리소스·문서·경로 |
 
-- 파이프라인은 **백그라운드 Job**으로 실행 — 메뉴를 바꿔도 계속 진행, 상단 배너에서 진행률 확인
-- 상세: [`docs/web_local.md`](docs/web_local.md) · [`docs/user_guide.md`](docs/user_guide.md) · PDF [`docs/user_guide.pdf`](docs/user_guide.pdf)
-- 소개 자료: [`docs/project_introduction.md`](docs/project_introduction.md) 
+- 더 자세한 화면 안내: [`docs/user_guide.md`](docs/user_guide.md) · PDF [`docs/user_guide.pdf`](docs/user_guide.pdf)
+- 로컬 UI 원칙: [`docs/web_local.md`](docs/web_local.md)
 
-## 오프라인 사용법
+### D. 자주 막히는 경우
 
-인터넷이 없는 PC에서는 소스 ZIP만으로 `pip install`이 되지 않습니다.  
-**소스 + Release wheel 묶음**을 USB로 옮긴 뒤 설치합니다.
+| 증상 | 확인 |
+|------|------|
+| `SetupOffline` — wheels 없음 | Release zip을 `vendor\wheels\`에 풀었는지 |
+| UI 안 뜸 / 빈 화면 | `web\out\index.html` 존재 여부 (`web-out.zip`) |
+| `file://` 로 HTML만 연 경우 | 반드시 `RunWebNext.bat` → `http://127.0.0.1:8600` |
+| import / catboost 오류 | Python **3.12 x64**, VC++ Redistributable x64 |
+| 데이터 오류 | `configs\local.yaml`의 `data_root`, raw 위치 |
 
-### GitHub에서 받을 것 (온라인 PC)
+### (개발자용) 온라인 PC에서 소스만 받아 실행
 
-| # | 받을 것 | 위치 |
-|---|---------|------|
-| 1 | 소스 ZIP | 초록 **Code** → **Download ZIP** |
-| 2 | 패키지 묶음 | [Releases](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases) → **`wheels-win-amd64-py312.zip`** (Streamlit 제거 후 재빌드본 권장) |
-| 3 | UI 정적 파일 | 같은 Release → **`web-out.zip`** → 프로젝트 `web/out/` 에 압축 해제 |
-| 4 | (필요 시) | Python **3.12 x64** 설치 파일 ([python.org](https://www.python.org/downloads/windows/)) |
+인터넷·Node가 있는 PC:
 
-raw CSV는 GitHub에 없습니다. 학습·추론 데이터는 사용자가 별도로 준비합니다.
-
-### 오프라인 PC 순서
-
-1. 소스 ZIP 압축 해제  
-2. `wheels-win-amd64-py312.zip`을 풀어 **`vendor\wheels\*.whl`** 이 되게 함  
-3. Python 3.12 x64 설치 (“Add to PATH” 권장)  
-4. **`SetupOffline.bat`** 더블클릭 (1회)  
-5. `notepad configs\local.yaml` → `data_root` 경로 수정  
-6. **`InitDataRoot.bat`** → raw를 `{data_root}\raw\` (추론은 `raw_inference\`)에 배치  
-7. **`RunWebNext.bat`** → 브라우저 `http://127.0.0.1:8600` (콘솔 창 유지)
-
-**전체 단계·폴더 구조·문제 해결:** [`docs/offline_setup.md`](docs/offline_setup.md)  
-(화면 안내·USB 체크리스트·wheel 재배포 방법 포함)
+1. `configs/local.yaml.example` → `configs/local.yaml` · `data_root` 설정  
+2. `python -m venv .venv` → `pip install -r requirements.txt`  
+3. `scripts\build_web.bat` → `web/out/` 생성  
+4. `RunWebNext.bat` → `http://127.0.0.1:8600`
 
 ## 유의사항
 
@@ -222,7 +249,7 @@ python scripts/05_train_random_forest.py
 | 문서 | 내용 |
 |------|------|
 | [`docs/user_guide.md`](docs/user_guide.md) | 웹 UI 사용법 (PDF: [`user_guide.pdf`](docs/user_guide.pdf)) |
-| [`docs/web_local.md`](docs/web_local.md) | Streamlit 실행·보안 원칙 |
+| [`docs/web_local.md`](docs/web_local.md) | Next+FastAPI 로컬 UI 실행·보안 원칙 |
 | [`docs/project_introduction.md`](docs/project_introduction.md) | 프로젝트 소개 (PDF/PPT 동봉) |
 | [`docs/pipeline.md`](docs/pipeline.md) | 스크립트 순서, 점수 파일명·컬럼, GitHub 허용/금지 |
 | [`docs/operations_criteria.md`](docs/operations_criteria.md) | 주·보 선정 원칙·4×4·평가 스냅샷 |

@@ -107,6 +107,14 @@ if not exist "%CD%\configs\local.yaml" (
   echo   이미 존재합니다. ^(경로만 확인하세요^)
 )
 
+if not exist "%CD%\web\out\index.html" (
+  echo.
+  echo [WARN] web\out\index.html 이 없습니다.
+  echo   Release 의 web-out.zip 을 풀어 web\out\ 이 되게 하세요.
+  echo   예^) web\out\index.html 이 보여야 합니다.
+  echo.
+)
+
 echo.
 echo ========================================
 echo  설치 완료
@@ -116,7 +124,8 @@ echo  다음 단계:
 echo    1^) notepad configs\local.yaml  — data_root 수정
 echo    2^) InitDataRoot.bat            — 데이터 폴더 골격 생성 ^(선택^)
 echo    3^) raw / raw_inference 에 CSV 배치
-echo    4^) RunWebNext.bat                  — 웹 UI 실행 (FastAPI :8600)
+echo    4^) ^(미완료 시^) web-out.zip → web\out\
+echo    5^) RunWebNext.bat              — 웹 UI 실행 (http://127.0.0.1:8600^)
 echo.
 echo  상세: docs\offline_setup.md
 echo.

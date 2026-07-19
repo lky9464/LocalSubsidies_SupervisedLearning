@@ -4,7 +4,9 @@
 GitHub에서 **소스 + Release 자산**을 받아 USB 등으로 옮긴 뒤, 아래 순서대로 진행하면 됩니다.
 
 > **한 줄 요약**  
-> 소스 ZIP + Release의 `wheels-win-amd64-py312.zip` (+ `web/out`) → Python 3.12 설치 → `SetupOffline.bat` → `data_root`·raw 준비 → `RunWebNext.bat`
+> [Release v0.3.0](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases/tag/v0.3.0) 에서  
+> **Source code (zip)** + **`wheels-win-amd64-py312.zip`** + **`web-out.zip`**  
+> → Python 3.12 설치 → `SetupOffline.bat` → `data_root`·raw 준비 → `RunWebNext.bat`
 
 ---
 
@@ -29,22 +31,19 @@ GitHub에서 **소스 + Release 자산**을 받아 USB 등으로 옮긴 뒤, 아
 
 온라인 가능한 PC에서 아래를 받아 USB·외장하드 등에 복사합니다.
 
-### ① 소스 코드 (ZIP 또는 git pull)
+### ① 소스 코드 (ZIP)
 
-1. 저장소: https://github.com/lky9464/LocalSubsidies_SupervisedLearning  
-2. 초록색 **Code** → **Download ZIP** (또는 인가된 clone/pull)
+권장: [Release v0.3.0](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases/tag/v0.3.0) → **Source code (zip)**  
+(버전을 wheels·web-out과 맞추려면 Code 버튼 ZIP보다 **Release 소스 ZIP**이 안전합니다.)
 
 ### ② wheel 묶음 (패키지 설치용)
 
-1. **Releases**: https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases  
-2. 최신(또는 안내된) 태그 → Assets **`wheels-win-amd64-py312.zip`**
+같은 Release → Assets **`wheels-win-amd64-py312.zip`**
 
-### ③ UI 정적 파일 (`web/out`)
+### ③ UI 정적 파일 (`web/out`) — **필수**
 
-오프라인 PC에 Node.js가 없으면 아래 중 하나가 필요합니다.
-
-- Release Assets의 **`web-out.zip`** (권장)을 풀어 프로젝트의 `web\out\` 이 되게 함  
-- 또는 온라인 PC에서 `scripts\build_web.bat` 실행 후 `web\out\` 폴더 전체를 USB로 복사
+같은 Release → Assets **`web-out.zip`** 을 풀어 프로젝트의 `web\out\` 이 되게 함  
+(`web\out\index.html` 확인). Node.js·`build_web.bat`은 오프라인 사용에 필요 없습니다.
 
 ### (권장) Python 설치 파일도 함께
 

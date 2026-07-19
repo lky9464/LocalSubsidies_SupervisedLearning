@@ -30,23 +30,16 @@
 
 ### B. 오프라인 PC 설치 순서 (1회)
 
-1. 소스 ZIP 압축 해제 → 예: `C:\work\LocalSubsidies_SupervisedLearning\`  
-   (`SetupOffline.bat`, `RunWebNext.bat`이 보이는 폴더가 프로젝트 루트)
-2. **`wheels-win-amd64-py312.zip`** 안의 `.whl` 파일들을  
-   **`vendor\wheels\`** 바로 아래에 둠  
-   (`vendor\wheels\wheels\*.whl` 처럼 한 겹 더 있으면 안 됨)
-3. **`web-out.zip`** 을 풀어 **`web\out\`** 이 되게 함  
-   → `web\out\index.html` 이 있어야 함  
-   (zip 안이 `index.html`, `_next\` … 이면 `web\out\` 폴더를 만든 뒤 그 안에 풀기)
-4. (필요 시) **`VC_redist.x64.exe`** 설치 → **`python-3.12.10-amd64.exe`** 설치  
-   (“Add python.exe to PATH” 권장) → `py -3.12 --version` 확인
-5. 프로젝트 루트에서 **`SetupOffline.bat`** 더블클릭 (인터넷 불필요 · `.venv` 생성·패키지 설치)
-6. `notepad configs\local.yaml` → `data_root` 를 본인 PC 경로로 수정  
-   예: `data_root: "C:/work/LocalSubsidies_ML_Data"` (프로젝트와 **형제 폴더** 권장)
-7. **`InitDataRoot.bat`** → 학습 raw는 `{data_root}\raw\`, 추론 raw는 `{data_root}\raw_inference\`  
-   (스키마: 루트의 [`TLS4902R_Layout.csv`](TLS4902R_Layout.csv), 보통 EUC-KR)
-8. **`RunWebNext.bat`** 더블클릭 → 브라우저 **`http://127.0.0.1:8600`**  
-   (**검은 콘솔 창을 닫지 마세요** — 서버·Job이 함께 종료됩니다)
+| # | 단계 | 할 일 / 확인 |
+|---|------|----------------|
+| 1 | 소스 압축 해제 | 예: `C:\work\LocalSubsidies_SupervisedLearning\` — `SetupOffline.bat`, `RunWebNext.bat`이 보이면 루트 |
+| 2 | wheels 배치 | `wheels-win-amd64-py312.zip`의 `.whl`을 **`vendor\wheels\`** 바로 아래 (`wheels\wheels\` 이중 폴더 금지) |
+| 3 | UI 배치 | `web-out.zip` → **`web\out\`** (`web\out\index.html` 확인; zip 루트가 `index.html`이면 `web\out\`에 풀기) |
+| 4 | VC++ · Python | (필요 시) `VC_redist.x64.exe` → `python-3.12.10-amd64.exe` (“Add to PATH” 권장) → `py -3.12 --version` |
+| 5 | 패키지 설치 | **`SetupOffline.bat`** 더블클릭 (인터넷 불필요 · `.venv` 생성) |
+| 6 | data_root | `notepad configs\local.yaml` → 예: `data_root: "C:/work/LocalSubsidies_ML_Data"` (프로젝트 **형제 폴더** 권장) |
+| 7 | 폴더 골격 · raw | **`InitDataRoot.bat`** → 학습 CSV는 `{data_root}\raw\`, 추론은 `raw_inference\` ([스키마](TLS4902R_Layout.csv), 보통 EUC-KR) |
+| 8 | 웹 실행 | **`RunWebNext.bat`** → **`http://127.0.0.1:8600`** (**콘솔 창을 닫지 마세요** — 서버·Job 종료) |
 
 설치·폴더 그림·문제 해결 상세: [`docs/offline_setup.md`](docs/offline_setup.md)
 

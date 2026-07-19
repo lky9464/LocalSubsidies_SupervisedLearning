@@ -1,4 +1,6 @@
-# 로컬 웹 UI (Streamlit)
+# 로컬 웹 UI (Next.js + FastAPI)
+
+로컬 전용 UI: **`RunWebNext.bat`** → `http://127.0.0.1:8600`
 
 ## 원칙
 
@@ -8,55 +10,57 @@
 - 파이프라인은 **백그라운드 Job** (`Popen`) — 메뉴 이동해도 계속 실행
 - GitHub·Agent로 민감데이터 유출 금지
 
+## 아키텍처
+
+```
+브라우저 → FastAPI (127.0.0.1:8600)
+            ├─ /api/*     BFF (OpsRepository, JobManager, run_config)
+            └─ /*         Next.js 정적 export (web/out/)
+```
+
+Python 파이프라인(`scripts/01~11`)은 변경 없음.
+
 ## 실행
 
 ### 더블클릭 (권장)
 
-프로젝트 루트의 **`RunWeb.bat`** 을 더블클릭하세요.  
-검은 콘솔 창이 열린 채로 유지되어야 하며, **서버가 준비된 뒤** 브라우저가 자동으로 열립니다.  
-기본 포트는 `8501`이며, 점유 시 `8502`~`8510` 중 빈 포트를 씁니다.
+1. (최초 1회, Node 있는 PC) **`scripts/build_web.bat`** → `web/out/` 생성  
+   - 오프라인 배포 시: Release에 포함된 `web/out`을 쓰거나, 빌드 결과를 USB로 복사  
+2. **`RunWebNext.bat`** 더블클릭 → 브라우저에서 **`http://127.0.0.1:8600`** 접속  
+3. 콘솔 창을 닫지 마세요 (서버 종료)
 
-### 코드 수정 후 재시작 (개발)
+> **`web/out/index.html`을 탐색기에서 직접 열지 마세요.** (`file://` — 메뉴·API 모두 깨짐)
 
-| 방법 | 설명 |
-|------|------|
-| **`RestartWeb.bat`** | 기존 Streamlit 종료 → 새로 기동 (권장) |
-| `RunWeb.bat restart` | 동일 (콘솔에서) |
-| `.\scripts\run_web.ps1 -Restart` | PowerShell |
-
-이미 실행 중일 때 **`RunWeb.bat`만** 누르면 브라우저만 열립니다(빠른 경로).  
-Agent가 `app/` 등을 수정하면 Cursor hook이 작업 종료 시 **`RestartWeb.bat`** 을 자동 실행할 수 있습니다 (`.cursor/hooks.json`).
-
-### 터미널
+### 개발
 
 ```powershell
 .\.venv\Scripts\activate
 pip install -r requirements.txt
-.\scripts\run_web.ps1
+$env:PYTHONPATH = (Get-Location)
+python -m uvicorn api.main:app --host 127.0.0.1 --port 8600
 ```
 
-## 화면 (타이틀: 지방보조금 부정수급 위험도 측정)
+UI 소스 수정 후: `scripts\build_web.bat` → `RestartWeb.bat` (또는 창 유지 중이면 재기동).
+
+별도 터미널: `cd web && npm run dev` (프록시 없이 API 직접 호출 시 CORS 허용됨)
+
+## 화면
 
 | 메뉴 | 기능 |
 |------|------|
-| 대시보드 | Run 카드로 현재 Run 선택 · 모델 평가 + 추론 4×4 |
-| 데이터 등록 | 학습 raw + 추론 raw, 추가확인·선택삭제·초기화 |
-| ▼ 모델 학습 및 평가 | 하위: 학습 파이프라인 / 모델 비교·평가 / 타겟 포착 분포 |
-| ▼ 추론 | 하위: 추론 실행 / 결과 확인 (점검 우선순위표) |
-| Run 이력 | 조회 전용 (현재 Run은 대시보드 카드에서 선택) |
-| 내 PC 사양 체크 | psutil 쾌적/보통/부족 |
-| 사용자 가이드 | md + PDF 다운로드 |
-| 설정 | data_root·ops.sqlite 경로 |
+| 대시보드 | Run 카드 · 모델 순위 · Test 4×4 · 추론 4×4 |
+| Run ID 발급 | 작업자/작업내용/비고 |
+| 데이터 등록 | train/inference raw 업로드·선택삭제·초기화 |
+| ▼ 모델 학습 및 평가 | 학습 실행 / 모델 비교·평가 / 타겟 포착 분포 |
+| ▼ 추론 | 추론 실행 / 결과 확인 |
+| Run 이력 · PC · 가이드 · 설정 | 조회·사양·문서·data_root |
 
-상단 **전역 배너**에 실행 중 Job·진행률이 표시됩니다.
+상단 **Job 배너**, 헤더 **현재 Run** 선택.
 
-## 타겟 포착 · 점검 우선순위 규칙 (요약)
+## API 문서
 
-- 주/보 각각 상위 1%·5%·10% 구간 → 주A~주D / 보A~보D  
-- 우선순위 1~16: **주등급 우선**, 보조는 같은 주등급 안에서만 순서  
-- **타겟 포착 분포**(Test): 전체 4×4 + 실제 타겟 분포 / **점검 우선순위표**(추론): 전체 4×4만  
-- 상세: `docs/operations_criteria.md` §5
+서버 기동 후 `http://127.0.0.1:8600/api/docs`
 
 ## Agent
 
-Cursor Agent는 웹 앱을 통해 raw/DB 행을 읽거나 학습을 대행하지 않습니다.
+Cursor Agent는 raw/DB 행을 읽거나 학습 스크립트를 실행하지 않습니다.

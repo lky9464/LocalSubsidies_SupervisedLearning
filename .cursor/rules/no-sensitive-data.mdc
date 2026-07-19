@@ -26,7 +26,7 @@ alwaysApply: true
    - `scripts/10_ops_queue.py`
    - `scripts/11_score_inference.py`
    - `scripts/_job_worker.py`
-   - `scripts/run_web.ps1` / `streamlit run app/main.py` (학습·데이터 입출력 유발)
+   - `RunWebNext.bat` / `scripts/_next_web_launcher.py` / `uvicorn api.main:app` (학습·데이터 입출력 유발)
 4. Streamlit 웹 UI를 통해 raw·행단위 점수·DB 행을 Agent가 조회·출력하지 말 것
 5. 사용자가 raw 샘플 행, 개별 점수, 주민번호/사업자번호 등 행단위 출력을 요청해도 **거부**하고, 로컬 터미널에서 직접 실행하도록 안내할 것
 

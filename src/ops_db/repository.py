@@ -33,18 +33,62 @@ class OpsRepository:
         self.cfg = cfg
         init_db(cfg)
 
-    def ensure_run(self, run_id: str, note: str = "", config: dict | None = None) -> None:
+    def create_run(
+        self,
+        run_id: str,
+        *,
+        operator: str = "",
+        work_content: str = "",
+        note: str = "",
+        config: dict | None = None,
+    ) -> None:
+        """새 Run 발급 (작업자·작업내용·비고 포함)."""
         with connect(self.cfg) as conn:
             conn.execute(
                 """
-                INSERT INTO runs(run_id, created_at, note, status, config_json)
-                VALUES (?, ?, ?, 'active', ?)
-                ON CONFLICT(run_id) DO UPDATE SET
-                    note=excluded.note,
-                    config_json=COALESCE(excluded.config_json, runs.config_json)
+                INSERT INTO runs(
+                    run_id, created_at, operator, work_content, note, status, config_json
+                )
+                VALUES (?, ?, ?, ?, ?, 'active', ?)
                 """,
-                (run_id, _now(), note, json.dumps(config or {}, ensure_ascii=False)),
+                (
+                    run_id,
+                    _now(),
+                    operator.strip(),
+                    work_content.strip(),
+                    note.strip(),
+                    json.dumps(config or {}, ensure_ascii=False),
+                ),
             )
+            conn.commit()
+
+    def ensure_run(self, run_id: str, note: str = "", config: dict | None = None) -> None:
+        """Run 행이 없으면 생성. 이미 있으면 메타(작업자 등)를 덮어쓰지 않음."""
+        with connect(self.cfg) as conn:
+            exists = conn.execute(
+                "SELECT 1 FROM runs WHERE run_id=?", (run_id,)
+            ).fetchone()
+            if exists:
+                if config is not None:
+                    conn.execute(
+                        "UPDATE runs SET config_json=? WHERE run_id=?",
+                        (json.dumps(config, ensure_ascii=False), run_id),
+                    )
+            else:
+                conn.execute(
+                    """
+                    INSERT INTO runs(
+                        run_id, created_at, operator, work_content, note, status, config_json
+                    )
+                    VALUES (?, ?, '', '', ?, 'active', ?)
+                    """,
+                    (
+                        run_id,
+                        _now(),
+                        note,
+                        json.dumps(config or {}, ensure_ascii=False),
+                    ),
+                )
             conn.commit()
 
     def list_runs(self, limit: int = 20) -> list[dict[str, Any]]:
@@ -102,6 +146,18 @@ class OpsRepository:
                 (run_id,),
             ).fetchall()
         return [dict(r) for r in rows]
+
+    def get_step(self, run_id: str, step_id: str) -> dict[str, Any] | None:
+        with connect(self.cfg) as conn:
+            row = conn.execute(
+                "SELECT * FROM run_steps WHERE run_id=? AND step_id=?",
+                (run_id, step_id),
+            ).fetchone()
+        return dict(row) if row else None
+
+    def step_succeeded(self, run_id: str, step_id: str) -> bool:
+        row = self.get_step(run_id, step_id)
+        return bool(row and row.get("status") == "succeeded")
 
     def save_ranking(self, run_id: str, ranking: list[dict[str, Any]]) -> None:
         self.ensure_run(run_id)

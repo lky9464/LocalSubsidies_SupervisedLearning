@@ -4,7 +4,7 @@
 #   powershell -ExecutionPolicy Bypass -File .\scripts\build_offline_wheels.ps1
 #
 # 이후 (선택):
-#   gh release upload v0.2.0 .\dist\wheels-win-amd64-py312.zip --clobber
+#   gh release upload v0.3.0 .\dist\wheels-win-amd64-py312.zip --clobber
 
 $ErrorActionPreference = "Stop"
 
@@ -79,5 +79,5 @@ Write-Host "  Wheels folder : $wheelDir"
 Write-Host "  Zip for Release: $zipPath ($sizeMb MB)"
 Write-Host ""
 Write-Host "Upload example:"
-Write-Host "  gh release upload v0.2.0 `"$zipPath`" --clobber"
+Write-Host "  gh release upload v0.3.0 `"$zipPath`" --clobber"
 Write-Host "Docs: docs\offline_setup.md"

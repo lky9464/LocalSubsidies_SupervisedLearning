@@ -10,6 +10,8 @@ SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS runs (
     run_id TEXT PRIMARY KEY,
     created_at TEXT NOT NULL,
+    operator TEXT,
+    work_content TEXT,
     note TEXT,
     status TEXT NOT NULL DEFAULT 'active',
     config_json TEXT
@@ -145,3 +147,11 @@ def _migrate(conn: sqlite3.Connection) -> None:
     }
     if ops_cols and "priority" not in ops_cols:
         conn.execute("ALTER TABLE ops_queue_rows ADD COLUMN priority INTEGER")
+
+    run_cols = {
+        r[1] for r in conn.execute("PRAGMA table_info(runs)").fetchall()
+    }
+    if run_cols and "operator" not in run_cols:
+        conn.execute("ALTER TABLE runs ADD COLUMN operator TEXT")
+    if run_cols and "work_content" not in run_cols:
+        conn.execute("ALTER TABLE runs ADD COLUMN work_content TEXT")

@@ -1,0 +1,237 @@
+"""Metrics / ranking table logic (ported from app.ui.metrics_table)."""
+
+from __future__ import annotations
+
+import json
+from typing import Any
+
+import pandas as pd
+
+from api.constants import ALGO_LABELS, COMPARE_COLUMNS
+from src.io.config import resolve_data_path
+
+
+def load_eval_maps(cfg: dict[str, Any]) -> tuple[dict, dict]:
+    summary_path = resolve_data_path(cfg, "algorithms") / "eval_summary.json"
+    if not summary_path.exists():
+        return {}, {}
+    try:
+        with open(summary_path, encoding="utf-8") as f:
+            summary = json.load(f)
+        return summary.get("lift") or {}, summary.get("metrics") or {}
+    except OSError:
+        return {}, {}
+
+
+def _lift_get(lf: dict, *keys: str) -> Any:
+    for k in keys:
+        if k in lf and lf[k] is not None:
+            return lf[k]
+    return None
+
+
+def _topk_recall(lf: dict, pct: int) -> Any:
+    direct = _lift_get(
+        lf,
+        f"상위{pct}%양성포착비율(top_{pct}pct_recall)",
+        f"top_{pct}pct_recall",
+    )
+    if direct is not None:
+        return direct
+    rate = _lift_get(
+        lf,
+        f"상위{pct}%양성비율(top_{pct}pct_positive_rate)",
+        f"top_{pct}pct_positive_rate",
+    )
+    base = _lift_get(lf, "전체양성비율(base_positive_rate)", "base_positive_rate")
+    k = _lift_get(lf, f"상위{pct}%건수(top_{pct}pct_count)", f"top_{pct}pct_count")
+    if rate is not None and base is not None and k is not None:
+        try:
+            rate_f, base_f, k_f = float(rate), float(base), float(k)
+            if base_f > 0 and k_f > 0:
+                n_est = k_f / (float(pct) / 100.0)
+                return (rate_f * k_f) / (base_f * n_est)
+        except (TypeError, ValueError):
+            pass
+    lift = _lift_get(lf, f"상위{pct}%리프트(top_{pct}pct_lift)", f"top_{pct}pct_lift")
+    if lift is not None:
+        try:
+            return float(lift) * (float(pct) / 100.0)
+        except (TypeError, ValueError):
+            pass
+    return None
+
+
+def _coalesce(*vals: Any) -> Any:
+    for v in vals:
+        if v is not None:
+            return v
+    return None
+
+
+def _row_from_parts(
+    rank: Any,
+    algo: str,
+    role: Any,
+    ranking_row: dict,
+    m: dict,
+    lf: dict,
+) -> dict:
+    return {
+        "순위": rank,
+        "알고리즘": ALGO_LABELS.get(algo, algo),
+        "algo_key": algo,
+        "역할": role,
+        "PR-AUC": _coalesce(
+            ranking_row.get("pr_auc"), m.get("PR_AUC(AveragePrecision)")
+        ),
+        "ROC-AUC": _coalesce(ranking_row.get("roc_auc"), m.get("ROC_AUC(ROC_AUC)")),
+        "F1": _coalesce(ranking_row.get("f1"), m.get("F1점수(F1)")),
+        "상위1%리프트": _coalesce(
+            _lift_get(lf, "상위1%리프트(top_1pct_lift)", "top_1pct_lift"),
+            ranking_row.get("top1_lift"),
+        ),
+        "상위1%양성비중": _coalesce(
+            _lift_get(
+                lf, "상위1%양성비율(top_1pct_positive_rate)", "top_1pct_positive_rate"
+            ),
+            ranking_row.get("top1_precision"),
+        ),
+        "상위1%양성포착": _coalesce(
+            _topk_recall(lf, 1), ranking_row.get("top1_recall")
+        ),
+        "상위5%리프트": _coalesce(
+            _lift_get(lf, "상위5%리프트(top_5pct_lift)", "top_5pct_lift"),
+            ranking_row.get("top5_lift"),
+        ),
+        "상위5%양성비중": _coalesce(
+            _lift_get(
+                lf, "상위5%양성비율(top_5pct_positive_rate)", "top_5pct_positive_rate"
+            ),
+            ranking_row.get("top5_precision"),
+        ),
+        "상위5%양성포착": _coalesce(
+            _topk_recall(lf, 5), ranking_row.get("top5_recall")
+        ),
+    }
+
+
+def build_compare_frame(
+    cfg: dict[str, Any],
+    ranking: list[dict],
+    *,
+    allow_global_fallback: bool = True,
+) -> pd.DataFrame:
+    lift_map, metrics_map = load_eval_maps(cfg)
+    rows: list[dict] = []
+
+    if ranking:
+        for r in ranking:
+            algo = r["algo"]
+            lf = lift_map.get(algo) or {}
+            m = metrics_map.get(algo) or {}
+            rows.append(_row_from_parts(r.get("rank"), algo, r.get("role"), r, m, lf))
+    elif allow_global_fallback and metrics_map:
+        for i, algo in enumerate(metrics_map.keys(), start=1):
+            lf = lift_map.get(algo) or {}
+            m = metrics_map.get(algo) or {}
+            rows.append(_row_from_parts(i, algo, None, {}, m, lf))
+
+    df = pd.DataFrame(rows)
+    if df.empty:
+        return df
+    for c in COMPARE_COLUMNS:
+        if c not in df.columns:
+            df[c] = None
+    df = df[COMPARE_COLUMNS + (["algo_key"] if "algo_key" in df.columns else [])]
+    if "순위" in df.columns:
+        df = df.sort_values("순위", ascending=True, na_position="last")
+    return df.reset_index(drop=True)
+
+
+def sort_ops_summary_priority(summary: pd.DataFrame) -> pd.DataFrame:
+    if summary.empty:
+        return summary
+    out = summary.copy()
+    if "priority" in out.columns:
+        out = out.sort_values(
+            ["priority"]
+            + [c for c in ("primary_band", "aux_band") if c in out.columns],
+            kind="mergesort",
+        )
+        return out.reset_index(drop=True)
+    if "grade" in out.columns:
+        order = {"S": 0, "A": 1, "B": 2, "C": 3}
+        out["_ord"] = out["grade"].map(lambda g: order.get(str(g), 99))
+        out = out.sort_values("_ord").drop(columns=["_ord"])
+        return out.reset_index(drop=True)
+    return out
+
+
+def format_ops_summary(summary: pd.DataFrame) -> pd.DataFrame:
+    if summary.empty:
+        return summary
+    rename = {
+        "primary_band": "주등급",
+        "aux_band": "보등급",
+        "cell": "조합",
+        "priority": "우선순위",
+        "cnt": "건수",
+        "grade": "주등급",
+        "cross_check": "조합",
+    }
+    return summary.rename(columns={k: v for k, v in rename.items() if k in summary.columns})
+
+
+def radar_chart_data(compare_df: pd.DataFrame, metrics: list[str] | None = None) -> dict:
+    """Min-max normalized radar series for Recharts."""
+    if compare_df.empty:
+        return {"metrics": [], "series": []}
+
+    numeric_cols = [
+        "PR-AUC",
+        "ROC-AUC",
+        "F1",
+        "상위1%리프트",
+        "상위1%양성비중",
+        "상위1%양성포착",
+        "상위5%리프트",
+        "상위5%양성비중",
+        "상위5%양성포착",
+    ]
+    available = [c for c in numeric_cols if c in compare_df.columns]
+    selected = metrics or ["PR-AUC", "상위1%리프트", "상위1%양성포착", "F1"]
+    selected = [m for m in selected if m in available]
+    if len(selected) < 3:
+        return {"metrics": selected, "series": []}
+
+    mins = {m: float("inf") for m in selected}
+    maxs = {m: float("-inf") for m in selected}
+    for _, row in compare_df.iterrows():
+        for m in selected:
+            v = row.get(m)
+            try:
+                fv = float(v)
+            except (TypeError, ValueError):
+                continue
+            mins[m] = min(mins[m], fv)
+            maxs[m] = max(maxs[m], fv)
+
+    series = []
+    for _, row in compare_df.iterrows():
+        name = str(row.get("알고리즘", ""))
+        values: dict[str, float | None] = {}
+        for m in selected:
+            try:
+                fv = float(row.get(m))
+            except (TypeError, ValueError):
+                values[m] = None
+                continue
+            lo, hi = mins[m], maxs[m]
+            if hi > lo:
+                values[m] = (fv - lo) / (hi - lo)
+            else:
+                values[m] = 0.5
+        series.append({"name": name, "values": values})
+
+    return {"metrics": selected, "series": series}

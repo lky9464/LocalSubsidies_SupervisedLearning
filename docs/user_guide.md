@@ -5,8 +5,9 @@
 ## 1. 시작하기
 
 1. `configs/local.yaml` 에 `data_root` 경로를 설정합니다.
-2. `RunWeb.bat` 을 더블클릭합니다 (콘솔 창을 닫지 마세요).
-3. 브라우저에서 `http://127.0.0.1:8501` 을 엽니다.
+2. (최초) `web/out` 이 없으면 `scripts/build_web.bat` 또는 Release의 `web-out.zip`을 준비합니다.
+3. `RunWebNext.bat` 을 더블클릭합니다 (콘솔 창을 닫지 마세요).
+4. 브라우저에서 `http://127.0.0.1:8600` 을 엽니다.
 
 ## 2. 메뉴 구성
 
@@ -59,4 +60,4 @@
 
 - 브라우저 주소는 반드시 `127.0.0.1` 이어야 합니다.
 - raw·점수 CSV·모델 파일은 GitHub에 올리지 마세요.
-- 코드 수정 후에는 RunWeb.bat 을 재시작하세요.
+- 코드·UI 수정 후에는 `scripts/build_web.bat`(필요 시) 후 `RestartWeb.bat` / `RunWebNext.bat` 을 재시작하세요.

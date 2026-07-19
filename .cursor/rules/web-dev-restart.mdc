@@ -1,14 +1,20 @@
 ---
-description: Web UI 개발 시 RunWeb 재시작 규칙
-globs: app/**,RunWeb.bat,RestartWeb.bat,scripts/run_web.ps1,scripts/_web_launcher.py,.streamlit/**
+description: Web UI 개발 시 RunWebNext 재시작 규칙
+globs: api/**,web/**,RunWebNext.bat,RestartWeb.bat,scripts/_next_web_launcher.py,scripts/_restart_web_guard.ps1
 alwaysApply: false
 ---
 
-# Web UI 개발 재시작
+# Web UI 재시작 (RunWebNext)
 
-`app/`, `.streamlit/`, 웹 실행 스크립트를 수정한 뒤 UI 확인이 필요하면:
+`api/`, `web/`, 웹 실행 스크립트를 수정한 뒤 UI 확인이 필요하면:
 
-1. **`RestartWeb.bat`** 실행 (기존 Streamlit 종료 후 재기동)
-2. `RunWeb.bat`만 실행하지 말 것 — 이미 떠 있으면 **구버전 코드**가 그대로 보일 수 있음
+1. **기본: stop hook 에만 맡긴다.** Agent가 `RestartWeb.bat`을 직접 호출하지 말 것.
+2. `afterFileEdit` → `.cursor/web_restart_pending` → Agent `stop` 시 `RestartWeb.bat` 1회.
+3. 즉시 확인이 필요할 때만 `RestartWeb.bat` 1회. (pending 삭제 + 25초 CreateNew 잠금으로 이중 기동 차단)
+4. `RunWebNext.bat`만 단독 실행하지 말 것. `RestartWeb`을 연속/중복 Start-Process 하지 말 것.
 
-Cursor hook(`.cursor/hooks.json`)이 Agent 작업 종료 시 자동으로 `RestartWeb.bat`을 호출할 수 있습니다.
+동작 요약:
+- 기존 `RunWebNext.bat` cmd 창·uvicorn(8600) 종료 → 새 콘솔 1개 · 브라우저 탭 1회(20초 디바운스)
+- Cursor: `afterFileEdit` 경로 매칭 / `stop` + `RestartWeb` CreateNew 잠금
+
+정적 UI(`web/`) 변경 시: `scripts/build_web.bat` 후 재시작. 브라우저 **Ctrl+F5** 권장.

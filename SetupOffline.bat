@@ -89,7 +89,7 @@ if errorlevel 1 (
   exit /b 1
 )
 
-"%VPY%" -c "import streamlit, pandas, sklearn, catboost; print('OK: streamlit', streamlit.__version__)"
+"%VPY%" -c "import fastapi, uvicorn, pandas, sklearn, catboost; print('OK: fastapi', fastapi.__version__)"
 if errorlevel 1 (
   echo [ERROR] import 검증 실패.
   pause
@@ -116,7 +116,7 @@ echo  다음 단계:
 echo    1^) notepad configs\local.yaml  — data_root 수정
 echo    2^) InitDataRoot.bat            — 데이터 폴더 골격 생성 ^(선택^)
 echo    3^) raw / raw_inference 에 CSV 배치
-echo    4^) RunWeb.bat                  — 웹 UI 실행
+echo    4^) RunWebNext.bat                  — 웹 UI 실행 (FastAPI :8600)
 echo.
 echo  상세: docs\offline_setup.md
 echo.

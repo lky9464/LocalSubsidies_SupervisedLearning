@@ -1,4 +1,4 @@
-"""
+﻿"""
 docs/project_introduction.pptx 생성 — 도식·흐름도 포함 소개 슬라이드.
 
 사용: python scripts/generate_introduction_pptx.py
@@ -313,7 +313,7 @@ def build_pptx(out_path: Path | None = None) -> Path:
          "  app/        ← 웹 화면\n"
          "  scripts/    ← 파이프라인\n"
          "  configs/    ← 설정\n"
-         "  RunWeb.bat  ← 실행\n\n"
+         "  RunWebNext.bat  ← 실행\n\n"
          "✓ GitHub 가능 (코드만)",
          fill=C_LIGHT, size=11, align=PP_ALIGN.LEFT, line=C_OK)
     _box(sl, Inches(6.5), Inches(1.4), Inches(6.0), Inches(5.2),
@@ -388,7 +388,7 @@ def build_pptx(out_path: Path | None = None) -> Path:
             "venv + pip install",
             "local.yaml (data_root)",
             "raw/ · raw_inference/ 생성",
-            "RunWeb.bat 실행",
+            "RunWebNext.bat 실행",
         ],
         x=Inches(4.2),
         y=Inches(1.4),
@@ -403,8 +403,8 @@ def build_pptx(out_path: Path | None = None) -> Path:
         sl,
         [
             "① data_root 확인",
-            "② RunWeb.bat 더블클릭",
-            "③ http://127.0.0.1:8501",
+            "② RunWebNext.bat 더블클릭",
+            "③ http://127.0.0.1:8600",
             "④ 상단 Job 배너로 진행 확인",
         ],
         x=Inches(3.8),
@@ -413,10 +413,10 @@ def build_pptx(out_path: Path | None = None) -> Path:
         h=Inches(0.7),
     )
     _box(sl, Inches(0.5), Inches(5.5), Inches(5.5), Inches(1.3),
-         "종료: RunWeb.bat\n콘솔 창 닫기\n→ 서버·Job 함께 종료",
+         "종료: RunWebNext.bat\n콘솔 창 닫기\n→ 서버·Job 함께 종료",
          fill=(0xFF, 0xEB, 0xEE), size=12, align=PP_ALIGN.LEFT)
     _box(sl, Inches(6.3), Inches(5.5), Inches(6.0), Inches(1.3),
-         "주의: 코드 수정 후\nRunWeb.bat 재시작\n브라우저만 새로고침 X",
+         "주의: 코드 수정 후\nRunWebNext.bat 재시작\n브라우저만 새로고침 X",
          fill=(0xFF, 0xF8, 0xE1), size=12, align=PP_ALIGN.LEFT)
 
     # ════════════════════════════════════════════════════════
@@ -425,7 +425,7 @@ def build_pptx(out_path: Path | None = None) -> Path:
     sl = _section("4. 전반 업무 순서 — 큰 그림")
     _flow_vertical(
         sl,
-        ["PC 사양 확인 · raw 배치 · RunWeb.bat"],
+        ["PC 사양 확인 · raw 배치 · RunWebNext.bat"],
         x=Inches(4.0), y=Inches(1.2), w=Inches(5.0), h=Inches(0.55),
     )
     _box(sl, Inches(2.5), Inches(2.5), Inches(8.0), Inches(1.1),
@@ -568,7 +568,7 @@ def build_pptx(out_path: Path | None = None) -> Path:
     _box(sl, Inches(5.3), Inches(2.7), Inches(7.2), Inches(4.1),
          "백그라운드 Job: 학습·추론 실행 중\n"
          "다른 메뉴로 이동해도 계속 진행\n"
-         "RunWeb.bat 창은 반드시 유지",
+         "RunWebNext.bat 창은 반드시 유지",
          fill=(0xE3, 0xF2, 0xFD), size=12, align=PP_ALIGN.LEFT)
 
     # ════════════════════════════════════════════════════════
@@ -681,7 +681,7 @@ def build_pptx(out_path: Path | None = None) -> Path:
         "지방보조금 부정수급 위험도 측정 시스템\n\n"
         "· 로컬 PC 전용 (127.0.0.1)\n"
         "· 상세: docs/operations_criteria.md\n"
-        "· 웹: RunWeb.bat → 사용자 가이드",
+        "· 웹: RunWebNext.bat → 사용자 가이드",
         fill=C_LIGHT, size=16, align=PP_ALIGN.CENTER,
     )
 

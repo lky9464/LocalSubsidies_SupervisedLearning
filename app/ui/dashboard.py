@@ -1,4 +1,4 @@
-"""대시보드 — 모델 평가 / 추론 섹션."""
+"""대시보드 — Run 선택 카드 · 모델 평가 / 추론 섹션."""
 
 from __future__ import annotations
 
@@ -16,7 +16,6 @@ from src.scoring.ops_queue import summarize_matrix
 def render() -> None:
     cfg = get_cfg()
     repo = OpsRepository(cfg)
-    run_id = st.session_state.run_id
 
     st.markdown(
         '<p class="lsl-brand">지방보조금 부정수급 위험도 측정</p>',
@@ -25,20 +24,22 @@ def render() -> None:
     st.title("대시보드")
     st.caption("로컬 전용 · 127.0.0.1 · raw는 DB에 저장하지 않습니다.")
 
-    c1, c2, c3 = st.columns(3)
-    c1.metric("현재 Run", run_id)
+    _render_run_cards(repo)
+    run_id = st.session_state.run_id
+
     job = JobManager(cfg).get_active_job()
+    j1, j2 = st.columns(2)
     if job and job.get("status") == "running":
-        c2.metric("Job", "실행 중")
-        c3.metric("진행", f"{int(float(job.get('progress') or 0) * 100)}%")
+        j1.metric("Job", "실행 중")
+        j2.metric("진행", f"{int(float(job.get('progress') or 0) * 100)}%")
     else:
-        c2.metric("Job", job.get("status") if job else "대기")
-        c3.metric("최근 runs", str(len(repo.list_runs(5))))
+        j1.metric("Job", job.get("status") if job else "대기")
+        j2.metric("최근 runs", str(len(repo.list_runs(5))))
 
     # ── 모델 평가 ──────────────────────────────────────────
     st.markdown("---")
     st.header("모델 평가")
-    st.caption("학습·평가 파이프라인 결과 (Test).")
+    st.caption(f"학습·평가 파이프라인 결과 (Test) · Run `{run_id}` 기준.")
 
     ranking = repo.get_ranking(run_id)
     st.subheader("모델 순위")
@@ -63,7 +64,7 @@ def render() -> None:
     st.markdown("---")
     st.header("추론")
     st.caption(
-        "라벨 미지 데이터 점검 우선순위 (주·보 4×4). "
+        f"라벨 미지 데이터 점검 우선순위 (주·보 4×4) · Run `{run_id}` 기준. "
         "상세·Excel은 「추론」→「결과 확인」."
     )
 
@@ -87,3 +88,52 @@ def render() -> None:
 
     st.metric("추론 건수", f"{len(queue):,}")
     render_inference_matrix(summarize_matrix(queue))
+
+
+def _render_run_cards(repo: OpsRepository) -> None:
+    """클릭으로 현재 Run 선택."""
+    st.subheader("현재 Run 선택")
+    runs = repo.list_runs(12)
+    if not runs:
+        st.info("Run 기록이 없습니다. 학습 파이프라인에서 새 Run을 시작하세요.")
+        return
+
+    current = st.session_state.run_id
+    ids = {r["run_id"] for r in runs}
+    if current not in ids:
+        # 목록에 없으면 최신으로 맞춤
+        st.session_state.run_id = runs[0]["run_id"]
+        current = st.session_state.run_id
+
+    st.markdown(
+        f'<div class="lsl-run-hint">'
+        f"<strong>선택됨:</strong> <code>{current}</code> — "
+        f"아래 모델 평가·추론 및 다른 메뉴의 결과가 이 Run 기준으로 표시됩니다."
+        f"</div>",
+        unsafe_allow_html=True,
+    )
+
+    # 카드 그리드 (최대 4열)
+    cols_per_row = 4
+    for i in range(0, len(runs), cols_per_row):
+        chunk = runs[i : i + cols_per_row]
+        cols = st.columns(cols_per_row)
+        for col, run in zip(cols, chunk):
+            rid = run["run_id"]
+            created = (run.get("created_at") or "")[:16].replace("T", " ")
+            note = (run.get("note") or "").strip()
+            active = rid == current
+            label = f"{'● ' if active else ''}{rid}"
+            with col:
+                typ = "primary" if active else "secondary"
+                if st.button(
+                    label,
+                    key=f"dash_run_{rid}",
+                    use_container_width=True,
+                    type=typ,
+                    help=f"생성: {created}" + (f" · {note}" if note else ""),
+                ):
+                    if rid != st.session_state.run_id:
+                        st.session_state.run_id = rid
+                        st.rerun()
+                st.caption(created or "—")

@@ -160,8 +160,9 @@ python scripts/07_evaluate.py           # 평가·점수 (명칭/금액/TOP10피
 python scripts/08_update_ranking.py     # 모델 순위 (eval 기반)
 python scripts/09_report.py             # 집계 리포트
 python scripts/10_ops_queue.py          # 타겟 포착 분포 Test (주/보 A~D · 4×4)
-# 운영 추론 (라벨 미지 데이터, 예: 2026)
+# 운영 추론 (라벨 미지 데이터, 예: 2026) — 주·보 모델 각각 (configs/default.yaml ops_queue 참고)
 python scripts/11_score_inference.py --algo random_forest
+python scripts/11_score_inference.py --algo catboost
 ```
 
 > 의심 피처가 있으면 Feature 제외 후 `03`부터 다시 실행하고, `04` PASS 후 `05`로 진행합니다.  
@@ -220,7 +221,7 @@ python scripts/05_train_random_forest.py
 | [`docs/web_local.md`](docs/web_local.md) | Streamlit 실행·보안 원칙 |
 | [`docs/project_introduction.md`](docs/project_introduction.md) | 프로젝트 소개 (PDF/PPT 동봉) |
 | [`docs/pipeline.md`](docs/pipeline.md) | 스크립트 순서, 점수 파일명·컬럼, GitHub 허용/금지 |
-| [`docs/operations_criteria.md`](docs/operations_criteria.md) | 모델 순위·타겟 포착·점검 우선순위 (4×4) |
+| [`docs/operations_criteria.md`](docs/operations_criteria.md) | 주·보 선정 원칙·4×4·평가 스냅샷 |
 | [`docs/metrics_guide.md`](docs/metrics_guide.md) | 평가 지표 해설 |
 | [`docs/offline_setup.md`](docs/offline_setup.md) | **오프라인 사용법** (GitHub 다운로드 → 설치 → 실행) |
 | [`docs/AGENT_BOUNDARY.md`](docs/AGENT_BOUNDARY.md) | Cursor Agent / 민감데이터 격리 |
@@ -229,8 +230,11 @@ python scripts/05_train_random_forest.py
 
 ## 참고. 사용 알고리즘 5종 설명
 
-아래는 비전문가도 흐름을 잡을 수 있도록 **직관 설명 + 도식**으로 정리한 것입니다.  
-(운영 순위·수치 비교는 [`docs/operations_criteria.md`](docs/operations_criteria.md) 참고)
+아래는 비전문가도 흐름을 잡을 수 있도록 **직관 설명 + 도식**으로 정리한 것입니다.
+
+**주·보 모델:** 5종을 학습·비교한 뒤 **평가(07)·순위(08)** 와 `configs/default.yaml`의 `ops_queue.primary_algo` / `aux_algo`로 정합니다.  
+데이터·타겟 정의·재학습에 따라 **주·보에 쓰는 알고리즘은 바뀔 수 있습니다** (고정 아님).  
+현재 평가 스냅샷·선정 기준: [`docs/operations_criteria.md`](docs/operations_criteria.md)
 
 ```mermaid
 flowchart LR
@@ -249,7 +253,7 @@ flowchart LR
 **한 줄:** 서로 다른 “작은 결정나무”를 많이 키운 뒤, **다수결(또는 평균)** 로 최종 판단을 냅니다.
 
 - 나무가 하나만 있으면 편향·과적합에 약할 수 있지만, 여러 나무를 **투표**하면 흔들림이 줄어듭니다.
-- 본 프로젝트에서는 **주 운영 모델**로 사용합니다.
+- 불균형·범주형이 많은 업무 데이터에서 **안정적인 baseline**으로 자주 1~2위에 오며, 주·보 후보로 자주 쓰입니다.
 
 ```mermaid
 flowchart TB
@@ -269,7 +273,7 @@ flowchart TB
 **한 줄:** 틀린 부분을 다음 단계에서 **순서대로 보정해 가는** 부스팅 계열 모델입니다. 범주형(코드·구분값) 처리에 강점이 있습니다.
 
 - “한 번에 완벽”이 아니라, **약한 학습기를 쌓아 오차를 줄여** 갑니다.
-- 본 프로젝트에서는 **보조·교차확인 모델**로 사용합니다.
+- 범주형(코드·구분값) 처리에 강해 **주·보 중 하나 또는 교차 확인용** 후보로 자주 쓰입니다.
 
 ```mermaid
 flowchart LR
@@ -285,7 +289,7 @@ flowchart LR
 
 - 1층: 여러 기본 모델이 각자 점수/확률을 냄  
 - 2층: 그 결과들을 입력으로 받아 최종 판단을 냄  
-- 본 프로젝트에서는 **참고·예비 모델**로 둡니다 (단독 운영보다 비교용에 가깝습니다).
+- **참고·비교용**으로 학습하며, 평가 순위에 따라 주·보 후보가 될 수 있습니다.
 
 ```mermaid
 flowchart TB
@@ -306,7 +310,7 @@ flowchart TB
 **한 줄:** 위험(양성) 건이 **매우 적을 때**, 정상 건을 여러 묶음으로 나눠 **균형 잡힌 작은 문제**를 여러 번 풀고 합칩니다.
 
 - 부정수급처럼 “드문 사건”에서, 한쪽만 많은 데이터 편향을 완화하려는 접근입니다.
-- 본 평가에서는 성능이 상대적으로 낮아 **운영 후보에서는 제외**했습니다 (비교용으로 학습·리포트는 유지).
+- 일부 평가에서는 성능이 상대적으로 낮을 수 있어 **비교·리포트용**으로 두고, 순위는 08·07 결과를 따릅니다.
 
 ```mermaid
 flowchart LR
@@ -327,7 +331,7 @@ flowchart LR
 **한 줄:** CatBoost와 같은 **“틀린 곳을 단계적으로 고치는”** 계열이지만, 구현·하이퍼파라미터 체계가 다른 고전적 부스팅입니다.
 
 - 잔차(남은 오차)를 다음 트리가 학습하는 방식으로 성능을 올립니다.
-- 본 프로젝트에서는 5종 비교에 포함하되, 운영 우선순위는 RF·CatBoost·Stacked 뒤입니다.
+- 5종 비교에 포함하며, **평가 순위**에 따라 주·보·참고 역할이 정해집니다.
 
 ```mermaid
 flowchart TB

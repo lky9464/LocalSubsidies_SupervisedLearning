@@ -5,7 +5,13 @@ from __future__ import annotations
 import pandas as pd
 import streamlit as st
 
-from app.ui.common import ALGO_LABELS, get_cfg, start_job
+from app.ui.common import (
+    ALGO_LABELS,
+    get_cfg,
+    preview_limit_select,
+    render_preview_dataframe,
+    start_job,
+)
 from app.ui.inference_helpers import (
     available_inference_algos,
     export_inference_ops_queue,
@@ -189,21 +195,20 @@ def _render_grade_view(
         format_func=lambda g: g if g else "(전체)",
         key="infer_grade_filter",
     )
-    limit = st.slider("미리보기 행 수 (로컬만)", 0, 200, 30, 10, key="infer_preview_limit")
+    limit = preview_limit_select(key="infer_preview_limit", default=30)
 
-    if limit > 0:
-        filtered = queue if not grade else queue[queue[GRADE_COL] == grade]
-        preview = filtered.head(limit).copy()
-        st.caption(
-            f"미리보기 {len(preview):,}행 / 필터 후 {len(filtered):,}행 · "
-            "전체는 「Excel 생성」 또는 로컬 CSV를 여세요."
-            + (
-                f" · 열: {PRIORITY_COL}, {CELL_COL}"
-                if PRIORITY_COL in preview.columns
-                else ""
-            )
+    filtered = queue if not grade else queue[queue[GRADE_COL] == grade]
+    preview = filtered.head(limit).copy()
+    st.caption(
+        f"미리보기 {len(preview):,}행 / 필터 후 {len(filtered):,}행 · "
+        "전체는 「Excel 생성」 또는 로컬 CSV를 여세요."
+        + (
+            f" · 열: {PRIORITY_COL}, {CELL_COL}"
+            if PRIORITY_COL in preview.columns
+            else ""
         )
-        st.dataframe(preview, use_container_width=True, hide_index=True)
+    )
+    render_preview_dataframe(preview)
 
 
 def _render_algo_view(cfg: dict, available: list[str], encoding: str) -> None:
@@ -247,15 +252,14 @@ def _render_algo_view(cfg: dict, available: list[str], encoding: str) -> None:
         st.dataframe(ym, use_container_width=True, hide_index=True)
 
     sort_high = st.checkbox("위험도 점수 내림차순", value=True, key="infer_sort_high")
-    limit = st.slider("미리보기 행 수", 0, 200, 30, 10, key="infer_algo_limit")
-    if limit > 0:
-        show = df.copy()
-        if sort_high:
-            show["_sort"] = pd.to_numeric(show[SCORE_COL], errors="coerce")
-            show = show.sort_values("_sort", ascending=False, kind="mergesort").drop(
-                columns=["_sort"]
-            )
-        st.dataframe(show.head(limit), use_container_width=True, hide_index=True)
+    limit = preview_limit_select(key="infer_algo_limit", default=30)
+    show = df.copy()
+    if sort_high:
+        show["_sort"] = pd.to_numeric(show[SCORE_COL], errors="coerce")
+        show = show.sort_values("_sort", ascending=False, kind="mergesort").drop(
+            columns=["_sort"]
+        )
+    render_preview_dataframe(show.head(limit))
 
 
 def render_run() -> None:

@@ -1,4 +1,4 @@
-"""Run 이력."""
+"""Run 이력 — 조회 전용 (현재 Run 선택은 대시보드)."""
 
 from __future__ import annotations
 
@@ -15,6 +15,11 @@ def render() -> None:
     cfg = get_cfg()
     repo = OpsRepository(cfg)
     st.title("Run 이력")
+    st.caption(
+        "조회 전용입니다. 웹 전반에 적용할 현재 Run은 "
+        "「대시보드」의 Run 카드에서 선택하세요."
+    )
+    st.info(f"현재 적용 중 Run: `{st.session_state.run_id}`")
 
     runs = repo.list_runs(50)
     if not runs:
@@ -25,10 +30,12 @@ def render() -> None:
     st.dataframe(df, use_container_width=True, hide_index=True)
 
     ids = [r["run_id"] for r in runs]
-    pick = st.selectbox("Run 상세", ids, index=0)
-    if st.button("이 Run을 현재로 설정"):
-        st.session_state.run_id = pick
-        st.success(f"현재 run = {pick}")
+    # 기본: 현재 run이 목록에 있으면 그것으로, 없으면 최신
+    try:
+        default_i = ids.index(st.session_state.run_id)
+    except ValueError:
+        default_i = 0
+    pick = st.selectbox("상세 조회할 Run", ids, index=default_i)
 
     st.subheader("단계 상태")
     steps = repo.list_steps(pick)

@@ -58,6 +58,9 @@ temp/
 # Streamlit
 .streamlit/secrets.toml
 
+# Cursor dev hook flag
+.cursor/web_restart_pending
+
 
 # 리포트 원본 중 행단위가 섞일 수 있는 경로 (집계 리포트는 커밋 가능)
 outputs/models/

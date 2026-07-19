@@ -54,15 +54,18 @@ def render() -> None:
 
 
 def _charts_by_metric(df: pd.DataFrame) -> None:
-    """지표별로 알고리즘을 나란히 비교."""
+    """선택 지표를 꼭짓점으로 하는 방사형(레이더) 차트 — 알고리즘별 색 구분."""
     try:
-        import plotly.express as px
+        import plotly.graph_objects as go
     except ImportError:
         st.info("plotly 미설치 — `pip install plotly` 후 차트가 표시됩니다.")
         return
 
-    st.subheader("비교 차트")
-    st.caption("같은 지표를 알고리즘 간에 비교합니다.")
+    st.subheader("비교 차트 (방사형)")
+    st.caption(
+        "선택한 지표가 꼭짓점이 됩니다. "
+        "스케일이 다른 지표는 알고리즘 간 상대 비율(0~1)로 정규화해 비교합니다."
+    )
     label_col = "알고리즘"
     metric_cols = [
         c
@@ -87,42 +90,57 @@ def _charts_by_metric(df: pd.DataFrame) -> None:
         metric_cols,
         default=[m for m in metric_cols if m in ("PR-AUC", "상위1%리프트", "상위1%양성포착", "F1")],
     )
-    if not pick:
+    if len(pick) < 3:
+        st.warning("방사형 차트는 지표를 3개 이상 선택하세요.")
         return
 
-    melt = df.melt(
-        id_vars=[label_col],
-        value_vars=pick,
-        var_name="지표",
-        value_name="값",
-    )
-    # 지표별 facet — 각 지표에서 알고리즘 비교
-    fig = px.bar(
-        melt,
-        x=label_col,
-        y="값",
-        color=label_col,
-        facet_col="지표",
-        facet_col_wrap=3,
-        color_discrete_sequence=[
-            "#1b5e4a",
-            "#2e7d63",
-            "#4caf8f",
-            "#81c8b0",
-            "#a8d5c4",
-        ],
-    )
+    # 지표별 min-max 정규화 (알고리즘 간 상대 비교)
+    norm = df[pick].apply(pd.to_numeric, errors="coerce")
+    for col in pick:
+        lo = float(norm[col].min())
+        hi = float(norm[col].max())
+        if hi > lo:
+            norm[col] = (norm[col] - lo) / (hi - lo)
+        else:
+            norm[col] = 1.0
+
+    colors = [
+        "#1565c0",  # blue
+        "#c62828",  # red
+        "#6a1b9a",  # purple
+        "#ef6c00",  # orange
+        "#00838f",  # teal
+        "#2e7d32",  # green
+        "#ad1457",  # pink
+    ]
+    theta = list(pick) + [pick[0]]
+
+    fig = go.Figure()
+    for i, (_, row) in enumerate(df.iterrows()):
+        r_vals = [float(norm.loc[row.name, m]) for m in pick]
+        r_vals.append(r_vals[0])
+        color = colors[i % len(colors)]
+        fig.add_trace(
+            go.Scatterpolar(
+                r=r_vals,
+                theta=theta,
+                name=str(row[label_col]),
+                fill="toself",
+                line=dict(color=color, width=2),
+                fillcolor=color,
+                opacity=0.45,
+            )
+        )
+
     fig.update_layout(
+        polar=dict(
+            radialaxis=dict(visible=True, range=[0, 1], tickfont=dict(size=10)),
+            angularaxis=dict(tickfont=dict(size=11)),
+        ),
+        showlegend=True,
+        legend=dict(orientation="h", yanchor="bottom", y=1.08, x=0),
         paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
-        showlegend=False,
-        margin=dict(l=10, r=10, t=40, b=80),
-        height=280 * ((len(pick) + 2) // 3),
+        margin=dict(l=40, r=40, t=60, b=40),
+        height=520,
     )
-    fig.for_each_annotation(lambda a: a.update(text=a.text.split("=")[-1]))
-    # facet 기본은 맨 아랫줄만 x라벨 — 모든 패널에 알고리즘명 표시
-    fig.for_each_xaxis(
-        lambda ax: ax.update(showticklabels=True, tickangle=-35, title_text="")
-    )
-    fig.update_yaxes(matches=None, showticklabels=True)
     st.plotly_chart(fig, use_container_width=True)

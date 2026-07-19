@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-from app.ui.common import get_cfg, start_job
+from app.ui.common import get_cfg, preview_limit_select, render_preview_dataframe, start_job
 from app.ui.matrix_view import render_test_dual_matrices
 from app.ui.metrics_table import format_ops_summary, sort_ops_summary_priority
 from src.ops_db.repository import OpsRepository
@@ -47,11 +47,11 @@ def render() -> None:
         format_func=lambda g: g if g else "(전체)",
         help="주등급별 의미는 상단 도움말을 참고하세요.",
     )
-    limit = st.slider("미리보기 행 수 (로컬만)", 0, 200, 30, 10)
-    if limit > 0 and meta["total"] > 0:
+    limit = preview_limit_select(key="ops_preview_limit", default=30)
+    if meta["total"] > 0:
         df = repo.query_ops_queue(run_id, grade=grade or None, limit=limit)
-        st.caption("행 미리보기는 제한됩니다. 전체는 로컬 Excel을 여세요.")
-        st.dataframe(df, use_container_width=True, hide_index=True)
+        st.caption("미리보기만 표시합니다. 전체는 로컬 Excel을 여세요.")
+        render_preview_dataframe(df)
 
     if st.button("10 타겟 포착 분포 재실행", type="primary"):
         start_job(run_id, ["ops_queue"])

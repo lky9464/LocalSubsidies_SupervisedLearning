@@ -22,8 +22,34 @@ ALGO_LABELS = {
     "random_forest": "RandomForest",
 }
 
+PREVIEW_OPTIONS = (10, 30, 50, 100)
+PREVIEW_TABLE_HEIGHT = 360
+
 # Job 배너 자동 갱신 주기
 _JOB_POLL_SEC = 2
+
+
+def preview_limit_select(
+    *,
+    key: str,
+    default: int = 30,
+    label: str = "미리보기 수",
+) -> int:
+    opts = list(PREVIEW_OPTIONS)
+    idx = opts.index(default) if default in opts else opts.index(30)
+    return int(
+        st.selectbox(label, opts, index=idx, key=key, format_func=lambda n: f"{n}건")
+    )
+
+
+def render_preview_dataframe(df: Any, *, height: int = PREVIEW_TABLE_HEIGHT) -> None:
+    """고정 높이 표 — 행이 많으면 세로 스크롤."""
+    st.dataframe(
+        df,
+        use_container_width=True,
+        hide_index=True,
+        height=height,
+    )
 
 
 @st.cache_resource

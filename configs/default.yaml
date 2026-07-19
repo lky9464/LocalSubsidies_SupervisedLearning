@@ -123,10 +123,10 @@ feature_importance:
   permutation_repeats: 2
 
 # 주·보 상위% 구간 A~D (4×4). Test=타겟 포착 분포(10), 추론=점검 우선순위표
-# A: 상위 a% / B: a~b% / C: b~c% / D: c% 초과. 우선순위=주등급 우선·보조는 동등급 내 정렬
+# primary_algo / aux_algo: 평가·순위(08) 후 설정. 데이터 변경 시 갱신 (고정 아님)
 ops_queue:
-  primary_algo: random_forest
-  aux_algo: catboost
+  primary_algo: random_forest   # 현재 스냅샷 예시
+  aux_algo: catboost            # 현재 스냅샷 예시
   a_top_pct: 1
   b_top_pct: 5
   c_top_pct: 10

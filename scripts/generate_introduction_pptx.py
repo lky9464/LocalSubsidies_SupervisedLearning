@@ -295,10 +295,10 @@ def build_pptx(out_path: Path | None = None) -> Path:
     # ════════════════════════════════════════════════════════
     sl = _section("사용 알고리즘 (5종 비교)")
     _box(sl, Inches(0.5), Inches(1.5), Inches(5.5), Inches(1.2),
-         "★ 주 운영: RandomForest\n점수·점검 우선순위의 기본", fill=C_PRIMARY, size=13, bold=True)
+         "★ 주 모델 (primary)\n평가·순위로 선정 · 4×4 1차 기준", fill=C_PRIMARY, size=13, bold=True)
     sl.shapes[-1].text_frame.paragraphs[0].runs[0].font.color.rgb = _rgb(C_WHITE)
     _box(sl, Inches(6.3), Inches(1.5), Inches(5.5), Inches(1.2),
-         "★ 보조: CatBoost\n교차 확인·미탐 보완", fill=C_ACCENT, size=13, bold=True)
+         "★ 보조 모델 (aux)\n교차 확인 · 동등급 정렬", fill=C_ACCENT, size=13, bold=True)
     sl.shapes[-1].text_frame.paragraphs[0].runs[0].font.color.rgb = _rgb(C_WHITE)
     _box(sl, Inches(0.5), Inches(3.0), Inches(11.3), Inches(1.0),
          "참고: Stacked Ensemble · EasyEnsemble · Gradient Boosting (비교·리포트용)",
@@ -346,7 +346,7 @@ def build_pptx(out_path: Path | None = None) -> Path:
     )
     for i, (label, col) in enumerate([("쾌적", C_OK), ("보통", C_WARN), ("부족", C_DANGER)]):
         _box(sl, Inches(0.5) + i * Inches(4.1), Inches(3.5), Inches(3.8), Inches(1.0),
-             {"쾌적": "5종 일괄 학습 OK", "보통": "수 시간 · 절전 OFF", "부족": "RF+CatBoost만 권장"}[label],
+             {"쾌적": "5종 일괄 학습 OK", "보통": "수 시간 · 절전 OFF", "부족": "주·보 2종만 권장"}[label],
              fill=col if col != C_OK else C_LIGHT, size=12, bold=True)
     _box(sl, Inches(0.5), Inches(4.8), Inches(12), Inches(0.7),
          "웹 메뉴 「내 PC 사양 체크」에서 본인 PC를 즉시 확인할 수 있습니다.",
@@ -535,7 +535,7 @@ def build_pptx(out_path: Path | None = None) -> Path:
             ["성능 확인", "07·08 후", "대시보드"],
             ["점검 기준 검증", "10 후", "타겟 포착 분포"],
             ["2026 미지 데이터", "raw_inference → 11", "추론 → 결과 확인"],
-            ["PC 느림", "RF+CatBoost만", "내 PC 사양 체크"],
+            ["PC 느림", "주·보 2종만", "내 PC 사양 체크"],
         ],
         top=Inches(1.3),
     )
@@ -636,11 +636,11 @@ def build_pptx(out_path: Path | None = None) -> Path:
         ("예시 1: 연 1회 모델 갱신",
          ["raw/ 배치", "파이프라인 01~10", "모델 비교·평가", "타겟 포착 확인", "→ 추론에 사용"]),
         ("예시 2: 분기별 선제 점검",
-         ["raw_inference/ 1~5월", "추론 RF+CatBoost", "Excel 우선순위", "점검 계획 회의", "6월 추가 후 재실행"]),
+         ["raw_inference/ 1~5월", "추론(주·보)", "Excel 우선순위", "점검 계획 회의", "6월 추가 후 재실행"]),
         ("예시 3: 주·보 불일치",
          ["주A × 보D → 과탐 가능", "사유 확인 후 점검", "주A × 보A → 최우선", "", ""]),
         ("예시 4: PC 사양 부족",
-         ["사양 체크 → 부족", "RF+CatBoost만 선택", "05·11 실행", "운영 기본 충분", ""]),
+         ["사양 체크 → 부족", "주·보 2종만 선택", "05·11 실행", "4×4에 충분", ""]),
     ]
     for title, steps in examples:
         sl = _section(title)

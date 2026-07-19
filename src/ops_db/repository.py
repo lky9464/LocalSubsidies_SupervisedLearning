@@ -228,7 +228,7 @@ class OpsRepository:
     def delete_raw_registry_ids(
         self, ids: list[int], *, dataset_kind: str = "train"
     ) -> list[dict[str, Any]]:
-        """메타 삭제 후 삭제된 행(파일 경로용)을 반환."""
+        """메타 삭제 후 삭제된 행(파일 경로용)을 반환. 남은 행 id는 1..N으로 재부여."""
         if not ids:
             return []
         kind = "inference" if dataset_kind == "inference" else "train"
@@ -244,6 +244,7 @@ class OpsRepository:
                 f"DELETE FROM {table} WHERE id IN ({placeholders})",
                 ids,
             )
+            self._reindex_registry_table(conn, table, dataset_kind=kind)
             conn.commit()
         return deleted
 
@@ -262,8 +263,84 @@ class OpsRepository:
             else:
                 rows = conn.execute(f"SELECT * FROM {table}").fetchall()
                 conn.execute(f"DELETE FROM {table}")
+            self._reindex_registry_table(conn, table, dataset_kind=kind)
             conn.commit()
         return [dict(r) for r in rows]
+
+    def _reindex_registry_table(
+        self, conn: Any, table: str, *, dataset_kind: str
+    ) -> None:
+        """남은 행의 id를 등록 시각·기존 id 순으로 1..N 재부여하고 AUTOINCREMENT 동기화."""
+        if table == "raw_registry" and dataset_kind == "train":
+            where = "WHERE COALESCE(dataset_kind,'train')='train'"
+        else:
+            where = ""
+        rows = conn.execute(
+            f"SELECT * FROM {table} {where} ORDER BY id ASC"
+        ).fetchall()
+        rows = [dict(r) for r in rows]
+        if table == "raw_registry" and dataset_kind == "train":
+            conn.execute(
+                "DELETE FROM raw_registry WHERE COALESCE(dataset_kind,'train')='train'"
+            )
+        else:
+            conn.execute(f"DELETE FROM {table}")
+
+        if table == "raw_registry":
+            cols = (
+                "id, registered_at, filename, rel_path, row_count, "
+                "file_sha256, note, dataset_kind"
+            )
+            for new_id, r in enumerate(rows, start=1):
+                conn.execute(
+                    f"""
+                    INSERT INTO raw_registry({cols})
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        new_id,
+                        r.get("registered_at"),
+                        r.get("filename"),
+                        r.get("rel_path"),
+                        r.get("row_count"),
+                        r.get("file_sha256"),
+                        r.get("note"),
+                        r.get("dataset_kind") or "train",
+                    ),
+                )
+        else:
+            cols = (
+                "id, registered_at, filename, rel_path, row_count, file_sha256, note"
+            )
+            for new_id, r in enumerate(rows, start=1):
+                conn.execute(
+                    f"""
+                    INSERT INTO raw_inference_registry({cols})
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        new_id,
+                        r.get("registered_at"),
+                        r.get("filename"),
+                        r.get("rel_path"),
+                        r.get("row_count"),
+                        r.get("file_sha256"),
+                        r.get("note"),
+                    ),
+                )
+
+        # sqlite_sequence 동기화 (다음 AUTOINCREMENT가 N+1부터)
+        max_id = len(rows)
+        seq = conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='sqlite_sequence'"
+        ).fetchone()
+        if seq:
+            conn.execute("DELETE FROM sqlite_sequence WHERE name=?", (table,))
+            if max_id > 0:
+                conn.execute(
+                    "INSERT INTO sqlite_sequence(name, seq) VALUES (?, ?)",
+                    (table, max_id),
+                )
 
     def replace_ops_queue(self, run_id: str, queue_df: pd.DataFrame) -> int:
         """주·보 구간·우선순위 운영 컬럼만 적재 (기여도 TOP 등 제외)."""

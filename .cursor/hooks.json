@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "hooks": {
+    "afterFileEdit": [
+      {
+        "command": "powershell -NoProfile -ExecutionPolicy Bypass -File .cursor/hooks/mark_web_restart.ps1"
+      }
+    ],
+    "stop": [
+      {
+        "command": "powershell -NoProfile -ExecutionPolicy Bypass -File .cursor/hooks/restart_web_on_stop.ps1",
+        "loop_limit": 1
+      }
+    ]
+  }
+}

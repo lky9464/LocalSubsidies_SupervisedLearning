@@ -52,6 +52,31 @@ div[data-testid="stMetric"] {
   color: var(--md-sys-color-on-primary) !important;
 }
 
+/* 위험 버튼 (전체삭제 등) — Streamlit st-key-* 래퍼 */
+.lsl-danger-btn button,
+div[class*="st-key-train_clear"] button,
+div[class*="st-key-infer_clear"] button {
+  background: #c62828 !important;
+  color: #ffffff !important;
+  border: 1px solid #b71c1c !important;
+}
+.lsl-danger-btn button:hover,
+div[class*="st-key-train_clear"] button:hover,
+div[class*="st-key-infer_clear"] button:hover {
+  background: #b71c1c !important;
+  border-color: #8e0000 !important;
+}
+
+.lsl-run-hint {
+  background: #e8f5e9;
+  border: 1px solid #a5d6a7;
+  border-radius: 12px;
+  padding: 0.65rem 0.9rem;
+  margin: 0.35rem 0 0.85rem;
+  color: #1b3a2a;
+  font-size: 0.95rem;
+}
+
 div[data-testid="stExpander"] {
   background: var(--md-sys-color-surface-container);
   border-radius: var(--md-radius);

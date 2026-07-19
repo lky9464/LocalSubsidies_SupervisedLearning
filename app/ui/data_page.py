@@ -90,27 +90,36 @@ def _section_upload(
     if st.session_state.get(f"{key_prefix}_confirm_add"):
         _confirm_add_dialog(cfg, repo, target_dir, rel_prefix, dataset_kind, key_prefix)
 
-    st.markdown("##### 등록 메타 (DB)")
     reg = repo.list_raw_registry(dataset_kind=dataset_kind)
     if not reg:
+        st.markdown("##### 등록 메타 (DB)")
         st.write("등록 메타 없음")
         return
 
     df = pd.DataFrame(reg)
     select_mode = st.session_state.get(f"{key_prefix}_select_mode", False)
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        if st.button("선택 삭제", key=f"{key_prefix}_sel_del"):
-            st.session_state[f"{key_prefix}_select_mode"] = True
-            st.rerun()
-    with c2:
-        if st.button("초기화(전체삭제)", key=f"{key_prefix}_clear"):
-            st.session_state[f"{key_prefix}_confirm_clear"] = True
-            st.rerun()
-    with c3:
-        if select_mode and st.button("선택 모드 취소", key=f"{key_prefix}_sel_cancel"):
-            st.session_state[f"{key_prefix}_select_mode"] = False
-            st.rerun()
+
+    head_l, head_r = st.columns([1.4, 2])
+    with head_l:
+        st.markdown("##### 등록 메타 (DB)")
+    with head_r:
+        if select_mode:
+            # 선택 모드: 초기화 숨김, 우측 취소만
+            sp, cancel_col = st.columns([2, 1])
+            with cancel_col:
+                if st.button("선택 모드 취소", key=f"{key_prefix}_sel_cancel"):
+                    st.session_state[f"{key_prefix}_select_mode"] = False
+                    st.rerun()
+        else:
+            sp, sel_col, clear_col = st.columns([1, 1, 1.2])
+            with sel_col:
+                if st.button("선택 삭제", key=f"{key_prefix}_sel_del"):
+                    st.session_state[f"{key_prefix}_select_mode"] = True
+                    st.rerun()
+            with clear_col:
+                if st.button("초기화(전체삭제)", key=f"{key_prefix}_clear"):
+                    st.session_state[f"{key_prefix}_confirm_clear"] = True
+                    st.rerun()
 
     if st.session_state.get(f"{key_prefix}_confirm_clear"):
         _confirm_clear_dialog(cfg, repo, dataset_kind, key_prefix)
@@ -137,7 +146,7 @@ def _section_upload(
             else:
                 _delete_meta_and_files(cfg, repo, ids, dataset_kind)
                 st.session_state[f"{key_prefix}_select_mode"] = False
-                st.success(f"{len(ids)}건 삭제")
+                st.success(f"{len(ids)}건 삭제 (id 재부여 완료)")
                 st.rerun()
     else:
         st.dataframe(df, use_container_width=True, hide_index=True)

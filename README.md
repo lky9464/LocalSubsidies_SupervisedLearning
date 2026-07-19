@@ -13,17 +13,20 @@
 ## 일반 사용자 — 오프라인 PC 설치·사용 (권장)
 
 대상: Windows 10/11 x64 · 인터넷이 없는 업무 PC ·  
-온라인에서는 **소스 ZIP + [Release v0.3.0](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases/tag/v0.3.0) 자산만** 받은 뒤 USB로 옮김.  
+온라인에서는 **[Release v0.3.0](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases/tag/v0.3.0) 한곳**에서 소스·wheels·UI·Python·VC++까지 받은 뒤 USB로 옮김.  
 (학습·추론 raw CSV는 사용자가 별도 준비. Node.js·개발 환경 불필요.)
 
 ### A. 온라인 PC에서 받을 것 (USB에 복사)
 
-| # | 파일 | 받는 곳 |
-|---|------|---------|
-| 1 | **소스 ZIP** | [Release v0.3.0](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases/tag/v0.3.0) → **Source code (zip)** (권장) |
-| 2 | **`wheels-win-amd64-py312.zip`** | 같은 Release → Assets |
-| 3 | **`web-out.zip`** | 같은 Release → Assets (**필수** — UI 화면) |
-| 4 | Python **3.12 x64** 설치파일 (오프라인 PC에 Python 없을 때) | [python.org](https://www.python.org/downloads/windows/) · `amd64` |
+모두 같은 [Release v0.3.0](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases/tag/v0.3.0) Assets / Source:
+
+| # | 파일 | 비고 |
+|---|------|------|
+| 1 | **Source code (zip)** | 권장 (Code 버튼 ZIP보다 태그 정합) |
+| 2 | **`wheels-win-amd64-py312.zip`** | 오프라인 pip용 |
+| 3 | **`web-out.zip`** | UI (**필수**) |
+| 4 | **`python-3.12.10-amd64.exe`** | 공식 Python 3.12.10 x64 (이미 있으면 생략) |
+| 5 | **`VC_redist.x64.exe`** | VC++ x64 (CatBoost 등 · 이미 있으면 생략) |
 
 ### B. 오프라인 PC 설치 순서 (1회)
 
@@ -35,7 +38,8 @@
 3. **`web-out.zip`** 을 풀어 **`web\out\`** 이 되게 함  
    → `web\out\index.html` 이 있어야 함  
    (zip 안이 `index.html`, `_next\` … 이면 `web\out\` 폴더를 만든 뒤 그 안에 풀기)
-4. Python 3.12 x64 설치 (“Add python.exe to PATH” 권장) → `py -3.12 --version` 확인
+4. (필요 시) **`VC_redist.x64.exe`** 설치 → **`python-3.12.10-amd64.exe`** 설치  
+   (“Add python.exe to PATH” 권장) → `py -3.12 --version` 확인
 5. 프로젝트 루트에서 **`SetupOffline.bat`** 더블클릭 (인터넷 불필요 · `.venv` 생성·패키지 설치)
 6. `notepad configs\local.yaml` → `data_root` 를 본인 PC 경로로 수정  
    예: `data_root: "C:/work/LocalSubsidies_ML_Data"` (프로젝트와 **형제 폴더** 권장)
@@ -76,7 +80,7 @@
 | `InitDataRoot.bat` 경로/명령 오류·깨진 한글 | 최신 `InitDataRoot.bat` + `scripts\init_data_root.py` 사용. `configs\local.yaml`의 `data_root` 확인 후 재실행. 배치 파일은 ASCII 전용(코드페이지 무관) |
 | UI 안 뜸 / 빈 화면 | `web\out\index.html` 존재 여부 (`web-out.zip`) |
 | `file://` 로 HTML만 연 경우 | 반드시 `RunWebNext.bat` → `http://127.0.0.1:8600` |
-| import / catboost 오류 | Python **3.12 x64**, VC++ Redistributable x64 |
+| import / catboost 오류 | Python **3.12 x64**, Release의 `VC_redist.x64.exe` 설치 |
 | 데이터 오류 | `configs\local.yaml`의 `data_root`, raw 위치 |
 
 ### (개발자용) 온라인 PC에서 소스만 받아 실행

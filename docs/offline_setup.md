@@ -5,8 +5,9 @@ GitHub에서 **소스 + Release 자산**을 받아 USB 등으로 옮긴 뒤, 아
 
 > **한 줄 요약**  
 > [Release v0.3.0](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases/tag/v0.3.0) 에서  
-> **Source code (zip)** + **`wheels-win-amd64-py312.zip`** + **`web-out.zip`**  
-> → Python 3.12 설치 → `SetupOffline.bat` → `data_root`·raw 준비 → `RunWebNext.bat`
+> **Source + wheels + web-out + `python-3.12.10-amd64.exe` + `VC_redist.x64.exe`**  
+> → 설치 → `SetupOffline.bat` → `data_root`·raw 준비 → `RunWebNext.bat`  
+> (Python·VC++가 이미 있으면 해당 exe는 생략 가능)
 
 ---
 
@@ -46,18 +47,22 @@ GitHub에서 **소스 + Release 자산**을 받아 USB 등으로 옮긴 뒤, 아
 같은 Release → Assets **`web-out.zip`** 을 풀어 프로젝트의 `web\out\` 이 되게 함  
 (`web\out\index.html` 확인). Node.js·`build_web.bat`은 오프라인 사용에 필요 없습니다.
 
-### (권장) Python 설치 파일도 함께
+### ④ Python · VC++ 설치 파일 — **같은 Release**
 
-- Python 3.12 Windows **64-bit** installer  
-  https://www.python.org/downloads/windows/  
-- (선택) [VC++ Redistributable x64](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist)
+| 파일 | 출처 (재배포) | 비고 |
+|------|----------------|------|
+| **`python-3.12.10-amd64.exe`** | [python.org](https://www.python.org/ftp/python/3.12.10/python-3.12.10-amd64.exe) · PSF License | wheels와 동일 계열(3.12 x64) |
+| **`VC_redist.x64.exe`** | [Microsoft VC++ x64](https://aka.ms/vs/17/release/vc_redist.x64.exe) | CatBoost 등 네이티브 의존성 |
+
+SHA-256은 Release 본문에 적어 두었습니다. 오프라인 PC에 이미 설치되어 있으면 생략해도 됩니다.
 
 ### USB에 넣을 목록 (체크)
 
-- [ ] 소스 ZIP (또는 pull한 폴더)
+- [ ] 소스 ZIP (Release Source code zip)
 - [ ] `wheels-win-amd64-py312.zip`
 - [ ] `web-out.zip` 또는 빌드된 `web\out\`
-- [ ] Python 3.12 x64 설치 파일 (필요 시)
+- [ ] `python-3.12.10-amd64.exe` (필요 시)
+- [ ] `VC_redist.x64.exe` (필요 시)
 - [ ] 학습·평가용 raw CSV (사용자 확보)
 
 ---
@@ -93,7 +98,11 @@ LocalSubsidies_SupervisedLearning\
 **주의:** zip 안에 `wheels` 폴더가 한 겹 더 있으면  
 `vendor\wheels\wheels\*.whl` 이 되지 않도록 **`.whl`이 바로 `vendor\wheels\` 아래** 있게 옮기세요.
 
-### 2-3. Python 3.12 설치
+### 2-3. VC++ · Python 3.12 설치
+
+1. (필요 시) Release의 **`VC_redist.x64.exe`** 실행  
+2. Release의 **`python-3.12.10-amd64.exe`** 실행 — **“Add python.exe to PATH”** 권장  
+3. **새** cmd에서 확인:
 
 ```text
 py -3.12 --version

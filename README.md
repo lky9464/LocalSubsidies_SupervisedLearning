@@ -72,6 +72,7 @@
 | 증상 | 확인 |
 |------|------|
 | `SetupOffline` — wheels 없음 | Release zip을 `vendor\wheels\`에 풀었는지 |
+| `SetupOffline.bat` 더블클릭 후 창이 바로 닫힘 | 최신 `SetupOffline.bat` 사용(창 유지). 또는 `cmd`에서 `SetupOffline.bat` 실행. `SetupOffline.log` 확인 |
 | UI 안 뜸 / 빈 화면 | `web\out\index.html` 존재 여부 (`web-out.zip`) |
 | `file://` 로 HTML만 연 경우 | 반드시 `RunWebNext.bat` → `http://127.0.0.1:8600` |
 | import / catboost 오류 | Python **3.12 x64**, VC++ Redistributable x64 |

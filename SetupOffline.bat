@@ -1,16 +1,26 @@
 @echo off
-chcp 65001 >nul
 setlocal EnableExtensions
-title Local Subsidies — Offline Setup
+REM Keep window open on double-click so errors are visible.
+if /I not "%~1"=="_run" (
+  cmd /k "%~f0" _run
+  exit /b
+)
+
 cd /d "%~dp0"
+title Local Subsidies Offline Setup
+chcp 65001 >nul 2>&1
+
+set "LOG=%CD%\SetupOffline.log"
+echo ===== SetupOffline %DATE% %TIME% ===== > "%LOG%"
+call :log "cwd=%CD%"
 
 echo.
 echo ========================================
-echo  오프라인 환경 설치 (1회)
+echo  Offline setup (one-time)
 echo ========================================
 echo.
 
-REM --- Python 확인 ---
+REM --- Python ---
 set "PYEXE="
 where py >nul 2>&1
 if not errorlevel 1 (
@@ -24,110 +34,128 @@ if not defined PYEXE (
 )
 
 if not defined PYEXE (
-  echo [ERROR] Python 을 찾을 수 없습니다.
-  echo   오프라인 PC에 Python 3.12 ^(64-bit^) 를 먼저 설치하세요.
-  echo   설치 후 이 창을 닫고 SetupOffline.bat 을 다시 실행하세요.
-  echo   안내: docs\offline_setup.md
-  pause
-  exit /b 1
+  echo [ERROR] Python not found.
+  echo   Install Python 3.12 x64 on this PC first, then run SetupOffline.bat again.
+  echo   Guide: docs\offline_setup.md
+  call :log "ERROR: Python not found"
+  goto :fail
 )
 
 echo [1/4] Python: %PYEXE%
+call :log "Python=%PYEXE%"
 "%PYEXE%" -c "import sys; v=sys.version_info; raise SystemExit(0 if (v.major,v.minor)==(3,12) else 1)" 2>nul
 if errorlevel 1 (
-  echo [WARN] Python 3.12 가 아닙니다. wheel 묶음은 3.12용입니다.
-  echo        가능하면 3.12 x64 로 다시 설치하세요. 계속 진행합니다...
+  echo [WARN] Not Python 3.12. Wheels are built for 3.12 x64. Continuing anyway...
   echo.
+  call :log "WARN: not Python 3.12"
 )
 
-REM --- wheels 확인 ---
+REM --- wheels ---
 set "WHEELDIR=%CD%\vendor\wheels"
 if not exist "%WHEELDIR%" (
-  echo [ERROR] vendor\wheels 폴더가 없습니다.
-  echo.
-  echo   GitHub Releases 에서 wheels-win-amd64-py312.zip 을 받아
-  echo   압축을 풀면 vendor\wheels\ 아래에 .whl 파일들이 있어야 합니다.
-  echo.
-  echo   예^)
+  echo [ERROR] Folder missing: vendor\wheels
+  echo   Unzip wheels-win-amd64-py312.zip so .whl files are under vendor\wheels\
+  echo   Example:
   echo     LocalSubsidies_SupervisedLearning\
   echo       vendor\wheels\*.whl
-  echo.
-  echo   Release: https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases
-  echo   안내: docs\offline_setup.md
-  pause
-  exit /b 1
+  call :log "ERROR: vendor\wheels missing"
+  goto :fail
 )
 
 dir /b "%WHEELDIR%\*.whl" >nul 2>&1
 if errorlevel 1 (
-  echo [ERROR] vendor\wheels 에 .whl 파일이 없습니다.
-  echo   wheels-win-amd64-py312.zip 을 이 폴더에 풀어 주세요.
-  pause
-  exit /b 1
+  echo [ERROR] No .whl files in vendor\wheels
+  echo   Unzip wheels-win-amd64-py312.zip into vendor\wheels\
+  call :log "ERROR: no whl files"
+  goto :fail
 )
 
 REM --- venv ---
-echo [2/4] 가상환경 .venv 생성/확인...
+echo [2/4] Creating/checking .venv ...
+call :log "venv step"
 if not exist "%CD%\.venv\Scripts\python.exe" (
   "%PYEXE%" -m venv .venv
   if errorlevel 1 (
-    echo [ERROR] venv 생성 실패.
-    pause
-    exit /b 1
+    echo [ERROR] venv creation failed.
+    call :log "ERROR: venv failed"
+    goto :fail
   )
 )
 
 set "VPIP=%CD%\.venv\Scripts\pip.exe"
 set "VPY=%CD%\.venv\Scripts\python.exe"
+if not exist "%VPIP%" (
+  echo [ERROR] .venv\Scripts\pip.exe missing after venv create.
+  call :log "ERROR: pip missing"
+  goto :fail
+)
 
-echo [3/4] vendor\wheels 에서 패키지 설치 (인터넷 불필요)...
+echo [3/4] Installing packages from vendor\wheels (no internet)...
+call :log "pip install start"
 "%VPIP%" install --no-index --find-links="%WHEELDIR%" -r "%CD%\requirements.lock.txt"
 if errorlevel 1 (
-  echo [ERROR] 패키지 설치 실패.
-  echo   Python 버전^(3.12 x64^)과 wheel 묶음이 일치하는지 확인하세요.
-  pause
-  exit /b 1
+  echo [ERROR] pip install failed.
+  echo   Check Python 3.12 x64 and that wheels match.
+  call :log "ERROR: pip install failed"
+  goto :fail
 )
 
 "%VPY%" -c "import fastapi, uvicorn, pandas, sklearn, catboost; print('OK: fastapi', fastapi.__version__)"
 if errorlevel 1 (
-  echo [ERROR] import 검증 실패.
-  pause
-  exit /b 1
+  echo [ERROR] Import check failed.
+  call :log "ERROR: import failed"
+  goto :fail
 )
 
 REM --- local.yaml ---
 echo [4/4] configs\local.yaml ...
 if not exist "%CD%\configs\local.yaml" (
   copy /Y "%CD%\configs\local.yaml.example" "%CD%\configs\local.yaml" >nul
-  echo   local.yaml 을 예제에서 복사했습니다.
-  echo   메모장으로 열어 data_root 경로를 본인 PC에 맞게 수정하세요.
+  echo   Copied local.yaml from example. Edit data_root path:
   echo     notepad configs\local.yaml
 ) else (
-  echo   이미 존재합니다. ^(경로만 확인하세요^)
+  echo   local.yaml already exists. Check data_root path.
 )
 
 if not exist "%CD%\web\out\index.html" (
   echo.
-  echo [WARN] web\out\index.html 이 없습니다.
-  echo   Release 의 web-out.zip 을 풀어 web\out\ 이 되게 하세요.
-  echo   예^) web\out\index.html 이 보여야 합니다.
+  echo [WARN] web\out\index.html not found.
+  echo   Unzip web-out.zip into web\out\  ^(need web\out\index.html^)
   echo.
+  call :log "WARN: web\out missing"
 )
 
 echo.
 echo ========================================
-echo  설치 완료
+echo  Setup complete
 echo ========================================
 echo.
-echo  다음 단계:
-echo    1^) notepad configs\local.yaml  — data_root 수정
-echo    2^) InitDataRoot.bat            — 데이터 폴더 골격 생성 ^(선택^)
-echo    3^) raw / raw_inference 에 CSV 배치
-echo    4^) ^(미완료 시^) web-out.zip → web\out\
-echo    5^) RunWebNext.bat              — 웹 UI 실행 (http://127.0.0.1:8600^)
+echo  Next:
+echo    1^) notepad configs\local.yaml  - set data_root
+echo    2^) InitDataRoot.bat
+echo    3^) Put CSV into raw / raw_inference
+echo    4^) If needed: web-out.zip -^> web\out\
+echo    5^) RunWebNext.bat  -^> http://127.0.0.1:8600
 echo.
-echo  상세: docs\offline_setup.md
+echo  Log: SetupOffline.log
+echo  Guide: docs\offline_setup.md
 echo.
-pause
+call :log "OK complete"
+goto :end
+
+:fail
+echo.
+echo Setup failed. See messages above and SetupOffline.log
+echo.
+goto :end
+
+:log
+>> "%LOG%" echo %~1
+exit /b 0
+
+:end
+echo.
+echo Window stays open so you can read messages. Type exit to close.
+echo.
 endlocal
+exit /b 0

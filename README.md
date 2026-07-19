@@ -26,7 +26,7 @@
 
 - 파이프라인은 **백그라운드 Job**으로 실행 — 메뉴를 바꿔도 계속 진행, 상단 배너에서 진행률 확인
 - 상세: [`docs/web_local.md`](docs/web_local.md) · [`docs/user_guide.md`](docs/user_guide.md) · PDF [`docs/user_guide.pdf`](docs/user_guide.pdf)
-- 소개 자료: [`docs/project_introduction.md`](docs/project_introduction.md) · [PDF](docs/project_introduction.pdf) · [PPT](docs/project_introduction.pptx)
+- 소개 자료: [`docs/project_introduction.md`](docs/project_introduction.md) 
 
 ## 오프라인 사용법
 

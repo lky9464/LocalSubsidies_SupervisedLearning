@@ -1,5 +1,4 @@
 @echo off
-chcp 65001 >nul
 setlocal EnableExtensions
 cd /d "%~dp0\.."
 
@@ -13,23 +12,23 @@ if errorlevel 1 (
 )
 where node >nul 2>&1
 if errorlevel 1 (
-  echo [ERROR] Node.js 가 없습니다. UI 빌드는 Node가 필요합니다 ^(오프라인 PC에는 불필요^).
+  echo [ERROR] Node.js not found. UI build needs Node ^(not required on offline PCs^).
   echo.
-  echo   방법 1 - winget ^(관리자 PowerShell^):
+  echo   Option 1 - winget ^(admin PowerShell^):
   echo     winget install OpenJS.NodeJS.LTS
   echo.
-  echo   방법 2 - 수동 설치:
+  echo   Option 2 - manual install:
   echo     https://nodejs.org/  ^> LTS ^> Windows Installer ^(64-bit^)
-  echo     설치 후 **새** cmd 창을 열고 build_web.bat 을 다시 실행하세요.
+  echo     Then open a NEW cmd window and run build_web.bat again.
   echo.
-  echo   이미 설치했는데도 이 메시지면: 터미널/Cursor를 재시작하거나 PATH에 node가 있는지 확인하세요.
+  echo   If Node is already installed: restart the terminal/Cursor, or check PATH.
   pause
   exit /b 1
 )
 
 cd web
 if not exist package.json (
-  echo [ERROR] web\package.json 없음
+  echo [ERROR] web\package.json missing
   pause
   exit /b 1
 )
@@ -44,5 +43,5 @@ if errorlevel 1 exit /b 1
 
 echo.
 echo Build complete: web\out\
-echo 오프라인 배포 시 web\out 폴더를 Release zip에 포함하세요.
+echo For offline deploy, include web\out in the Release zip.
 pause

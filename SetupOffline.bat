@@ -8,7 +8,6 @@ if /I not "%~1"=="_run" (
 
 cd /d "%~dp0"
 title Local Subsidies Offline Setup
-chcp 65001 >nul 2>&1
 
 set "LOG=%CD%\SetupOffline.log"
 echo ===== SetupOffline %DATE% %TIME% ===== > "%LOG%"

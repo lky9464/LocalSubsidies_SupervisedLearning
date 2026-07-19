@@ -1,5 +1,5 @@
 @echo off
-REM FastAPI+Next UI(8600) 재시작 — Cursor stop hook / 수동 재시작용
+REM Restart FastAPI+Next UI on port 8600 (Cursor stop hook / manual restart)
 cd /d "%~dp0"
 
 set "PY=%CD%\.venv\Scripts\python.exe"

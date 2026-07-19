@@ -19,6 +19,7 @@ GitHub에서 **소스 + Release 자산**을 받아 USB 등으로 옮긴 뒤, 아
 | 네트워크 | **설치·실행 시 인터넷 불필요** (wheel·UI를 미리 받아 둔 경우) |
 | 데이터 | raw CSV는 GitHub에 **없음** — 사용자가 `{data_root}`에 직접 둠 |
 | UI | FastAPI + Next 정적 export (`web/out`) · `http://127.0.0.1:8600` |
+| 배치 파일 | **ASCII 전용** — PC 코드페이지(UTF-8 / CP949 / EUC-KR 등)와 무관하게 동작. 한글 안내는 README·이 문서 참고 |
 
 이 저장소에는 **코드·문서·스키마**만 있습니다.  
 학습·추론용 CSV, 모델, 행단위 점수는 Release에도 포함되지 않습니다.

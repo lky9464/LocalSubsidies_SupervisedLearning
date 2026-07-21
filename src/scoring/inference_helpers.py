@@ -59,8 +59,8 @@ def resolve_primary_aux(cfg: dict[str, Any], run_id: str) -> tuple[str, str]:
         return OpsRepository(cfg).get_primary_aux(run_id)
     except Exception:  # noqa: BLE001
         return (
-            str(ops_cfg.get("primary_algo", "random_forest")),
-            str(ops_cfg.get("aux_algo", "catboost")),
+            str(ops_cfg.get("primary_algo", "random_forest_v1")),
+            str(ops_cfg.get("aux_algo", "catboost_v1")),
         )
 
 

@@ -15,16 +15,30 @@ def merge_raw_csvs(
     encoding: str | None = None,
     pattern: str = "*.csv",
     candidates: list[str] | None = None,
+    files: list[Path] | None = None,
 ) -> pd.DataFrame:
-    """raw_dir 내 CSV를 세로 결합한다. 파일명·건수·감지 인코딩만 요약한다."""
-    files = sorted(raw_dir.glob(pattern))
-    if not files:
-        raise FileNotFoundError(f"CSV가 없습니다: {raw_dir} (pattern={pattern})")
+    """CSV를 세로 결합한다. files가 있으면 그 목록만, 없으면 raw_dir glob.
+
+    파일명·건수·감지 인코딩만 요약한다(행 샘플 없음).
+    """
+    if files is not None:
+        file_list = list(files)
+        missing = [str(p) for p in file_list if not p.is_file()]
+        if missing:
+            raise FileNotFoundError(
+                "선택한 CSV 파일이 없습니다: " + ", ".join(Path(m).name for m in missing)
+            )
+        if not file_list:
+            raise FileNotFoundError("병합할 CSV 목록이 비어 있습니다.")
+    else:
+        file_list = sorted(raw_dir.glob(pattern))
+        if not file_list:
+            raise FileNotFoundError(f"CSV가 없습니다: {raw_dir} (pattern={pattern})")
 
     frames: list[pd.DataFrame] = []
-    print(f"[merge] 파일 수: {len(files)}")
+    print(f"[merge] 파일 수: {len(file_list)}")
     cand = candidates or list(DEFAULT_ENCODING_CANDIDATES)
-    for fp in files:
+    for fp in file_list:
         df, used = read_csv_auto(fp, encoding=encoding, candidates=cand)
         print(
             f"[merge] 읽음: {fp.name} / 행수={len(df):,} / 컬럼수={df.shape[1]} "

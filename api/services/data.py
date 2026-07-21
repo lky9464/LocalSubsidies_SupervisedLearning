@@ -33,6 +33,19 @@ def save_upload_files(
 
     target_dir.mkdir(parents=True, exist_ok=True)
     encoding = cfg.get("encoding", "EUC-KR")
+
+    for filename, _data in files:
+        if repo.filename_exists(filename, dataset_kind=dataset_kind):
+            raise ValueError(
+                f"동일한 파일명이 이미 등록되어 있습니다: {filename}. "
+                "이름을 바꾸거나 기존 파일을 삭제한 뒤 다시 등록하세요."
+            )
+        if (target_dir / filename).exists():
+            raise ValueError(
+                f"디스크에 동일 파일명이 있습니다: {filename}. "
+                "이름을 바꾸거나 기존 파일을 삭제한 뒤 다시 등록하세요."
+            )
+
     saved = 0
     for filename, data in files:
         path = target_dir / filename
@@ -46,6 +59,7 @@ def save_upload_files(
             file_sha256=sha,
             note="web_upload",
             dataset_kind=dataset_kind,
+            selected=True,
         )
         saved += 1
     return saved

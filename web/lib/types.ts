@@ -23,9 +23,23 @@ export type MatrixPayload = {
   data: number[][];
 };
 
+export type AlgoVersionMeta = {
+  version: string;
+  algo_id: string;
+  label: string;
+  script?: string;
+};
+
+export type AlgoFamilyMeta = {
+  family: string;
+  label: string;
+  versions: AlgoVersionMeta[];
+};
+
 export type ConfigMeta = {
   algo_labels: Record<string, string>;
   algorithms: string[];
+  algorithm_registry?: AlgoFamilyMeta[];
   metric_help: Record<string, string>;
   preview_options: number[];
   train_steps: { id: string; label: string }[];

@@ -65,6 +65,10 @@ web/.next/
 web/out/
 
 
+# 임시 전달용 바이너리 (전달 후 삭제)
+docs/_transfer_sqlite_odbc/*.exe
+docs/_transfer_sqlite_jdbc/*.jar
+
 # 리포트 원본 중 행단위가 섞일 수 있는 경로 (집계 리포트는 커밋 가능)
 outputs/models/
 outputs/scores/

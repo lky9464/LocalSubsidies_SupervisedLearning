@@ -7,6 +7,7 @@
 - **127.0.0.1** 만 바인딩 (`0.0.0.0` 금지)
 - raw·모델·행단위 점수는 `{data_root}` 파일
 - 운영 DB는 `{data_root}/ops/ops.sqlite` — **런/순위/타겟 포착·점검 우선순위 조회·메타만**, raw 미포함
+- 데이터 등록: CSV는 `raw`/`raw_inference`에 누적, **선택(selected)된 파일만** 학습·추론에 사용 (Job 시작 시 run_config에 동결)
 - 파이프라인은 **백그라운드 Job** (`Popen`) — 메뉴 이동해도 계속 실행
 - GitHub·Agent로 민감데이터 유출 금지
 

@@ -15,6 +15,7 @@ Cursor Agent는 이 스크립트를 실행하지 마세요.
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -36,6 +37,7 @@ from src.io.config import (  # noqa: E402
     resolve_data_path,
 )
 from src.io.merge import merge_raw_csvs  # noqa: E402
+from src.pipeline.run_config import load_run_config, resolve_run_raw_paths  # noqa: E402
 from src.scoring.risk_score import probability_to_score  # noqa: E402
 from src.scoring.score_table import (  # noqa: E402
     assemble_score_table,
@@ -83,7 +85,21 @@ def main() -> None:
     algorithms = list(args.algo) if args.algo else list(cfg.get("algorithms", []))
     ensure_algo_dirs(cfg, algorithms)
 
-    if not input_dir.exists():
+    run_id = (os.environ.get("LSL_RUN_ID") or "").strip()
+    files = None
+    # --input-dir 명시 시 폴더 전체(호환). 없으면 Run 선택 목록 우선.
+    if run_id and not args.input_dir:
+        run_cfg = load_run_config(cfg, run_id)
+        files = resolve_run_raw_paths(cfg, run_cfg, kind="inference")
+        if not files:
+            raise FileNotFoundError(
+                "run_config.raw_inference_files 가 비어 있습니다. "
+                "데이터 등록에서 추론 CSV를 선택한 뒤 추론을 다시 시작하세요."
+            )
+        print(f"[inference] Run {run_id}: 선택 파일 {len(files)}개")
+        for p in files:
+            print(f"[inference]  - {p.name}")
+    elif not input_dir.exists():
         raise FileNotFoundError(
             f"추론 입력 폴더 없음: {input_dir}. "
             "CSV를 두거나 --input-dir로 지정하세요."
@@ -93,6 +109,7 @@ def main() -> None:
         input_dir,
         encoding=encoding,
         candidates=list(cfg.get("encoding_candidates") or []),
+        files=files,
     )
     # 학습 raw와 동일 레이아웃이어도 타겟·타겟수정 컬럼은 추론에서 무시
     ignore_cols = list(

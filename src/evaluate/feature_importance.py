@@ -193,21 +193,24 @@ def compute_top_features(
             sample_size=permutation_sample_size,
         )
 
-    if algo == "catboost":
+    from src.models.registry import family_of, normalize_algo_id
+
+    family = family_of(normalize_algo_id(algo))
+    if family == "catboost":
         values, method = importance_from_catboost(model, feature_names)
-    elif algo in ("random_forest", "gradient_boosting"):
+    elif family in ("random_forest", "gradient_boosting"):
         got = importance_from_tree_model(model, feature_names)
         if got is None:
             values, method = _perm()
         else:
             values, method = got
-    elif algo == "easy_ensemble":
+    elif family == "easy_ensemble":
         got = importance_from_easy_ensemble(model, feature_names)
         if got is None:
             values, method = _perm()
         else:
             values, method = got
-    elif algo == "stacked_ensemble":
+    elif family == "stacked_ensemble":
         values, method = _perm()
     else:
         got = importance_from_tree_model(model, feature_names)

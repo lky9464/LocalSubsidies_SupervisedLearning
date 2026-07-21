@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 import pandas as pd
@@ -27,10 +28,30 @@ from src.scoring.ops_queue import GRADE_COL, PRIMARY_LABELS, summarize_matrix, s
 from src.scoring.score_table import SCORE_COL
 
 
-def inference_prereq(cfg: dict[str, Any]) -> dict[str, Any]:
-    raw_dir = __import__("src.io.config", fromlist=["get_data_root"]).get_data_root(cfg) / "raw_inference"
+def inference_prereq(cfg: dict[str, Any], repo: OpsRepository | None = None) -> dict[str, Any]:
+    """선택(selected)된 추론 CSV 기준. 레지스트리 없으면 폴더 glob 폴백."""
+    if repo is None:
+        repo = OpsRepository(cfg)
+    selected = repo.list_selected_rel_paths(dataset_kind="inference")
+    if selected:
+        return {
+            "has_data": True,
+            "file_count": len(selected),
+            "selected_files": [Path(p).name for p in selected],
+        }
+    raw_dir = (
+        __import__("src.io.config", fromlist=["get_data_root"]).get_data_root(cfg)
+        / "raw_inference"
+    )
     csvs = list(raw_dir.glob("*.csv")) if raw_dir.exists() else []
-    return {"has_data": len(csvs) > 0, "file_count": len(csvs)}
+    return {
+        "has_data": False,
+        "file_count": len(csvs),
+        "selected_files": [],
+        "message": "데이터 등록에서 추론 CSV를 선택한 뒤 「선택 저장」하세요."
+        if csvs
+        else "등록·선택된 추론 CSV가 없습니다.",
+    }
 
 
 def trained_algos_for_run(cfg: dict[str, Any], run_id: str) -> list[str]:

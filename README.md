@@ -4,7 +4,7 @@
 
 지방보조금 부정수급 **위험도 점수(0~1000)** 측정을 위한 지도학습 파이프라인 + **로컬 웹 UI**입니다.
 
-- **v0.3** — Next.js + FastAPI 웹 UI(`127.0.0.1:8600`), 백그라운드 Job, 운영 DB(`ops.sqlite`), 추론 결과 조회
+- **v0.3** — Next.js + FastAPI 웹 UI(`127.0.0.1:8600`), 백그라운드 Job, 운영 DB(`ops.sqlite`), 추론 결과 조회 · ([진행 중] 알고리즘 `{family}_vN` · [`VERSION_HISTORY`](docs/VERSION_HISTORY.md) Unreleased)
 - **v0.2** — Streamlit UI (제거됨) · **v0.1** — CLI 전용 ([`v0.1.0`](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases/tag/v0.1.0))
 - 알고리즘: CatBoost, Stacked Ensemble, EasyEnsemble, Gradient Boosting, RandomForest
 - 학습 데이터·모델·행단위 점수는 **프로젝트 폴더 밖** `{data_root}`에만 보관
@@ -132,17 +132,17 @@ LocalSubsidies_ML_Data/                 # 프로젝트 밖 ({data_root})
     ├── operations/
     │   ├── ops_queue_test.xlsx         # 타겟 포착 분포 (Test)
     │   └── ops_queue_inference.xlsx    # 점검 우선순위표 (추론)
-    ├── catboost/
+    ├── catboost_v1/
     │   ├── model.joblib
     │   ├── train_meta.json
     │   ├── eval_metrics.json
     │   └── scores/
-    │       ├── test/                   # {algo}_test_scores.csv 등
-    │       └── inference/              # {algo}_inference_scores.csv 등
-    ├── stacked_ensemble/
-    ├── easy_ensemble/
-    ├── gradient_boosting/
-    └── random_forest/
+    │       ├── test/
+    │       └── inference/
+    ├── stacked_ensemble_v1/
+    ├── easy_ensemble_v1/
+    ├── gradient_boosting_v1/
+    └── random_forest_v1/
 
 LocalSubsidies_SupervisedLearning/      # 이 repo
 ├── api/                                # FastAPI BFF
@@ -150,11 +150,11 @@ LocalSubsidies_SupervisedLearning/      # 이 repo
 ├── RunWebNext.bat                      # 웹 UI 실행 (더블클릭 → :8600)
 └── outputs/reports/
     ├── comparison/                     # 5종 비교 Excel/PDF
-    ├── catboost/
-    ├── stacked_ensemble/
-    ├── easy_ensemble/
-    ├── gradient_boosting/
-    └── random_forest/
+    ├── catboost_v1/
+    ├── stacked_ensemble_v1/
+    ├── easy_ensemble_v1/
+    ├── gradient_boosting_v1/
+    └── random_forest_v1/
 ```
 
 ## 사전 준비 (사용자)
@@ -191,12 +191,15 @@ python scripts/08_update_ranking.py     # 모델 순위 (eval 기반)
 python scripts/09_report.py             # 집계 리포트
 python scripts/10_ops_queue.py          # 타겟 포착 분포 Test (주/보 A~D · 4×4)
 # 운영 추론 (라벨 미지 데이터, 예: 2026) — 주·보 모델 각각 (configs/default.yaml ops_queue 참고)
-python scripts/11_score_inference.py --algo random_forest
-python scripts/11_score_inference.py --algo catboost
+python scripts/11_score_inference.py --algo random_forest_v1
+python scripts/11_score_inference.py --algo catboost_v1
+# (선택) Validation 하이퍼 탐색 — RF/CatBoost, Test 미사용
+python scripts/12_tune_hyperparams.py
 ```
 
 > 의심 피처가 있으면 Feature 제외 후 `03`부터 다시 실행하고, `04` PASS 후 `05`로 진행합니다.  
-> 웹 UI에서는 누수 FAIL 시 **「제외 반영 후 03부터 재개」** 로 동일하게 처리합니다.
+> 웹 UI에서는 누수 FAIL 시 **「제외 반영 후 03부터 재개」** 로 동일하게 처리합니다.  
+> 알고리즘 ID·튜닝: [`docs/algo_id_migration.md`](docs/algo_id_migration.md) · [`docs/model_tuning.md`](docs/model_tuning.md) · [`docs/hyperparam_methodology.md`](docs/hyperparam_methodology.md)
 
 ### 학습(05) — 일괄 / 개별
 
@@ -205,15 +208,15 @@ python scripts/11_score_inference.py --algo catboost
 python scripts/05_train.py
 
 # 특정 알고리즘만 (--algo 반복 가능)
-python scripts/05_train.py --algo catboost
-python scripts/05_train.py --algo random_forest --algo gradient_boosting
+python scripts/05_train.py --algo catboost_v1
+python scripts/05_train.py --algo random_forest_v1 --algo gradient_boosting_v1
 
 # 알고리즘별 전용 스크립트
-python scripts/05_train_catboost.py
-python scripts/05_train_stacked_ensemble.py
-python scripts/05_train_easy_ensemble.py
-python scripts/05_train_gradient_boosting.py
-python scripts/05_train_random_forest.py
+python scripts/05_train_catboost_v1.py
+python scripts/05_train_stacked_ensemble_v1.py
+python scripts/05_train_easy_ensemble_v1.py
+python scripts/05_train_gradient_boosting_v1.py
+python scripts/05_train_random_forest_v1.py
 ```
 
 - 집계 결과: `outputs/reports/comparison/`, `outputs/reports/{algo}/`
@@ -254,6 +257,10 @@ python scripts/05_train_random_forest.py
 | [`docs/operations_criteria.md`](docs/operations_criteria.md) | 주·보 선정 원칙·4×4·평가 스냅샷 |
 | [`docs/metrics_guide.md`](docs/metrics_guide.md) | 평가 지표 해설 |
 | [`docs/offline_setup.md`](docs/offline_setup.md) | **오프라인 사용법** (GitHub 다운로드 → 설치 → 실행) |
+| [`docs/model_tuning.md`](docs/model_tuning.md) | 하이퍼파라미터 튜닝·기준선·피처 다음 단계 |
+| [`docs/hyperparam_methodology.md`](docs/hyperparam_methodology.md) | 5종 하이퍼 수정 **방법론** (수치 미적용) |
+| [`docs/algo_id_migration.md`](docs/algo_id_migration.md) | algo_id `*_v1` 로컬 마이그레이션 |
+| [`docs/VERSION_HISTORY.md`](docs/VERSION_HISTORY.md) | 버전 이력 (v0.1~) |
 | [`docs/AGENT_BOUNDARY.md`](docs/AGENT_BOUNDARY.md) | Cursor Agent / 민감데이터 격리 |
 
 ---

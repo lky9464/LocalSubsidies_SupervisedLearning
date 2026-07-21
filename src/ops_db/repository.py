@@ -196,17 +196,36 @@ class OpsRepository:
         if not rid:
             ops = self.cfg.get("ops_queue", {})
             return (
-                ops.get("primary_algo", "random_forest"),
-                ops.get("aux_algo", "catboost"),
+                ops.get("primary_algo", "random_forest_v1"),
+                ops.get("aux_algo", "catboost_v1"),
             )
         ranking = self.get_ranking(rid)
         primary = next((r["algo"] for r in ranking if r["role"] == "primary"), None)
         aux = next((r["algo"] for r in ranking if r["role"] == "aux"), None)
         ops = self.cfg.get("ops_queue", {})
         return (
-            primary or ops.get("primary_algo", "random_forest"),
-            aux or ops.get("aux_algo", "catboost"),
+            primary or ops.get("primary_algo", "random_forest_v1"),
+            aux or ops.get("aux_algo", "catboost_v1"),
         )
+
+    def filename_exists(self, filename: str, *, dataset_kind: str = "train") -> bool:
+        kind = "inference" if dataset_kind == "inference" else "train"
+        with connect(self.cfg) as conn:
+            if kind == "inference":
+                row = conn.execute(
+                    "SELECT 1 FROM raw_inference_registry WHERE filename=? LIMIT 1",
+                    (filename,),
+                ).fetchone()
+            else:
+                row = conn.execute(
+                    """
+                    SELECT 1 FROM raw_registry
+                    WHERE filename=? AND COALESCE(dataset_kind,'train')='train'
+                    LIMIT 1
+                    """,
+                    (filename,),
+                ).fetchone()
+        return row is not None
 
     def register_raw_file(
         self,
@@ -217,32 +236,87 @@ class OpsRepository:
         note: str = "",
         *,
         dataset_kind: str = "train",
+        selected: bool = True,
     ) -> None:
-        """dataset_kind: train | inference"""
+        """dataset_kind: train | inference. 신규 업로드는 기본 선택(selected=1)."""
         kind = "inference" if dataset_kind == "inference" else "train"
         table = "raw_inference_registry" if kind == "inference" else "raw_registry"
+        sel = 1 if selected else 0
         with connect(self.cfg) as conn:
             if table == "raw_registry":
                 conn.execute(
                     """
                     INSERT INTO raw_registry(
                         registered_at, filename, rel_path, row_count,
-                        file_sha256, note, dataset_kind
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                        file_sha256, note, dataset_kind, selected
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     """,
-                    (_now(), filename, rel_path, row_count, file_sha256, note, kind),
+                    (_now(), filename, rel_path, row_count, file_sha256, note, kind, sel),
                 )
             else:
                 conn.execute(
                     """
                     INSERT INTO raw_inference_registry(
                         registered_at, filename, rel_path, row_count,
-                        file_sha256, note
-                    ) VALUES (?, ?, ?, ?, ?, ?)
+                        file_sha256, note, selected
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
                     """,
-                    (_now(), filename, rel_path, row_count, file_sha256, note),
+                    (_now(), filename, rel_path, row_count, file_sha256, note, sel),
                 )
             conn.commit()
+
+    def set_raw_selection(self, ids: list[int], *, dataset_kind: str = "train") -> int:
+        """해당 kind의 selected를 주어진 id만 1, 나머지 0으로 설정. 선택된 개수 반환."""
+        kind = "inference" if dataset_kind == "inference" else "train"
+        table = "raw_inference_registry" if kind == "inference" else "raw_registry"
+        id_set = {int(i) for i in ids}
+        with connect(self.cfg) as conn:
+            if kind == "train":
+                conn.execute(
+                    "UPDATE raw_registry SET selected=0 WHERE COALESCE(dataset_kind,'train')='train'"
+                )
+                rows = conn.execute(
+                    """
+                    SELECT id FROM raw_registry
+                    WHERE COALESCE(dataset_kind,'train')='train'
+                    """
+                ).fetchall()
+            else:
+                conn.execute(f"UPDATE {table} SET selected=0")
+                rows = conn.execute(f"SELECT id FROM {table}").fetchall()
+            n = 0
+            for r in rows:
+                rid = int(r["id"])
+                if rid in id_set:
+                    conn.execute(
+                        f"UPDATE {table} SET selected=1 WHERE id=?",
+                        (rid,),
+                    )
+                    n += 1
+            conn.commit()
+        return n
+
+    def list_selected_rel_paths(self, *, dataset_kind: str = "train") -> list[str]:
+        kind = "inference" if dataset_kind == "inference" else "train"
+        with connect(self.cfg) as conn:
+            if kind == "inference":
+                rows = conn.execute(
+                    """
+                    SELECT rel_path FROM raw_inference_registry
+                    WHERE COALESCE(selected, 0)=1
+                    ORDER BY id ASC
+                    """
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    """
+                    SELECT rel_path FROM raw_registry
+                    WHERE COALESCE(dataset_kind,'train')='train'
+                      AND COALESCE(selected, 0)=1
+                    ORDER BY id ASC
+                    """
+                ).fetchall()
+        return [str(r["rel_path"]).replace("\\", "/") for r in rows if r["rel_path"]]
 
     def list_raw_registry(
         self, limit: int = 200, *, dataset_kind: str = "train"
@@ -345,13 +419,13 @@ class OpsRepository:
         if table == "raw_registry":
             cols = (
                 "id, registered_at, filename, rel_path, row_count, "
-                "file_sha256, note, dataset_kind"
+                "file_sha256, note, dataset_kind, selected"
             )
             for new_id, r in enumerate(rows, start=1):
                 conn.execute(
                     f"""
                     INSERT INTO raw_registry({cols})
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         new_id,
@@ -362,17 +436,19 @@ class OpsRepository:
                         r.get("file_sha256"),
                         r.get("note"),
                         r.get("dataset_kind") or "train",
+                        int(r.get("selected") if r.get("selected") is not None else 1),
                     ),
                 )
         else:
             cols = (
-                "id, registered_at, filename, rel_path, row_count, file_sha256, note"
+                "id, registered_at, filename, rel_path, row_count, "
+                "file_sha256, note, selected"
             )
             for new_id, r in enumerate(rows, start=1):
                 conn.execute(
                     f"""
                     INSERT INTO raw_inference_registry({cols})
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         new_id,
@@ -382,6 +458,7 @@ class OpsRepository:
                         r.get("row_count"),
                         r.get("file_sha256"),
                         r.get("note"),
+                        int(r.get("selected") if r.get("selected") is not None else 1),
                     ),
                 )
 

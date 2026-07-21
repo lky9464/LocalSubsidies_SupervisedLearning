@@ -61,7 +61,23 @@ PC·시간 제약 시 **주·보에 해당하는 2종만** 학습·추론해도 
 - Gradient Boosting: 3위(Stacked) 대비 우선순위 낮음 — 재평가 가능
 
 **설정 기본값** (`configs/default.yaml`):  
-`primary_algo: random_forest`, `aux_algo: catboost` — **초기값·스냅샷 반영**이며 영구 고정 아님.
+`primary_algo: random_forest_v1`, `aux_algo: catboost_v1` — **초기값·스냅샷 반영**이며 영구 고정 아님.  
+algo_id 형식·마이그레이션: [`algo_id_migration.md`](algo_id_migration.md).
+
+> **기준선 동결 (고도화용):** 위 스냅샷·Train/Test 구간·타겟·누수 제외 정책은  
+> 튜닝 비교의 **v0.3.0 Baseline** 이다. 상세·절차: [`model_tuning.md`](model_tuning.md).
+
+### 2.2 튜닝·재선정 시 최적화 목표
+
+하이퍼파라미터 탐색(`scripts/12_tune_hyperparams.py`)은 **Validation**(`split.valid_*`)만 사용한다. Test로 반복 튜닝하지 않는다.
+
+| 순위 | 지표 | 비고 |
+|------|------|------|
+| 1 | 상위 1%·5% 리프트 / 타겟 포착 | 점검 큐·4×4와 정합 |
+| 2 | PR-AUC | 불균형 순위 |
+| 가드 | 정밀도 급락 시 탈락 | `tune.min_precision_ratio` |
+
+후보 반영 후 **Test 1회** (`07`→`08`→`10`)로 확정하고, 순위가 바뀌면 §2.1·`ops_queue`를 갱신한다.
 
 ---
 
@@ -201,8 +217,8 @@ Stacked 등 **참고 모델**은 분쟁·재검토 시에만 사용 (단독 4×4
 1. CSV를 `{data_root}/raw_inference/` 에 배치 (스키마·EUC-KR 동일)  
 2. 로컬 실행 ( **`primary_algo` / `aux_algo` 각각** — 설정값 확인):
    ```text
-   python scripts/11_score_inference.py --algo random_forest
-   python scripts/11_score_inference.py --algo catboost
+   python scripts/11_score_inference.py --algo random_forest_v1
+   python scripts/11_score_inference.py --algo catboost_v1
    ```
    (예시는 당시 스냅샷. 실제 `--algo`는 설정·순위에 맞게 바꿉니다.)
 3. 점수 파일은 Test와 동일 양식·명명 규칙으로 저장 (로컬 전용, GitHub 금지)  
@@ -223,6 +239,16 @@ Stacked 등 **참고 모델**은 분쟁·재검토 시에만 사용 (단독 4×4
 - 2026 현장 적발/환수 결과와 점수 등급의 정합이 지속 불량  
 - 재학습 후 Test 지표에서 **1~3위·주·보 후보**가 바뀌는 경우  
 - raw 기간·건수·양성 비율이 크게 변한 경우  
+- `model_params` / 튜닝 반영 후 기준선 대비 4×4·리프트가 바뀌는 경우 ([`model_tuning.md`](model_tuning.md) §5)  
+
+### 8.1 튜닝 반영 후 주·보 체크리스트
+
+- [ ] Validation best → `model_params` 반영  
+- [ ] `05`(해당 algo) → `06` → `07` → `08` → `10`  
+- [ ] 기준선 대비 PR-AUC·상위 1%/5% 리프트·주A/주B 포착 비교  
+- [ ] 필요 시 `ops_queue.primary_algo` / `aux_algo` 갱신  
+- [ ] 본 절 §2.1 스냅샷·일자 갱신 · [`VERSION_HISTORY.md`](VERSION_HISTORY.md)  
+
 
 ---
 

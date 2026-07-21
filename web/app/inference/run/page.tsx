@@ -57,7 +57,13 @@ export default function InferenceRunPage() {
 
   const { data: prereq } = useQuery({
     queryKey: ["inferPrereq"],
-    queryFn: () => apiGet<{ has_data: boolean }>("/api/inference/prereq"),
+    queryFn: () =>
+      apiGet<{
+        has_data: boolean;
+        file_count?: number;
+        selected_files?: string[];
+        message?: string;
+      }>("/api/inference/prereq"),
   });
 
   const { data: meta } = useQuery({
@@ -149,13 +155,20 @@ export default function InferenceRunPage() {
         현재 Run에서 학습된 알고리즘만 선택할 수 있습니다. 기본값은 평가순위 주모델(1위)·보조모델(2위)입니다.
       </Alert>
 
+      {prereq?.has_data && (prereq.selected_files?.length || 0) > 0 ? (
+        <Alert>
+          추론에 사용할 CSV ({prereq.selected_files!.length}개): {prereq.selected_files!.join(", ")}
+        </Alert>
+      ) : null}
+
       {!prereq?.has_data ? (
         <>
           <Alert variant="destructive">
-            등록된 추론 데이터가 없습니다.{" "}
+            {prereq?.message || "선택된 추론 데이터가 없습니다."}{" "}
             <AppLink href="/data/" className="underline">
               데이터 등록
             </AppLink>
+            에서 추론 CSV를 체크한 뒤 「선택 저장」하세요.
           </Alert>
           <Button disabled>추론 실행</Button>
         </>

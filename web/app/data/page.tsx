@@ -1,8 +1,8 @@
 "use client";
 
-import { useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { apiDelete, apiGet, apiUpload } from "@/lib/api";
+import { apiDelete, apiGet, apiPut, apiUpload } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/alert";
 import { LoadingSpinner } from "@/components/loading-spinner";
@@ -13,6 +13,7 @@ type MetaItem = {
   row_count?: number | string;
   registered_at?: string;
   note?: string;
+  selected?: boolean;
 };
 
 function SimpleModal({
@@ -39,37 +40,6 @@ function SimpleModal({
   );
 }
 
-function MetaSummary({ items }: { items: MetaItem[] }) {
-  if (!items.length) {
-    return <p className="text-sm text-muted-foreground">등록 메타 없음</p>;
-  }
-  const totalRows = items.reduce((sum, it) => {
-    const n = Number(it.row_count);
-    return sum + (Number.isFinite(n) ? n : 0);
-  }, 0);
-  return (
-    <div className="space-y-2">
-      <p className="text-sm">
-        <span className="font-medium">{items.length}개 파일</span>
-        <span className="text-muted-foreground"> · 합계 약 {totalRows.toLocaleString()}행</span>
-      </p>
-      <ul className="max-h-56 space-y-1 overflow-auto rounded-md border bg-muted/30 p-3 text-sm">
-        {items.map((it) => (
-          <li key={String(it.id)} className="flex flex-wrap gap-x-3 gap-y-0.5">
-            <span className="font-mono text-xs sm:text-sm">{String(it.filename ?? "")}</span>
-            <span className="text-muted-foreground">
-              {it.row_count != null ? `${Number(it.row_count).toLocaleString()}행` : "행수?"}
-            </span>
-            <span className="text-xs text-muted-foreground">
-              {String(it.registered_at || "").slice(0, 19).replace("T", " ")}
-            </span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
 function DataSection({
   title,
   caption,
@@ -80,9 +50,11 @@ function DataSection({
   kind: "train" | "inference";
 }) {
   const path = kind === "train" ? "/api/data/raw" : "/api/data/raw-inference";
+  const selectionPath = `${path}/selection`;
   const inputRef = useRef<HTMLInputElement>(null);
-  const [selectMode, setSelectMode] = useState(false);
-  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [deleteMode, setDeleteMode] = useState(false);
+  const [deleteIds, setDeleteIds] = useState<Set<number>>(new Set());
+  const [activeIds, setActiveIds] = useState<Set<number>>(new Set());
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [clearOpen, setClearOpen] = useState(false);
@@ -99,11 +71,19 @@ function DataSection({
 
   const items = Array.isArray(data?.items) ? data.items : [];
 
+  useEffect(() => {
+    const next = new Set<number>();
+    for (const it of items) {
+      if (it.selected) next.add(Number(it.id));
+    }
+    setActiveIds(next);
+  }, [data]);
+
   async function upload(files: File[], confirm = false) {
     setBusy(true);
     setMsg("");
     try {
-      const res = await apiUpload<{ saved?: number; needs_confirm?: boolean }>(
+      const res = await apiUpload<{ saved?: number; needs_confirm?: boolean; message?: string }>(
         path,
         files,
         confirm ? { confirm_add: "true" } : undefined,
@@ -112,7 +92,7 @@ function DataSection({
         setPendingFiles(files);
         setConfirmOpen(true);
       } else {
-        setMsg(`${res.saved ?? files.length}개 파일 저장 및 메타 기록 완료`);
+        setMsg(`${res.saved ?? files.length}개 파일 저장 완료 (기본 선택됨). 필요 시 체크를 조정한 뒤 「선택 저장」하세요.`);
         await refetch();
       }
     } catch (e) {
@@ -122,13 +102,34 @@ function DataSection({
     }
   }
 
+  async function saveSelection() {
+    setBusy(true);
+    setMsg("");
+    try {
+      const res = await apiPut<{ selected_count: number }>(selectionPath, {
+        ids: [...activeIds],
+      });
+      setMsg(
+        res.selected_count > 0
+          ? `선택 저장 완료: ${res.selected_count}개 파일이 다음 ${kind === "train" ? "학습" : "추론"}에 사용됩니다.`
+          : "선택이 비어 있습니다. 학습/추론 전에 1개 이상 선택하세요.",
+      );
+      await refetch();
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : "선택 저장 실패");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function deleteSelected() {
-    if (!selected.size) return;
+    if (!deleteIds.size) return;
     setBusy(true);
     try {
-      await apiDelete(`${path}?ids=${[...selected].join(",")}`);
-      setSelected(new Set());
-      setSelectMode(false);
+      await apiDelete(`${path}?ids=${[...deleteIds].join(",")}`);
+      setDeleteIds(new Set());
+      setDeleteMode(false);
+      setMsg("선택한 파일을 삭제했습니다.");
       await refetch();
     } catch (e) {
       setMsg(e instanceof Error ? e.message : "삭제 실패");
@@ -142,6 +143,7 @@ function DataSection({
     try {
       await apiDelete(`${path}/all`);
       setClearOpen(false);
+      setMsg("전체 삭제 완료");
       await refetch();
     } catch (e) {
       setMsg(e instanceof Error ? e.message : "초기화 실패");
@@ -149,6 +151,9 @@ function DataSection({
       setBusy(false);
     }
   }
+
+  const selectedCount = activeIds.size;
+  const allSelected = items.length > 0 && selectedCount === items.length;
 
   return (
     <section className="space-y-4 rounded-lg border p-6">
@@ -174,27 +179,41 @@ function DataSection({
       </div>
       {msg ? <Alert variant="success">{msg}</Alert> : null}
 
-      <div className="flex items-center justify-between gap-2">
-        <h3 className="text-sm font-medium">등록 현황 (메타)</h3>
-        <div className="flex gap-2">
-          {selectMode ? (
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-sm font-medium">
+          등록 풀 · 사용 선택{" "}
+          <span className="font-normal text-muted-foreground">
+            (체크된 {selectedCount}개 → 다음 {kind === "train" ? "학습" : "추론"})
+          </span>
+        </h3>
+        <div className="flex flex-wrap gap-2">
+          {!deleteMode ? (
             <>
-              <Button variant="outline" size="sm" onClick={() => setSelectMode(false)}>
-                취소
+              <Button
+                size="sm"
+                onClick={() => void saveSelection()}
+                disabled={busy || !items.length}
+              >
+                선택 저장
               </Button>
-              <Button size="sm" onClick={() => void deleteSelected()} disabled={!selected.size || busy}>
-                선택 삭제
-              </Button>
-            </>
-          ) : (
-            <>
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setSelectMode(true)}
+                onClick={() => {
+                  if (allSelected) setActiveIds(new Set());
+                  else setActiveIds(new Set(items.map((it) => Number(it.id))));
+                }}
                 disabled={!items.length}
               >
-                선택 삭제
+                {allSelected ? "전체 해제" : "전체 선택"}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setDeleteMode(true)}
+                disabled={!items.length}
+              >
+                삭제 모드
               </Button>
               <Button
                 variant="destructive"
@@ -203,6 +222,15 @@ function DataSection({
                 disabled={!items.length}
               >
                 초기화
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button variant="outline" size="sm" onClick={() => setDeleteMode(false)}>
+                취소
+              </Button>
+              <Button size="sm" onClick={() => void deleteSelected()} disabled={!deleteIds.size || busy}>
+                선택 삭제
               </Button>
             </>
           )}
@@ -218,34 +246,56 @@ function DataSection({
         </Alert>
       ) : isLoading ? (
         <p className="text-sm text-muted-foreground">불러오는 중...</p>
-      ) : selectMode ? (
-        <div className="max-h-56 space-y-2 overflow-auto rounded-md border p-3">
-          {items.map((item) => {
-            const id = Number(item.id);
+      ) : !items.length ? (
+        <p className="text-sm text-muted-foreground">등록 메타 없음</p>
+      ) : (
+        <ul className="max-h-72 space-y-2 overflow-auto rounded-md border bg-muted/30 p-3 text-sm">
+          {items.map((it) => {
+            const id = Number(it.id);
+            const checked = deleteMode ? deleteIds.has(id) : activeIds.has(id);
             return (
-              <label key={id} className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={selected.has(id)}
-                  onChange={(e) => {
-                    const next = new Set(selected);
-                    if (e.target.checked) next.add(id);
-                    else next.delete(id);
-                    setSelected(next);
-                  }}
-                />
-                {String(item.filename)} ({String(item.row_count ?? "?")}행)
-              </label>
+              <li key={id}>
+                <label className="flex cursor-pointer flex-wrap items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={(e) => {
+                      if (deleteMode) {
+                        const next = new Set(deleteIds);
+                        if (e.target.checked) next.add(id);
+                        else next.delete(id);
+                        setDeleteIds(next);
+                      } else {
+                        const next = new Set(activeIds);
+                        if (e.target.checked) next.add(id);
+                        else next.delete(id);
+                        setActiveIds(next);
+                      }
+                    }}
+                  />
+                  <span className="font-mono text-xs sm:text-sm">{String(it.filename ?? "")}</span>
+                  <span className="text-muted-foreground">
+                    {it.row_count != null ? `${Number(it.row_count).toLocaleString()}행` : "행수?"}
+                  </span>
+                  {!deleteMode && it.selected ? (
+                    <span className="text-xs text-emerald-700">저장됨·사용</span>
+                  ) : null}
+                  <span className="text-xs text-muted-foreground">
+                    {String(it.registered_at || "").slice(0, 19).replace("T", " ")}
+                  </span>
+                </label>
+              </li>
             );
           })}
-        </div>
-      ) : (
-        <MetaSummary items={items} />
+        </ul>
       )}
 
       {confirmOpen ? (
-        <SimpleModal title="추가 등록 확인" onClose={() => setConfirmOpen(false)}>
-          <p className="mb-4 text-sm">이미 등록된 데이터가 있습니다. 추가 등록하시겠습니까?</p>
+        <SimpleModal title="풀에 추가 등록" onClose={() => setConfirmOpen(false)}>
+          <p className="mb-4 text-sm">
+            이미 등록된 데이터가 있습니다. 풀에 추가하시겠습니까? 학습/추론에 쓸 파일은 목록에서
+            체크한 뒤 「선택 저장」하세요.
+          </p>
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setConfirmOpen(false)}>
               취소
@@ -257,7 +307,7 @@ function DataSection({
                 setPendingFiles([]);
               }}
             >
-              등록
+              추가 등록
             </Button>
           </div>
         </SimpleModal>
@@ -288,17 +338,18 @@ export default function DataPage() {
       <div>
         <h1 className="text-2xl font-semibold">데이터 등록</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          업로드는 data_root 하위에만 저장됩니다. DB에는 파일명·행수 등 메타만 기록합니다.
+          CSV는 data_root에 누적 저장됩니다. 체크한 파일만 다음 학습·추론에 사용됩니다(여러 개면
+          세로 결합). DB에는 파일명·행수·선택 여부 등 메타만 기록합니다.
         </p>
       </div>
       <DataSection
         title="학습·평가 raw 데이터"
-        caption="TLS4902R 레이아웃 CSV(통상 8종). data_root/raw 에 저장됩니다."
+        caption="TLS4902R 레이아웃 CSV. data_root/raw. 사용할 파일 체크 → 선택 저장 → 학습 실행."
         kind="train"
       />
       <DataSection
         title="추론 raw 데이터"
-        caption="동일 레이아웃. TAET_YN 및 타겟 수정 3컬럼은 추론에서 무시됩니다. data_root/raw_inference."
+        caption="동일 레이아웃. data_root/raw_inference. 사용할 파일 체크 → 선택 저장 → 추론 실행."
         kind="inference"
       />
     </div>

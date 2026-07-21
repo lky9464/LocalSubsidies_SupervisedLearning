@@ -45,8 +45,8 @@ from src.scoring.ops_queue import (  # noqa: E402
 def _resolve_primary_aux(cfg: dict) -> tuple[str, str, str | None]:
     """ranking.json → ops DB → default.yaml 순."""
     ops_cfg = cfg.get("ops_queue", {})
-    default_p = ops_cfg.get("primary_algo", "random_forest")
-    default_a = ops_cfg.get("aux_algo", "catboost")
+    default_p = ops_cfg.get("primary_algo", "random_forest_v1")
+    default_a = ops_cfg.get("aux_algo", "catboost_v1")
     run_id = None
 
     rank_path = resolve_data_path(cfg, "algorithms") / "operations" / "model_ranking.json"

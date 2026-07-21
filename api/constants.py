@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
-ALGO_LABELS = {
-    "catboost": "CatBoost",
-    "stacked_ensemble": "Stacked Ensemble",
-    "easy_ensemble": "EasyEnsemble",
-    "gradient_boosting": "Gradient Boosting",
-    "random_forest": "RandomForest",
-}
+from src.models.registry import build_algo_labels_map, default_algo_labels
+
+# 정적 기본 라벨 (cfg 없이). API는 build_algo_labels_map(cfg) 권장.
+ALGO_LABELS = default_algo_labels()
+
+
+def algo_label(algo_id: str, cfg: dict | None = None) -> str:
+    return build_algo_labels_map(cfg).get(algo_id, algo_id)
+
 
 PREVIEW_OPTIONS = (10, 30, 50, 100)
 

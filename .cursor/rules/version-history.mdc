@@ -1,0 +1,24 @@
+---
+description: 버전 변경 시 docs/VERSION_HISTORY.md 기록 의무
+alwaysApply: true
+---
+
+# 버전 이력 기록
+
+프로젝트 버전(시맨틱 버전 · Git 태그 · GitHub Release)이 바뀌면 **반드시** [`docs/VERSION_HISTORY.md`](docs/VERSION_HISTORY.md)를 같은 작업에서 갱신한다.
+
+## 언제
+
+- `vX.Y.Z` 태그/Release 생성·준비
+- README 배지·문서의 현재 버전 표기 변경
+- 사용자가 버전 bump를 요청한 경우
+
+## 어떻게
+
+1. 문서 상단 **현재 버전**을 새 버전으로 수정
+2. 기존 최신 섹션 **위**에 `## vX.Y.Z — 짧은 제목` 추가
+3. 주요 변경을 bullet **3~5줄**로 요약 (README/릴리스 노트 전체를 복사하지 말 것)
+4. GitHub Release/태그 링크 추가
+5. README·오프라인 문서에 버전 번호가 있으면 함께 맞춤
+
+형식은 기존 `v0.3.0` / `v0.2.0` / `v0.1.0` 항목을 따른다.

@@ -125,8 +125,8 @@ feature_importance:
 # 주·보 상위% 구간 A~D (4×4). Test=타겟 포착 분포(10), 추론=점검 우선순위표
 # primary_algo / aux_algo: 평가·순위(08) 후 설정. 데이터 변경 시 갱신 (고정 아님)
 ops_queue:
-  primary_algo: random_forest   # 현재 스냅샷 예시
-  aux_algo: catboost            # 현재 스냅샷 예시
+  primary_algo: random_forest_v1
+  aux_algo: catboost_v1
   a_top_pct: 1
   b_top_pct: 5
   c_top_pct: 10
@@ -137,13 +137,102 @@ memory:
   n_jobs: 2
   transform_dtype: float32
 
-# 알고리즘 (로컬 학습 대상)
+# 알고리즘 레지스트리: family → versions (algo_id = {family}_v{N})
+# 새 Python 패키지 family는 v1부터. 하이퍼 변경 시 동일 family에 v2+ 추가.
+algorithm_registry:
+  catboost:
+    label: CatBoost
+    versions:
+      v1:
+        algo_id: catboost_v1
+        script: scripts/05_train_catboost_v1.py
+  stacked_ensemble:
+    label: Stacked Ensemble
+    versions:
+      v1:
+        algo_id: stacked_ensemble_v1
+        script: scripts/05_train_stacked_ensemble_v1.py
+  easy_ensemble:
+    label: EasyEnsemble
+    versions:
+      v1:
+        algo_id: easy_ensemble_v1
+        script: scripts/05_train_easy_ensemble_v1.py
+  gradient_boosting:
+    label: Gradient Boosting
+    versions:
+      v1:
+        algo_id: gradient_boosting_v1
+        script: scripts/05_train_gradient_boosting_v1.py
+  random_forest:
+    label: RandomForest
+    versions:
+      v1:
+        algo_id: random_forest_v1
+        script: scripts/05_train_random_forest_v1.py
+
+# 알고리즘별 하이퍼파라미터 (키 = algo_id). 수치는 기존 v0.3.0과 동일
+model_params:
+  catboost_v1:
+    iterations: 400
+    depth: 6
+    learning_rate: 0.05
+    auto_class_weights: Balanced
+  random_forest_v1:
+    n_estimators: 200
+    max_depth: 20
+    min_samples_leaf: 5
+    class_weight: balanced
+  gradient_boosting_v1:
+    max_iter: 300
+    max_depth: 6
+    learning_rate: 0.05
+    max_bins: 128
+    class_weight: balanced
+  stacked_ensemble_v1:
+    cv: 3
+    rf_n_estimators: 100
+    rf_max_depth: 16
+    rf_min_samples_leaf: 5
+    hgb_max_depth: 5
+    hgb_learning_rate: 0.05
+    hgb_max_iter: 150
+    hgb_max_bins: 128
+    meta_max_iter: 500
+  easy_ensemble_v1:
+    n_estimators: 8
+
+# Validation 소규모 격자 탐색 (scripts/12_tune_hyperparams.py)
+# split_mode=random: pool_start~pool_end 를 랜덤 분할 (본 파이프라인 Train/Test와 독립)
+# split_mode=time: split.valid_* 또는 tune.valid_* 로 Train 내부 기간 분할
+tune:
+  split_mode: random
+  pool_start: "202401"
+  pool_end: "202512"
+  valid_size: 0.2
+  random_state: 42
+  algorithms:
+    - random_forest_v1
+    - catboost_v1
+  primary_metric: top1_lift
+  min_precision_ratio: 0.85
+  grids:
+    random_forest_v1:
+      n_estimators: [150, 200, 300]
+      max_depth: [16, 20, 24]
+      min_samples_leaf: [3, 5, 8]
+    catboost_v1:
+      iterations: [300, 400, 500]
+      depth: [5, 6, 7]
+      learning_rate: [0.03, 0.05, 0.08]
+
+# 기본 학습 대상 algo_id 목록
 algorithms:
-  - catboost
-  - stacked_ensemble
-  - easy_ensemble
-  - gradient_boosting
-  - random_forest
+  - catboost_v1
+  - stacked_ensemble_v1
+  - easy_ensemble_v1
+  - gradient_boosting_v1
+  - random_forest_v1
 
 # CatBoost 범주형으로 다룰 후보 (실제 존재 컬럼만 사용)
 categorical_candidates:

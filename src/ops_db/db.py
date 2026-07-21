@@ -59,7 +59,8 @@ CREATE TABLE IF NOT EXISTS raw_registry (
     row_count INTEGER,
     file_sha256 TEXT,
     note TEXT,
-    dataset_kind TEXT NOT NULL DEFAULT 'train'
+    dataset_kind TEXT NOT NULL DEFAULT 'train',
+    selected INTEGER NOT NULL DEFAULT 1
 );
 
 CREATE TABLE IF NOT EXISTS raw_inference_registry (
@@ -69,7 +70,8 @@ CREATE TABLE IF NOT EXISTS raw_inference_registry (
     rel_path TEXT NOT NULL,
     row_count INTEGER,
     file_sha256 TEXT,
-    note TEXT
+    note TEXT,
+    selected INTEGER NOT NULL DEFAULT 1
 );
 
 CREATE TABLE IF NOT EXISTS ops_queue_rows (
@@ -140,6 +142,20 @@ def _migrate(conn: sqlite3.Connection) -> None:
         conn.execute(
             "ALTER TABLE raw_registry ADD COLUMN dataset_kind TEXT NOT NULL DEFAULT 'train'"
         )
+    # 기존 등록분은 즉시 사용 가능하도록 selected=1
+    if "selected" not in cols:
+        conn.execute(
+            "ALTER TABLE raw_registry ADD COLUMN selected INTEGER NOT NULL DEFAULT 1"
+        )
+
+    infer_cols = {
+        r[1]
+        for r in conn.execute("PRAGMA table_info(raw_inference_registry)").fetchall()
+    }
+    if infer_cols and "selected" not in infer_cols:
+        conn.execute(
+            "ALTER TABLE raw_inference_registry ADD COLUMN selected INTEGER NOT NULL DEFAULT 1"
+        )
 
     ops_cols = {
         r[1]
@@ -155,3 +171,6 @@ def _migrate(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE runs ADD COLUMN operator TEXT")
     if run_cols and "work_content" not in run_cols:
         conn.execute("ALTER TABLE runs ADD COLUMN work_content TEXT")
+
+    # Execution 스냅샷 기능 철회 — 잔여 테이블 제거
+    conn.execute("DROP TABLE IF EXISTS executions")

@@ -103,7 +103,10 @@ def main() -> None:
         model = packed["model"]
         pre = packed["preprocessor"]
 
-        if algo == "catboost":
+        from src.models.registry import family_of, normalize_algo_id
+
+        algo = normalize_algo_id(algo)
+        if family_of(algo) == "catboost":
             X_te, cols = transform_features(X_test_raw, pre, categorical, numeric)
             feat_names = list(cols) if cols else list(numeric) + list(categorical)
         else:

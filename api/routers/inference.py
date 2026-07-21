@@ -17,13 +17,14 @@ from api.services.inference import (
     missing_trained_algos,
 )
 from api.state import set_pipeline_abandon
+from src.pipeline.run_config import freeze_raw_selection
 
 router = APIRouter(prefix="/api/inference", tags=["inference"])
 
 
 @router.get("/prereq")
-def prereq(cfg=Depends(get_cfg)) -> dict:
-    return inference_prereq(cfg)
+def prereq(cfg=Depends(get_cfg), repo=Depends(get_repo)) -> dict:
+    return inference_prereq(cfg, repo)
 
 
 @router.get("/trained")
@@ -120,6 +121,17 @@ def run_inference(
 
     repo.ensure_run(body.run_id)
     set_pipeline_abandon(cfg, body.run_id, False)
+    try:
+        freeze_raw_selection(
+            cfg,
+            body.run_id,
+            repo.list_selected_rel_paths(dataset_kind="inference"),
+            kind="inference",
+        )
+    except ValueError as exc:
+        from fastapi import HTTPException
+
+        raise HTTPException(400, str(exc)) from exc
     try:
         job = mgr.start_steps(
             body.run_id,

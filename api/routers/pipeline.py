@@ -18,7 +18,14 @@ from api.services.pipeline import (
 )
 from api.state import get_opts_edit, get_pipeline_abandon, set_opts_edit, set_pipeline_abandon
 from src.io.config import resolve_repo_path
-from src.pipeline.run_config import load_run_config, run_config_path, save_run_config, warn_test_share
+from src.models.registry import build_algo_labels_map, normalize_algo_id
+from src.pipeline.run_config import (
+    freeze_raw_selection,
+    load_run_config,
+    run_config_path,
+    save_run_config,
+    warn_test_share,
+)
 from src.pipeline.runner import TRAIN_PIPELINE_STEPS
 
 router = APIRouter(tags=["pipeline"])
@@ -49,7 +56,8 @@ def get_config(run_id: str, cfg=Depends(get_cfg), repo=Depends(get_repo)) -> dic
     step_map = step_status_map(repo, run_id)
     locked = settings_locked(cfg, run_id, step_map)
     split = run_cfg.get("split") or {}
-    algos = run_cfg.get("algorithms") or []
+    algos = [normalize_algo_id(a) for a in (run_cfg.get("algorithms") or [])]
+    labels_map = build_algo_labels_map(cfg)
     warn = None
     if split.get("mode", "time") == "time":
         warn = warn_test_share(
@@ -58,6 +66,8 @@ def get_config(run_id: str, cfg=Depends(get_cfg), repo=Depends(get_repo)) -> dic
             split.get("test_start", ""),
             split.get("test_end", ""),
         )
+    selected_raw = repo.list_selected_rel_paths(dataset_kind="train")
+    frozen_raw = [str(x) for x in (run_cfg.get("raw_files") or [])]
     return {
         "run_id": run_id,
         "config": run_cfg,
@@ -66,11 +76,13 @@ def get_config(run_id: str, cfg=Depends(get_cfg), repo=Depends(get_repo)) -> dic
         "opts_edit": get_opts_edit(cfg, run_id),
         "pipeline_abandon": get_pipeline_abandon(cfg, run_id),
         "split_summary": _split_summary(split),
-        "algo_labels": [ALGO_LABELS.get(a, a) for a in algos],
+        "algo_labels": [labels_map.get(a, ALGO_LABELS.get(a, a)) for a in algos],
         "config_exists": run_config_path(cfg, run_id).exists(),
         "warn_test_share": warn,
         "steps": TRAIN_PIPELINE_STEPS,
         "step_status": step_map,
+        "selected_raw_files": selected_raw,
+        "frozen_raw_files": frozen_raw,
     }
 
 
@@ -88,7 +100,7 @@ def put_config(run_id: str, body: RunConfigUpdate, cfg=Depends(get_cfg), repo=De
     if body.algorithms is not None:
         if len(body.algorithms) < 2:
             raise HTTPException(400, "알고리즘을 2개 이상 선택하세요.")
-        run_cfg["algorithms"] = body.algorithms
+        run_cfg["algorithms"] = [normalize_algo_id(a) for a in body.algorithms]
     if body.options_committed is not None:
         run_cfg["options_committed"] = body.options_committed
     if body.exclude_features_extra is not None:
@@ -184,6 +196,18 @@ def pipeline_start(
     algos = list(run_cfg.get("algorithms") or [])
     if "train" in step_ids and len(algos) < 2:
         raise HTTPException(400, "학습 알고리즘을 2개 이상 선택하세요.")
+
+    # 01 merge 가 포함된 실행이면 현재 데이터 선택을 run_config에 동결
+    if "merge" in step_ids:
+        try:
+            run_cfg = freeze_raw_selection(
+                cfg,
+                run_id,
+                repo.list_selected_rel_paths(dataset_kind="train"),
+                kind="train",
+            )
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
 
     run_cfg["options_committed"] = True
     save_run_config(cfg, run_id, run_cfg)

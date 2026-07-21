@@ -25,6 +25,8 @@ alwaysApply: true
    - `scripts/09_report.py`
    - `scripts/10_ops_queue.py`
    - `scripts/11_score_inference.py`
+   - `scripts/12_tune_hyperparams.py`
+   - `scripts/migrate_algo_id_folders.py`
    - `scripts/_job_worker.py`
    - `RunWebNext.bat` / `scripts/_next_web_launcher.py` / `uvicorn api.main:app` (학습·데이터 입출력 유발)
 4. Streamlit 웹 UI를 통해 raw·행단위 점수·DB 행을 Agent가 조회·출력하지 말 것

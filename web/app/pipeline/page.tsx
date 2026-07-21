@@ -12,7 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DataTable } from "@/components/matrix-table";
 import { LoadingSpinner } from "@/components/job-banner";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { ConfigMeta } from "@/lib/types";
+import type { AlgoFamilyMeta, ConfigMeta } from "@/lib/types";
 
 function asStringArray(v: unknown): string[] {
   return Array.isArray(v) ? v.map(String) : [];
@@ -94,8 +94,36 @@ export default function PipelinePage() {
   const trainSteps = Array.isArray(meta?.train_steps) ? meta!.train_steps : [];
   const stepRows = Array.isArray(stepsData?.steps) ? stepsData!.steps : [];
   const metaAlgos = asStringArray(meta?.algorithms);
+  const algoRegistry: AlgoFamilyMeta[] = Array.isArray(meta?.algorithm_registry)
+    ? meta!.algorithm_registry!
+    : [];
   const leakageFeatures = asStringArray(leakage?.all_features);
   const leakageSelectedDefault = asStringArray(leakage?.default_selected);
+
+  function familyHasSelection(family: string): boolean {
+    const fam = algoRegistry.find((f) => f.family === family);
+    if (!fam) return false;
+    return fam.versions.some((v) => formAlgos.includes(v.algo_id));
+  }
+
+  function toggleFamily(family: string, checked: boolean) {
+    const fam = algoRegistry.find((f) => f.family === family);
+    if (!fam) return;
+    const cur = new Set(formAlgos);
+    if (checked) {
+      for (const v of fam.versions) cur.add(v.algo_id);
+    } else {
+      for (const v of fam.versions) cur.delete(v.algo_id);
+    }
+    setForm({ ...form, algorithms: [...cur] });
+  }
+
+  function toggleVersion(algoId: string, checked: boolean) {
+    const cur = new Set(formAlgos);
+    if (checked) cur.add(algoId);
+    else cur.delete(algoId);
+    setForm({ ...form, algorithms: [...cur] });
+  }
 
   useEffect(() => {
     if (!cfgData) return;
@@ -209,6 +237,29 @@ export default function PipelinePage() {
         </Alert>
       ) : null}
 
+      {(() => {
+        const selected = asStringArray(cfgData?.selected_raw_files);
+        const frozen = asStringArray(cfgData?.frozen_raw_files);
+        const names = (selected.length ? selected : frozen).map((p) => p.split(/[/\\]/).pop() || p);
+        if (!names.length) {
+          return (
+            <Alert variant="destructive">
+              선택된 학습 CSV가 없습니다.{" "}
+              <AppLink href="/data/" className="underline">
+                데이터 등록
+              </AppLink>
+              에서 파일을 체크한 뒤 「선택 저장」하세요. (01 원본 통합 실행 시 필수)
+            </Alert>
+          );
+        }
+        return (
+          <Alert>
+            학습에 사용할 CSV ({names.length}개): {names.join(", ")}
+            {selected.length ? " · 데이터 등록 선택 기준" : " · 이 Run에 동결된 목록"}
+          </Alert>
+        );
+      })()}
+
       <Card>
         <CardHeader>
           <CardTitle>
@@ -293,23 +344,47 @@ export default function PipelinePage() {
                 </div>
               )}
               <div>
-                <Label>학습 알고리즘 (2개 이상)</Label>
-                <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                  {metaAlgos.map((a) => (
-                    <label key={a} className="flex items-center gap-2 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={formAlgos.includes(a)}
-                        onChange={(e) => {
-                          const cur = new Set(formAlgos);
-                          if (e.target.checked) cur.add(a);
-                          else cur.delete(a);
-                          setForm({ ...form, algorithms: [...cur] });
-                        }}
-                      />
-                      {(meta?.algo_labels && meta.algo_labels[a]) || a}
-                    </label>
-                  ))}
+                <Label>학습 알고리즘 (종류 → 버전, 합계 2개 이상)</Label>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  동일 종류의 버전 2개 선택도 알고리즘 2개로 계산됩니다. 선택: {formAlgos.length}개
+                </p>
+                <div className="mt-3 space-y-3">
+                  {(algoRegistry.length
+                    ? algoRegistry
+                    : metaAlgos.map((a) => ({
+                        family: a,
+                        label: (meta?.algo_labels && meta.algo_labels[a]) || a,
+                        versions: [{ version: "v1", algo_id: a, label: a }],
+                      }))
+                  ).map((fam) => {
+                    const open = familyHasSelection(fam.family);
+                    return (
+                      <div key={fam.family} className="rounded-md border p-3">
+                        <label className="flex items-center gap-2 text-sm font-medium">
+                          <input
+                            type="checkbox"
+                            checked={open}
+                            onChange={(e) => toggleFamily(fam.family, e.target.checked)}
+                          />
+                          {fam.label}
+                        </label>
+                        {open ? (
+                          <div className="mt-2 ml-6 grid gap-2 sm:grid-cols-2">
+                            {fam.versions.map((v) => (
+                              <label key={v.algo_id} className="flex items-center gap-2 text-sm">
+                                <input
+                                  type="checkbox"
+                                  checked={formAlgos.includes(v.algo_id)}
+                                  onChange={(e) => toggleVersion(v.algo_id, e.target.checked)}
+                                />
+                                {v.label || v.version}
+                              </label>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
               <Button onClick={saveOptions} disabled={busy}>

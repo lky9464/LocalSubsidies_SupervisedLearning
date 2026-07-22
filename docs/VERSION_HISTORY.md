@@ -1,6 +1,6 @@
 # 버전 이력
 
-현재 버전: **v0.3.0**  
+현재 버전: **v0.4.0**  
 저장소: [LocalSubsidies_SupervisedLearning](https://github.com/lky9464/LocalSubsidies_SupervisedLearning)  
 릴리스: [Releases](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases)
 
@@ -8,17 +8,16 @@
 
 ---
 
-## Unreleased (작업 중 · 아직 v0.4.0 아님)
+## v0.4.0 — 하이퍼파라미터 튜닝·알고리즘 v2 추가
 
-알고리즘 `{family}_vN` 버전 관리·튜닝 도구·학습 옵션 2단 UI 등이 main에 반영 중이며,  
-하이퍼파라미터 채택·나머지 알고리즘 튜닝·Release 태그 전까지 **공식 버전은 v0.3.0** 을 유지한다.
+- **`12_tune_hyperparams.py`**: Validation 격자 탐색(28 trial) · `top1_lift` + 정밀도 가드로 best 선정 · RF·CatBoost v1 튜닝 리포트(JSON/Excel)
+- **튜닝 채택 → v2 등록**: `random_forest_v2`, `catboost_v2` (`algorithm_registry`, `05_train_*_v2.py`, `model_params`)
+- **`{family}_vN` 버전 체계**: algo_id 레지스트리 · 학습 옵션 UI 종류→버전 2단 선택 · `run_config.algorithms` + `LSL_RUN_ID`로 06~10 평가·순위 연동
+- **튜닝 분할**: `nested_random`(Test 고정 후 Train 안 Valid) · `split.mode=random` · [`hyperparam_methodology.md`](hyperparam_methodology.md) 원리·알고리즘별 설명 보강
+- **추론 결과**: Run별 `inference_algorithms` 저장 · v2 추론 시 주·보·파일 목록이 실제 선택 모델과 일치
+- **설정 메뉴**: 버전 정보(`/version/`) · [`local_web_flow.md`](local_web_flow.md) 학습·데이터 옵션 흐름 정리
 
-주요 진행 (요약):
-- algo_id `*_v1`, `algorithm_registry`, `05_train_*_v1.py`, `12_tune_hyperparams.py`
-- 학습 옵션 UI 종류→버전 2단 선택 (**학습 실행** 화면)
-- 데이터 등록: CSV 단위 사용 선택·선택 삭제·전체 삭제
-- `web/out/` 정적 UI를 git에 포함 (pull만으로 화면 반영; 소스 수정 시 `build_web.bat` 후 커밋)
-- [`algo_id_migration.md`](algo_id_migration.md) · [`hyperparam_methodology.md`](hyperparam_methodology.md) · [`model_tuning.md`](model_tuning.md)
+[Release v0.4.0](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases/tag/v0.4.0)
 
 ---
 

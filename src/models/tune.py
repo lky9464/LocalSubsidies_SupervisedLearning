@@ -42,6 +42,39 @@ def fit_valid_masks_within_train(
     return fit_m, valid_m
 
 
+def fit_valid_masks_random_within_mask(
+    parent_mask: np.ndarray | pd.Series,
+    *,
+    n_rows: int,
+    valid_size: float = 0.2,
+    random_state: int = 42,
+) -> tuple[np.ndarray, np.ndarray]:
+    """부모 마스크(통상 Train) 안에서만 랜덤 fit/valid 분리. Test와 겹치지 않음."""
+    from sklearn.model_selection import train_test_split
+
+    parent = np.asarray(parent_mask, dtype=bool)
+    if parent.shape[0] != n_rows:
+        raise RuntimeError(
+            f"마스크 길이 불일치: mask={parent.shape[0]} df={n_rows}"
+        )
+    idx = np.flatnonzero(parent)
+    if len(idx) < 150:
+        raise RuntimeError(
+            f"튜닝용 Train 행 수 부족: {len(idx)}. 03_preprocess 분할을 확인하세요."
+        )
+    fit_idx, valid_idx = train_test_split(
+        idx,
+        test_size=float(valid_size),
+        random_state=int(random_state),
+        shuffle=True,
+    )
+    fit_m = np.zeros(n_rows, dtype=bool)
+    valid_m = np.zeros(n_rows, dtype=bool)
+    fit_m[fit_idx] = True
+    valid_m[valid_idx] = True
+    return fit_m, valid_m
+
+
 def fit_valid_masks_random_pool(
     df: pd.DataFrame,
     *,
@@ -51,7 +84,7 @@ def fit_valid_masks_random_pool(
     random_state: int = 42,
     period_col: str = "CRTR_YM",
 ) -> tuple[np.ndarray, np.ndarray]:
-    """CRTR_YM 풀 구간에서 랜덤으로 fit/valid 분리 (튜닝 전용)."""
+    """CRTR_YM 풀 전체에서 랜덤 fit/valid (레거시·비권장: Test와 겹칠 수 있음)."""
     from sklearn.model_selection import train_test_split
 
     p = _period_series(df, period_col)
@@ -79,11 +112,33 @@ def resolve_tune_fit_valid(
     train_mask: np.ndarray | pd.Series,
     cfg: dict[str, Any],
 ) -> tuple[np.ndarray, np.ndarray, str]:
-    """tune.split_mode 에 따라 fit/valid 마스크와 설명 문자열 반환."""
+    """tune.split_mode 에 따라 fit/valid 마스크와 설명 문자열 반환.
+
+    - nested_random | random: 03의 train_mask 안에서만 Valid 분리 (Test 미사용, 권장)
+    - pool_random: 기간 풀 전체 80/20 (레거시)
+    - time: Train 내 기간 Valid
+    """
     tune_cfg = cfg.get("tune") or {}
     split_cfg = cfg.get("split") or {}
-    mode = str(tune_cfg.get("split_mode") or "time").lower().strip()
-    if mode == "random":
+    mode = str(tune_cfg.get("split_mode") or "nested_random").lower().strip()
+    # 구 설정 random → nested_random 과 동일하게 취급 (Test 혼용 방지)
+    if mode in ("nested_random", "random"):
+        valid_size = float(tune_cfg.get("valid_size", 0.2))
+        rs = int(tune_cfg.get("random_state", cfg.get("random_seed", 42)))
+        fit_m, valid_m = fit_valid_masks_random_within_mask(
+            train_mask,
+            n_rows=len(df),
+            valid_size=valid_size,
+            random_state=rs,
+        )
+        n_train = int(np.asarray(train_mask, dtype=bool).sum())
+        desc = (
+            f"mode=nested_random within train_mask "
+            f"train={n_train:,} valid_size={valid_size} seed={rs} (Test 미사용)"
+        )
+        return fit_m, valid_m, desc
+
+    if mode == "pool_random":
         pool_start = str(tune_cfg.get("pool_start") or "202401")
         pool_end = str(tune_cfg.get("pool_end") or "202512")
         valid_size = float(tune_cfg.get("valid_size", 0.2))
@@ -96,8 +151,8 @@ def resolve_tune_fit_valid(
             random_state=rs,
         )
         desc = (
-            f"mode=random pool={pool_start}~{pool_end} "
-            f"valid_size={valid_size} seed={rs}"
+            f"mode=pool_random pool={pool_start}~{pool_end} "
+            f"valid_size={valid_size} seed={rs} (레거시·Test와 겹칠 수 있음)"
         )
         return fit_m, valid_m, desc
 

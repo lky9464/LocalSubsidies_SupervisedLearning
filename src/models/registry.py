@@ -17,10 +17,12 @@ FAMILY_LABELS: dict[str, str] = {
 # 기본 등록 algo_id (configs.algorithm_registry / algorithms 와 동기)
 DEFAULT_ALGO_IDS: list[str] = [
     "catboost_v1",
+    "catboost_v2",
     "stacked_ensemble_v1",
     "easy_ensemble_v1",
     "gradient_boosting_v1",
     "random_forest_v1",
+    "random_forest_v2",
 ]
 
 _ALGO_ID_RE = re.compile(r"^([a-z][a-z0-9_]*)_v(\d+)$", re.IGNORECASE)
@@ -83,11 +85,12 @@ def default_algo_labels() -> dict[str, str]:
 
 
 def list_algo_ids(cfg: dict[str, Any] | None = None) -> list[str]:
-    """등록된 algo_id 목록 (algorithms 또는 algorithm_registry)."""
+    """등록된 algo_id 목록.
+
+    우선순위: algorithm_registry 전체 → algorithms 리스트 → DEFAULT_ALGO_IDS.
+    (UI·학습이 v2 등 레지스트리 버전을 빠짐없이 인식하도록 registry를 우선)
+    """
     if cfg:
-        listed = cfg.get("algorithms")
-        if listed:
-            return [normalize_algo_id(a) for a in listed]
         reg = cfg.get("algorithm_registry") or {}
         out: list[str] = []
         for family, meta in reg.items():
@@ -99,7 +102,19 @@ def list_algo_ids(cfg: dict[str, Any] | None = None) -> list[str]:
                     out.append(normalize_algo_id(f"{family}_{ver}"))
         if out:
             return out
+        listed = cfg.get("algorithms")
+        if listed:
+            return [normalize_algo_id(a) for a in listed]
     return list(DEFAULT_ALGO_IDS)
+
+
+def default_train_algo_ids(cfg: dict[str, Any] | None = None) -> list[str]:
+    """신규 Run 기본 학습 대상 (configs.algorithms, 없으면 v1만)."""
+    if cfg:
+        listed = cfg.get("algorithms")
+        if listed:
+            return [normalize_algo_id(a) for a in listed]
+    return [a for a in DEFAULT_ALGO_IDS if a.endswith("_v1")]
 
 
 def registry_payload(cfg: dict[str, Any] | None = None) -> list[dict[str, Any]]:

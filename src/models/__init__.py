@@ -8,6 +8,7 @@ from .factory import (
 )
 from .registry import (
     algo_display_label,
+    default_train_algo_ids,
     list_algo_ids,
     normalize_algo_id,
     parse_algo_id,
@@ -20,6 +21,7 @@ __all__ = [
     "ALGORITHM_NAMES",
     "algo_display_label",
     "build_model",
+    "default_train_algo_ids",
     "get_model_progress_info",
     "list_algo_ids",
     "normalize_algo_id",

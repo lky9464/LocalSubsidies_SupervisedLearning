@@ -61,15 +61,23 @@ def main() -> None:
     print(f"[preprocess] encoding={used}")
 
     split_cfg = run_cfg.get("split") or cfg.get("split", {})
-    mode = split_cfg.get("mode", "time")
+    mode = split_cfg.get("mode", "random")
     if mode == "random":
+        pool_start = split_cfg.get("pool_start") or split_cfg.get("train_start")
+        pool_end = split_cfg.get("pool_end") or split_cfg.get("train_end")
         train_m, test_m = random_split_masks(
             df,
             test_size=float(split_cfg.get("test_size", 0.3)),
             random_state=int(split_cfg.get("random_state", cfg.get("random_seed", 42))),
+            pool_start=str(pool_start) if pool_start else None,
+            pool_end=str(pool_end) if pool_end else None,
+        )
+        pool_note = (
+            f" pool={pool_start}~{pool_end}" if pool_start and pool_end else ""
         )
         print(
-            f"[preprocess] 분할=random test_size={split_cfg.get('test_size', 0.3)} "
+            f"[preprocess] 분할=random test_size={split_cfg.get('test_size', 0.3)}"
+            f"{pool_note} "
             f"train={int(train_m.sum()):,} / test={int(test_m.sum()):,}"
         )
     else:

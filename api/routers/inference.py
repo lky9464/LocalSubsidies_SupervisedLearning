@@ -17,7 +17,7 @@ from api.services.inference import (
     missing_trained_algos,
 )
 from api.state import set_pipeline_abandon
-from src.pipeline.run_config import freeze_raw_selection
+from src.pipeline.run_config import freeze_raw_selection, save_inference_algorithms
 
 router = APIRouter(prefix="/api/inference", tags=["inference"])
 
@@ -128,6 +128,7 @@ def run_inference(
             repo.list_selected_rel_paths(dataset_kind="inference"),
             kind="inference",
         )
+        save_inference_algorithms(cfg, body.run_id, algo_list)
     except ValueError as exc:
         from fastapi import HTTPException
 

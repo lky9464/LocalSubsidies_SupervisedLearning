@@ -53,11 +53,27 @@ def random_split_masks(
     *,
     test_size: float = 0.3,
     random_state: int = 42,
+    pool_start: str | None = None,
+    pool_end: str | None = None,
+    period_col: str = "CRTR_YM",
 ) -> tuple[pd.Series, pd.Series]:
-    """행 단위 랜덤 Train/Test 마스크 (겹치지 않음)."""
+    """행 단위 랜덤 Train/Test 마스크 (겹치지 않음).
+
+    pool_start~pool_end 가 있으면 해당 기간만 분할하고, 밖의 행은 Train/Test 모두 False.
+    """
     from sklearn.model_selection import train_test_split
 
-    idx = df.index.to_numpy()
+    if pool_start and pool_end:
+        p = df[period_col].astype(str).str.replace(r"\D", "", regex=True)
+        pool = ((p >= str(pool_start)) & (p <= str(pool_end))).to_numpy()
+        idx = df.index.to_numpy()[pool]
+    else:
+        idx = df.index.to_numpy()
+    if len(idx) < 150:
+        raise RuntimeError(
+            f"random 분할 풀 행 수 부족: {len(idx)}"
+            + (f" ({pool_start}~{pool_end})" if pool_start and pool_end else "")
+        )
     train_idx, test_idx = train_test_split(
         idx, test_size=float(test_size), random_state=int(random_state), shuffle=True
     )

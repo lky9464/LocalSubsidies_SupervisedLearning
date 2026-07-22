@@ -18,7 +18,10 @@ from src.io.banner import print_banner  # noqa: E402
 from src.io.config import load_config, resolve_data_path  # noqa: E402
 from src.ops_db.repository import OpsRepository  # noqa: E402
 from src.pipeline.ranking import build_model_ranking, save_model_ranking  # noqa: E402
-from src.pipeline.runner import new_run_id  # noqa: E402
+from src.pipeline.run_config import (  # noqa: E402
+    resolve_pipeline_algorithms,
+    resolve_pipeline_run_id,
+)
 
 
 def main() -> None:
@@ -32,12 +35,13 @@ def main() -> None:
     with open(summary_path, encoding="utf-8") as f:
         summary = json.load(f)
 
-    ranking = build_model_ranking(summary, algorithms=cfg.get("algorithms"))
+    algorithms = resolve_pipeline_algorithms(cfg)
+    ranking = build_model_ranking(summary, algorithms=algorithms)
     out = algo_root / "operations" / "model_ranking.json"
     save_model_ranking(ranking, out)
 
     repo = OpsRepository(cfg)
-    run_id = repo.get_latest_run_id() or new_run_id()
+    run_id = resolve_pipeline_run_id(cfg, repo=repo)
     repo.ensure_run(run_id, note="ranking")
     repo.save_ranking(run_id, ranking)
 

@@ -16,7 +16,7 @@ from src.scoring.inference_helpers import (
     inference_top_xlsx_path,
     load_inference_queue,
     load_inference_queue_lite,
-    resolve_primary_aux,
+    resolve_inference_primary_aux,
     run_has_inference_step,
 )
 from api.constants import ALGO_LABELS
@@ -113,9 +113,9 @@ def inference_results_meta(cfg: dict[str, Any], run_id: str) -> dict[str, Any]:
             "run_inference_missing": True,
             "expected_path_hint": "이 Run에서 「추론 실행」을 완료한 뒤 결과가 표시됩니다.",
         }
-    available = available_inference_algos(cfg)
+    available = available_inference_algos(cfg, run_id)
     if not available:
-        primary, _ = resolve_primary_aux(cfg, run_id)
+        primary, _ = resolve_inference_primary_aux(cfg, run_id)
         return {
             "available": [],
             "empty": True,
@@ -131,7 +131,7 @@ def inference_results_meta(cfg: dict[str, Any], run_id: str) -> dict[str, Any]:
         rows.append(
             {
                 "algo": algo,
-                "algo_label": algo,
+                "algo_label": ALGO_LABELS.get(algo, algo),
                 "score_exists": sm["exists"],
                 "score_mtime": sm.get("mtime", ""),
                 "score_size_kb": sm.get("size_kb", 0),
@@ -144,7 +144,7 @@ def inference_results_meta(cfg: dict[str, Any], run_id: str) -> dict[str, Any]:
 
 def dashboard_inference_block(cfg: dict[str, Any], run_id: str) -> dict[str, Any]:
     """대시보드용 — 4×4 매트릭스만 (키·점수 컬럼만 읽음)."""
-    primary, aux = resolve_primary_aux(cfg, run_id)
+    primary, aux = resolve_inference_primary_aux(cfg, run_id)
     if not run_has_inference_step(cfg, run_id):
         return {
             "empty": True,
@@ -176,7 +176,7 @@ def inference_ops_queue_payload(
     grade: str | None = None,
     limit: int = 30,
 ) -> dict[str, Any]:
-    primary, aux = resolve_primary_aux(cfg, run_id)
+    primary, aux = resolve_inference_primary_aux(cfg, run_id)
     try:
         queue = load_inference_queue(cfg, run_id)
     except Exception as exc:  # noqa: BLE001

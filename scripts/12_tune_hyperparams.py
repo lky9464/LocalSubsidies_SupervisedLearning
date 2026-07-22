@@ -2,6 +2,7 @@
 [로컬 전용] Validation 구간 하이퍼파라미터 소규모 탐색 (RF·CatBoost v*).
 
 Test 구간은 사용하지 않습니다. 집계 리포트만 outputs/reports/comparison/ 에 저장합니다.
+선행: 03_preprocess (split.mode=random 권장) — tune은 train_mask 안에서만 Valid 분리(nested_random).
 Cursor Agent는 실행하지 마세요.
 
 사용:

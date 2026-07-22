@@ -1,0 +1,13 @@
+model_params:
+  random_forest_v2:
+    n_estimators: 200
+    max_depth: 24
+    min_samples_leaf: 8
+    class_weight: balanced
+  catboost_v2:
+    iterations: 500
+    depth: 7
+    learning_rate: 0.08
+    auto_class_weights: Balanced
+note: Validation nested_random 채택값. configs/default.yaml 에 random_forest_v2 / catboost_v2 로
+  반영됨. Test 확정은 05→07→08→10 (v1과 비교 권장).

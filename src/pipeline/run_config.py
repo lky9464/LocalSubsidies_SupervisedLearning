@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any
 
@@ -10,33 +11,64 @@ import yaml
 from src.io.config import get_data_root
 
 
+def pipeline_run_id() -> str:
+    """Job/파이프라인 worker 가 설정하는 현재 Run ID (없으면 빈 문자열)."""
+    return (os.environ.get("LSL_RUN_ID") or "").strip()
+
+
+def resolve_pipeline_algorithms(cfg: dict[str, Any]) -> list[str]:
+    """LSL_RUN_ID 가 있으면 run_config.algorithms, 없으면 default.yaml algorithms."""
+    run_id = pipeline_run_id()
+    if run_id:
+        algos = load_run_config(cfg, run_id).get("algorithms")
+        if algos:
+            return list(algos)
+    return list(cfg.get("algorithms") or [])
+
+
+def resolve_pipeline_run_id(cfg: dict[str, Any], *, repo: Any | None = None) -> str:
+    """LSL_RUN_ID → ops DB 최신 run → 새 run_id 순."""
+    run_id = pipeline_run_id()
+    if run_id:
+        return run_id
+    if repo is not None:
+        latest = repo.get_latest_run_id()
+        if latest:
+            return latest
+    from src.pipeline.runner import new_run_id
+
+    return new_run_id()
+
+
 def run_config_path(cfg: dict[str, Any], run_id: str) -> Path:
     return get_data_root(cfg) / "runs" / run_id / "run_config.yaml"
 
 
 def default_run_config(cfg: dict[str, Any]) -> dict[str, Any]:
-    from src.models.registry import list_algo_ids
+    from src.models.registry import default_train_algo_ids
 
     split = dict(cfg.get("split", {}))
     return {
         "split": {
-            "mode": "time",
+            "mode": str(split.get("mode", "random")),
             "train_start": split.get("train_start", "202401"),
-            "train_end": split.get("train_end", "202506"),
+            "train_end": split.get("train_end", "202512"),
             "test_start": split.get("test_start", "202507"),
             "test_end": split.get("test_end", "202512"),
-            "test_size": 0.3,
-            "random_state": int(cfg.get("random_seed", 42)),
+            "test_size": float(split.get("test_size", 0.3)),
+            "random_state": int(split.get("random_state", cfg.get("random_seed", 42))),
             "valid_start": split.get("valid_start", "202504"),
             "valid_end": split.get("valid_end", "202506"),
         },
-        "algorithms": list_algo_ids(cfg),
+        "algorithms": default_train_algo_ids(cfg),
         "exclude_features_extra": [],
         # algo_id → {param: value} ; default.yaml model_params 위에 덮어씀
         "model_params": {},
         # 데이터 등록에서 선택한 CSV (Job 시작 시 동결). data_root 상대경로.
         "raw_files": [],
         "raw_inference_files": [],
+        # 추론 실행 시 --algo 로 선택한 algo_id (순서: 1=주, 2=보)
+        "inference_algorithms": [],
     }
 
 
@@ -94,6 +126,23 @@ def load_run_config(cfg: dict[str, Any], run_id: str) -> dict[str, Any]:
         else:
             base[k] = v
     return base
+
+
+def save_inference_algorithms(
+    cfg: dict[str, Any],
+    run_id: str,
+    algo_ids: list[str],
+) -> dict[str, Any]:
+    """추론 Job 시작 시 선택 알고리즘을 run_config에 기록 (주·보 표시용)."""
+    from src.models.registry import normalize_algo_id
+
+    algos = [normalize_algo_id(a) for a in algo_ids if str(a).strip()]
+    if not algos:
+        raise ValueError("추론 알고리즘을 1개 이상 지정하세요.")
+    run_cfg = load_run_config(cfg, run_id)
+    run_cfg["inference_algorithms"] = algos
+    save_run_config(cfg, run_id, run_cfg)
+    return run_cfg
 
 
 def save_run_config(cfg: dict[str, Any], run_id: str, run_cfg: dict[str, Any]) -> Path:

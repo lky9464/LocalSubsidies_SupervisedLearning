@@ -13,6 +13,7 @@ from api.schemas.common import LeakageResume, PipelineAbandonUpdate, RunConfigUp
 from api.serializers import df_to_records
 from api.services.pipeline import (
     extra_for_steps,
+    job_is_running,
     settings_locked,
     step_status_map,
 )
@@ -73,6 +74,7 @@ def get_config(run_id: str, cfg=Depends(get_cfg), repo=Depends(get_repo)) -> dic
         "config": run_cfg,
         "committed": bool(run_cfg.get("options_committed")),
         "locked": locked,
+        "job_running": job_is_running(cfg),
         "opts_edit": get_opts_edit(cfg, run_id),
         "pipeline_abandon": get_pipeline_abandon(cfg, run_id),
         "split_summary": _split_summary(split),

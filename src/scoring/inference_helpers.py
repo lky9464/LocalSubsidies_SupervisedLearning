@@ -13,7 +13,9 @@ from src.io.config import (
     resolve_algo_score_top_xlsx,
     resolve_data_path,
 )
+from src.models.registry import list_algo_ids
 from src.ops_db.repository import OpsRepository
+from src.pipeline.run_config import load_run_config
 from src.scoring.ops_queue import (
     GRADE_COL,
     build_ops_queue,
@@ -36,8 +38,65 @@ def inference_export_paths(cfg: dict[str, Any]) -> tuple[Path, Path]:
     return out_dir / "ops_queue_inference.csv", out_dir / "ops_queue_inference.xlsx"
 
 
-def available_inference_algos(cfg: dict[str, Any]) -> list[str]:
-    algos = list(cfg.get("algorithms") or [])
+def _order_algos_by_ranking(cfg: dict[str, Any], run_id: str, algos: list[str]) -> list[str]:
+    if len(algos) <= 1:
+        return algos
+    try:
+        ranking = OpsRepository(cfg).get_ranking(run_id)
+    except Exception:  # noqa: BLE001
+        ranking = []
+    ordered: list[str] = []
+    for row in ranking:
+        algo = str(row.get("algo", ""))
+        if algo in algos and algo not in ordered:
+            ordered.append(algo)
+    for algo in algos:
+        if algo not in ordered:
+            ordered.append(algo)
+    return ordered
+
+
+def _algos_from_latest_inference_batch(cfg: dict[str, Any], run_cfg: dict[str, Any]) -> list[str]:
+    """run_config 학습 대상 중, 가장 최근 추론 실행 묶음(점수 mtime)만 반환."""
+    configured = [str(a) for a in (run_cfg.get("algorithms") or []) if str(a).strip()]
+    scored: list[tuple[str, float]] = []
+    for algo in configured:
+        path = inference_score_path(cfg, algo)
+        if path.is_file():
+            scored.append((algo, path.stat().st_mtime))
+    if not scored:
+        return []
+    latest_mtime = max(m for _, m in scored)
+    # 11_score_inference.py 가 연속 실행하는 알고리즘 묶음 (최대 ~10분 여유)
+    batch_window_sec = 600.0
+    return [a for a, m in scored if latest_mtime - m <= batch_window_sec]
+
+
+def inference_algorithms_for_run(cfg: dict[str, Any], run_id: str) -> list[str]:
+    """이 Run 추론에 사용된 algo_id 목록 (순서: 1=주, 2=보)."""
+    if not run_id:
+        return []
+    run_cfg = load_run_config(cfg, run_id)
+    saved = [str(a) for a in (run_cfg.get("inference_algorithms") or []) if str(a).strip()]
+    if saved:
+        return saved
+
+    batch = _algos_from_latest_inference_batch(cfg, run_cfg)
+    if batch:
+        return _order_algos_by_ranking(cfg, run_id, batch)
+
+    return []
+
+
+def available_inference_algos(cfg: dict[str, Any], run_id: str | None = None) -> list[str]:
+    """추론 점수 CSV가 있는 algo_id 목록 (Run별 — 이번 추론에 쓴 알고리즘만)."""
+    if run_id:
+        return [
+            a
+            for a in inference_algorithms_for_run(cfg, run_id)
+            if inference_score_path(cfg, a).exists()
+        ]
+    algos = list_algo_ids(cfg)
     return [a for a in algos if inference_score_path(cfg, a).exists()]
 
 
@@ -54,6 +113,7 @@ def file_meta(path: Path) -> dict[str, Any]:
 
 
 def resolve_primary_aux(cfg: dict[str, Any], run_id: str) -> tuple[str, str]:
+    """평가 순위(08) 기준 주·보조. Test ops_queue(10)용."""
     ops_cfg = dict(cfg.get("ops_queue") or {})
     try:
         return OpsRepository(cfg).get_primary_aux(run_id)
@@ -62,6 +122,24 @@ def resolve_primary_aux(cfg: dict[str, Any], run_id: str) -> tuple[str, str]:
             str(ops_cfg.get("primary_algo", "random_forest_v1")),
             str(ops_cfg.get("aux_algo", "catboost_v1")),
         )
+
+
+def resolve_inference_primary_aux(cfg: dict[str, Any], run_id: str) -> tuple[str, str]:
+    """추론 결과용 주·보조 — run_config.inference_algorithms 우선."""
+    infer_algos = inference_algorithms_for_run(cfg, run_id) if run_id else []
+    if len(infer_algos) >= 2:
+        return infer_algos[0], infer_algos[1]
+    if len(infer_algos) == 1:
+        primary = infer_algos[0]
+        _, aux = resolve_primary_aux(cfg, run_id)
+        return primary, aux if aux != primary else ""
+    if run_id:
+        return resolve_primary_aux(cfg, run_id)
+    ops_cfg = dict(cfg.get("ops_queue") or {})
+    return (
+        str(ops_cfg.get("primary_algo", "random_forest_v1")),
+        str(ops_cfg.get("aux_algo", "catboost_v1")),
+    )
 
 
 def run_has_inference_step(cfg: dict[str, Any], run_id: str) -> bool:
@@ -90,7 +168,7 @@ def load_inference_queue_lite(cfg: dict[str, Any], run_id: str) -> pd.DataFrame 
     """주·보조 inference 4×4 집계용 (키·점수만). 주 모델 파일 없으면 None."""
     if not run_has_inference_step(cfg, run_id):
         return None
-    primary, aux = resolve_primary_aux(cfg, run_id)
+    primary, aux = resolve_inference_primary_aux(cfg, run_id)
     primary_path = inference_score_path(cfg, primary)
     if not primary_path.exists():
         return None
@@ -112,7 +190,7 @@ def load_inference_queue(cfg: dict[str, Any], run_id: str) -> pd.DataFrame | Non
     """주·보조 inference 점수로 우선순위표 생성. 주 모델 파일 없으면 None."""
     if not run_has_inference_step(cfg, run_id):
         return None
-    primary, aux = resolve_primary_aux(cfg, run_id)
+    primary, aux = resolve_inference_primary_aux(cfg, run_id)
     primary_path = inference_score_path(cfg, primary)
     if not primary_path.exists():
         return None
@@ -143,7 +221,7 @@ def export_inference_ops_queue(cfg: dict[str, Any], run_id: str) -> tuple[Path, 
     """추론 점검 우선순위표 CSV·Excel 저장 (구간 규칙은 10과 동일, 시트는 추론용)."""
     queue = load_inference_queue(cfg, run_id)
     if queue is None or queue.empty:
-        primary, _ = resolve_primary_aux(cfg, run_id)
+        primary, _ = resolve_inference_primary_aux(cfg, run_id)
         raise FileNotFoundError(
             f"주 모델 scores/inference/{primary}_inference_scores.csv 가 없습니다."
         )
@@ -160,11 +238,11 @@ def dashboard_inference_line(cfg: dict[str, Any], run_id: str) -> str | None:
     """대시보드 한 줄 요약. 없으면 None."""
     if not run_has_inference_step(cfg, run_id):
         return None
-    available = available_inference_algos(cfg)
+    available = available_inference_algos(cfg, run_id)
     if not available:
         return None
 
-    primary, _ = resolve_primary_aux(cfg, run_id)
+    primary, _ = resolve_inference_primary_aux(cfg, run_id)
     primary_path = inference_score_path(cfg, primary)
     meta = file_meta(primary_path)
     if not meta["exists"]:

@@ -14,6 +14,7 @@ import {
   Moon,
   Settings,
   Sun,
+  Tag,
   Workflow,
 } from "lucide-react";
 import { useState } from "react";
@@ -21,6 +22,7 @@ import { cn } from "@/lib/utils";
 import { hardNavigate } from "@/lib/navigation";
 import { useRun } from "@/components/run-context";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -140,18 +142,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           {bottomNav.map((item) => (
             <NavLink key={item.href} {...item} />
           ))}
+          <div className="my-2 border-t border-border" />
+          <NavLink href="/version/" label="버전 정보" icon={Tag} />
+          <div className="my-2 border-t border-border" />
         </nav>
-      </aside>
-      <div className="flex min-w-0 flex-1 flex-col">
+      </aside>      <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-6 py-3">
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-muted-foreground">현재 Run</span>
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
+            <span className="shrink-0 text-sm text-muted-foreground">현재 Run</span>
             <Select
               value={runId || undefined}
               onValueChange={(v) => setRunId(v)}
               disabled={loading || runs.length === 0}
             >
-              <SelectTrigger className="w-[220px]">
+              <SelectTrigger className="w-[220px] shrink-0">
                 <SelectValue placeholder="Run 선택" />
               </SelectTrigger>
               <SelectContent>
@@ -162,10 +166,27 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 ))}
               </SelectContent>
             </Select>
+            <Input
+              readOnly
+              tabIndex={-1}
+              aria-label="작업내용"
+              title={
+                runs.find((r) => r.run_id === runId)?.work_content?.trim() ||
+                "작업내용 없음"
+              }
+              value={
+                runs.find((r) => r.run_id === runId)?.work_content?.trim() ||
+                (runId ? "(작업내용 없음)" : "")
+              }
+              placeholder="작업내용"
+              className="min-w-[20rem] flex-1 cursor-default bg-muted/40 text-muted-foreground focus-visible:ring-0"
+              onFocus={(e) => e.currentTarget.blur()}
+            />
           </div>
           <Button
             variant="ghost"
             size="icon"
+            className="shrink-0"
             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
             aria-label="테마 전환"
           >

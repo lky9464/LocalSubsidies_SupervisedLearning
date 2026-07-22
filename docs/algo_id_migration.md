@@ -65,4 +65,10 @@ python scripts/08_update_ranking.py
 python scripts/10_ops_queue.py
 ```
 
-주·보 설정: `configs/default.yaml` → `ops_queue.primary_algo: random_forest_v1`, `aux_algo: catboost_v1`
+주·보 설정: `configs/default.yaml` → `ops_queue.primary_algo: random_forest_v1`, `aux_algo: catboost_v1`  
+(Test 확정 후 v2로 바꿀 수 있음)
+
+## 3. v2 폴더
+
+튜닝 채택 후 `random_forest_v2` / `catboost_v2` 학습 시 `{data_root}/algorithms/` 아래 새 폴더가 생깁니다.  
+v1 폴더는 삭제하지 마세요.

@@ -41,6 +41,7 @@ from src.io.config import (  # noqa: E402
     resolve_data_path,
     resolve_repo_path,
 )
+from src.pipeline.run_config import resolve_pipeline_algorithms  # noqa: E402
 from src.scoring.score_table import save_top_features_json  # noqa: E402
 
 
@@ -56,7 +57,7 @@ def _sklearn_feature_names(preprocessor, fallback: list[str]) -> list[str]:
 def main() -> None:
     print_banner()
     cfg = load_config()
-    algorithms = cfg.get("algorithms", [])
+    algorithms = resolve_pipeline_algorithms(cfg)
     ensure_algo_dirs(cfg, algorithms)
     top_n = int(cfg.get("feature_importance", {}).get("top_n", 10))
 

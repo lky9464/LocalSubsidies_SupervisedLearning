@@ -52,7 +52,8 @@ export default function PipelinePage() {
     queryKey: ["runConfig", activeRun],
     queryFn: () => apiGet<Record<string, unknown>>(`/api/runs/${activeRun}/config`),
     enabled: !!activeRun,
-    refetchInterval: (q) => (q.state.data?.locked ? 5000 : false),
+    refetchInterval: (q) =>
+      q.state.data?.locked || q.state.data?.job_running ? 5000 : false,
   });
 
   const { data: stepsData, refetch: refetchSteps } = useQuery({
@@ -84,6 +85,7 @@ export default function PipelinePage() {
   const algos = asStringArray(config.algorithms);
   const committed = Boolean(cfgData?.committed);
   const locked = Boolean(cfgData?.locked);
+  const jobRunning = Boolean(cfgData?.job_running);
   const stepStatus =
     cfgData?.step_status && typeof cfgData.step_status === "object"
       ? (cfgData.step_status as Record<string, string>)
@@ -217,17 +219,35 @@ export default function PipelinePage() {
 
       <div>
         <Label>실행할 Run</Label>
-        <select
-          className="mt-1 block rounded-md border px-3 py-2 text-sm"
-          value={activeRun}
-          onChange={(e) => setLocalRun(e.target.value)}
-        >
-          {runs.map((r) => (
-            <option key={r.run_id} value={r.run_id}>
-              {r.run_id}
-            </option>
-          ))}
-        </select>
+        <div className="mt-1 flex min-w-0 flex-wrap items-center gap-3">
+          <select
+            className="block w-[220px] shrink-0 rounded-md border px-3 py-2 text-sm"
+            value={activeRun}
+            onChange={(e) => setLocalRun(e.target.value)}
+          >
+            {runs.map((r) => (
+              <option key={r.run_id} value={r.run_id}>
+                {r.run_id}
+              </option>
+            ))}
+          </select>
+          <Input
+            readOnly
+            tabIndex={-1}
+            aria-label="작업내용"
+            title={
+              runs.find((r) => r.run_id === activeRun)?.work_content?.trim() ||
+              "작업내용 없음"
+            }
+            value={
+              runs.find((r) => r.run_id === activeRun)?.work_content?.trim() ||
+              (activeRun ? "(작업내용 없음)" : "")
+            }
+            placeholder="작업내용"
+            className="min-w-[20rem] flex-1 cursor-default bg-muted/40 text-muted-foreground focus-visible:ring-0"
+            onFocus={(e) => e.currentTarget.blur()}
+          />
+        </div>
       </div>
 
       {msg ? <Alert>{msg}</Alert> : null}
@@ -274,7 +294,8 @@ export default function PipelinePage() {
               {locked ? (
                 <>
                   <p className="text-xs text-muted-foreground">
-                    1번 단계 시작 후~파이프라인 완료 전에는 변경할 수 없습니다.
+                    1번 단계 시작 후~파이프라인 완료 전에는 학습 옵션을 변경할 수 없습니다.
+                    다음 단계 버튼은 계속 사용할 수 있습니다.
                   </p>
                   <Button variant="outline" onClick={abandon}>
                     전체 작업 취소 후 설정 수정
@@ -428,7 +449,7 @@ export default function PipelinePage() {
                 key={step.id}
                 variant="outline"
                 className="justify-between"
-                disabled={!committed || locked || busy}
+                disabled={!committed || jobRunning || busy}
                 onClick={() => setStepDialog({ sid: step.id, label: step.label })}
               >
                 <span>{step.label}</span>
@@ -442,7 +463,7 @@ export default function PipelinePage() {
       <section>
         <h2 className="mb-3 text-lg font-medium">일괄 실행 (01→10)</h2>
         <Button
-          disabled={!committed || algos.length < 2 || busy}
+          disabled={!committed || algos.length < 2 || jobRunning || busy}
           onClick={() => setBatchOpen(true)}
         >
           01→10 일괄 실행
@@ -451,8 +472,10 @@ export default function PipelinePage() {
 
       <section>
         <h2 className="mb-3 text-lg font-medium">단계 상태</h2>
-        {locked ? (
-          <p className="mb-2 text-xs text-muted-foreground">자동 갱신 중 (5초)</p>
+        {locked || jobRunning ? (
+          <p className="mb-2 text-xs text-muted-foreground">
+            {jobRunning ? "Job 실행 중 — 자동 갱신 (5초)" : "단계 진행 중 — 자동 갱신 (5초)"}
+          </p>
         ) : null}
         <DataTable rows={stepRows} empty="아직 단계 기록이 없습니다." />
       </section>

@@ -26,13 +26,14 @@ from src.io.config import (  # noqa: E402
     resolve_data_path,
     resolve_repo_path,
 )
+from src.pipeline.run_config import resolve_pipeline_algorithms  # noqa: E402
 from src.report.export import export_metrics_excel, export_summary_pdf  # noqa: E402
 
 
 def main() -> None:
     print_banner()
     cfg = load_config()
-    algorithms = cfg.get("algorithms", [])
+    algorithms = resolve_pipeline_algorithms(cfg)
     ensure_algo_dirs(cfg, algorithms)
     algo_root = resolve_data_path(cfg, "algorithms")
     comparison_dir = resolve_repo_path(cfg, "reports_comparison")

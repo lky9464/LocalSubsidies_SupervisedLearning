@@ -21,6 +21,9 @@
 | 내 PC 사양 체크 | RAM/CPU/디스크 권장 여부 |
 | 사용자 가이드 | 이 문서·PDF |
 | 설정 | data_root·ops.sqlite 경로 |
+| 버전 정보 | 현재 버전 · 릴리스 이력 (`VERSION_HISTORY.md`) |
+
+로컬 PC·웹·`data_root` 역할이 헷갈리면 [`local_web_flow.md`](local_web_flow.md) (도식)을 참고하세요.
 
 ## 3. 데이터 등록 · 선택
 

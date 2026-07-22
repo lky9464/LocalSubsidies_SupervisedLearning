@@ -26,6 +26,7 @@ from api.routers import (
     session,
     settings,
     system,
+    version,
 )
 from src.io.config import PROJECT_ROOT
 
@@ -62,6 +63,7 @@ for mod in (
     system,
     settings,
     guide,
+    version,
 ):
     app.include_router(mod.router)
 

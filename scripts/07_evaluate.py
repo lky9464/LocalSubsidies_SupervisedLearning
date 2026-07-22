@@ -41,6 +41,7 @@ from src.io.config import (  # noqa: E402
     resolve_data_path,
 )
 from src.scoring.risk_score import probability_to_score  # noqa: E402
+from src.pipeline.run_config import resolve_pipeline_algorithms  # noqa: E402
 from src.scoring.score_table import (  # noqa: E402
     assemble_score_table,
     build_fixed_score_extra_frame,
@@ -70,7 +71,7 @@ def main() -> None:
     cfg = load_config()
     interim = resolve_data_path(cfg, "interim")
     processed = resolve_data_path(cfg, "processed")
-    algorithms = cfg.get("algorithms", [])
+    algorithms = resolve_pipeline_algorithms(cfg)
     ensure_algo_dirs(cfg, algorithms)
     encoding = cfg.get("encoding", "EUC-KR")
     scoring_cfg = cfg.get("scoring", {})

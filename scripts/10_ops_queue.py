@@ -31,7 +31,7 @@ from src.io.config import (  # noqa: E402
 )
 from src.ops_db.repository import OpsRepository  # noqa: E402
 from src.pipeline.ranking import load_model_ranking  # noqa: E402
-from src.pipeline.runner import new_run_id  # noqa: E402
+from src.pipeline.run_config import pipeline_run_id, resolve_pipeline_run_id  # noqa: E402
 from src.scoring.ops_queue import (  # noqa: E402
     GRADE_COL,
     PRIMARY_LABELS,
@@ -43,11 +43,11 @@ from src.scoring.ops_queue import (  # noqa: E402
 
 
 def _resolve_primary_aux(cfg: dict) -> tuple[str, str, str | None]:
-    """ranking.json → ops DB → default.yaml 순."""
+    """ranking.json → ops DB(현재 Run) → default.yaml 순."""
     ops_cfg = cfg.get("ops_queue", {})
     default_p = ops_cfg.get("primary_algo", "random_forest_v1")
     default_a = ops_cfg.get("aux_algo", "catboost_v1")
-    run_id = None
+    run_id = pipeline_run_id() or None
 
     rank_path = resolve_data_path(cfg, "algorithms") / "operations" / "model_ranking.json"
     ranking = load_model_ranking(rank_path)
@@ -59,8 +59,8 @@ def _resolve_primary_aux(cfg: dict) -> tuple[str, str, str | None]:
 
     try:
         repo = OpsRepository(cfg)
-        run_id = repo.get_latest_run_id()
-        return (*repo.get_primary_aux(run_id), run_id)
+        rid = run_id or repo.get_latest_run_id()
+        return (*repo.get_primary_aux(rid), rid)
     except Exception:  # noqa: BLE001
         return default_p, default_a, run_id
 
@@ -108,8 +108,7 @@ def main() -> None:
     write_ops_queue_excel(queue, xlsx_path, mode="test")
 
     repo = OpsRepository(cfg)
-    if not run_id:
-        run_id = repo.get_latest_run_id() or new_run_id()
+    run_id = resolve_pipeline_run_id(cfg, repo=repo)
     repo.ensure_run(run_id, note="ops_priority")
     n = repo.replace_ops_queue(run_id, queue)
     print(f"[ops] DB 적재: run_id={run_id}, rows={n:,}")

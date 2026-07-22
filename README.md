@@ -82,7 +82,7 @@
 
 1. `configs/local.yaml.example` → `configs/local.yaml` · `data_root` 설정  
 2. `python -m venv .venv` → `pip install -r requirements.txt`  
-3. `scripts\build_web.bat` → `web/out/` 생성  
+3. `git pull` 로 `web/out/` 포함 여부 확인 (UI 소스만 수정한 경우 `scripts\build_web.bat` 후 커밋)  
 4. `RunWebNext.bat` → `http://127.0.0.1:8600`
 
 ## 유의사항
@@ -146,7 +146,7 @@ LocalSubsidies_ML_Data/                 # 프로젝트 밖 ({data_root})
 
 LocalSubsidies_SupervisedLearning/      # 이 repo
 ├── api/                                # FastAPI BFF
-├── web/                                # Next.js 소스 (빌드 → web/out, Release로 배포)
+├── web/                                # Next.js 소스 + 정적 export(web/out, git 추적)
 ├── RunWebNext.bat                      # 웹 UI 실행 (더블클릭 → :8600)
 └── outputs/reports/
     ├── comparison/                     # 5종 비교 Excel/PDF

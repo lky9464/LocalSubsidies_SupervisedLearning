@@ -15,7 +15,9 @@
 
 주요 진행 (요약):
 - algo_id `*_v1`, `algorithm_registry`, `05_train_*_v1.py`, `12_tune_hyperparams.py`
-- 학습 옵션 UI 종류→버전 2단 선택
+- 학습 옵션 UI 종류→버전 2단 선택 (**학습 실행** 화면)
+- 데이터 등록: CSV 단위 사용 선택·선택 삭제·전체 삭제
+- `web/out/` 정적 UI를 git에 포함 (pull만으로 화면 반영; 소스 수정 시 `build_web.bat` 후 커밋)
 - [`algo_id_migration.md`](algo_id_migration.md) · [`hyperparam_methodology.md`](hyperparam_methodology.md) · [`model_tuning.md`](model_tuning.md)
 
 ---

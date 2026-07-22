@@ -1,4 +1,4 @@
 node_modules/
 .next/
-out/
+# out/ 은 저장소에서 추적 (루트 .gitignore 주석 참고)
 .env*.local

@@ -118,11 +118,45 @@ def cmd_stop() -> int:
     return 0
 
 
+def _check_web_out() -> int:
+    """Ensure static UI exists; warn if source looks newer than export."""
+    out_index = ROOT / "web" / "out" / "index.html"
+    if not out_index.is_file():
+        print(
+            "ERROR: web/out/ missing. After git pull, the tracked web/out should exist.\n"
+            "  If developing UI: run scripts\\build_web.bat (needs Node.js).",
+            file=sys.stderr,
+            flush=True,
+        )
+        return 1
+    app_dir = ROOT / "web" / "app"
+    if app_dir.is_dir():
+        try:
+            newest_src = max(
+                (p.stat().st_mtime for p in app_dir.rglob("*") if p.is_file()),
+                default=0.0,
+            )
+            out_mtime = out_index.stat().st_mtime
+            if newest_src > out_mtime + 2.0:
+                print(
+                    "WARN: web/app sources are newer than web/out.\n"
+                    "  UI may be stale. Run scripts\\build_web.bat then commit web/out.",
+                    file=sys.stderr,
+                    flush=True,
+                )
+        except OSError:
+            pass
+    return 0
+
+
 def cmd_run(restart: bool) -> int:
     if restart:
         n = _stop_server()
         print(f"Stopped {n} server(s)", flush=True)
         time.sleep(0.3)
+
+    if _check_web_out() != 0:
+        return 1
 
     if _health_ok(timeout=0.2) and not restart:
         print("Already running — opening browser.", flush=True)

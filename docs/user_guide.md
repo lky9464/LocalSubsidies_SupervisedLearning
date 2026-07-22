@@ -5,7 +5,7 @@
 ## 1. 시작하기
 
 1. `configs/local.yaml` 에 `data_root` 경로를 설정합니다.
-2. (최초) `web/out` 이 없으면 `scripts/build_web.bat` 또는 Release의 `web-out.zip`을 준비합니다.
+2. `git pull` 시 `web/out` 이 함께 오는지 확인합니다. 없거나 UI 소스를 수정했다면 `scripts/build_web.bat` 또는 Release의 `web-out.zip`을 준비합니다.
 3. `RunWebNext.bat` 을 더블클릭합니다 (콘솔 창을 닫지 마세요).
 4. 브라우저에서 `http://127.0.0.1:8600` 을 엽니다.
 

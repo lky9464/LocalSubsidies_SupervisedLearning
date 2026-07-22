@@ -4,7 +4,7 @@
 GitHub에서 **소스 + Release 자산**을 받아 USB 등으로 옮긴 뒤, 아래 순서대로 진행하면 됩니다.
 
 > **한 줄 요약**  
-> [Release v0.3.0](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases/tag/v0.3.0) 에서  
+> [Release v0.4.0](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases/tag/v0.4.0) 에서  
 > **Source + wheels + web-out + `python-3.12.10-amd64.exe` + `VC_redist.x64.exe`**  
 > → 설치 → `SetupOffline.bat` → `data_root`·raw 준비 → `RunWebNext.bat`  
 > (Python·VC++가 이미 있으면 해당 exe는 생략 가능)
@@ -35,7 +35,7 @@ GitHub에서 **소스 + Release 자산**을 받아 USB 등으로 옮긴 뒤, 아
 
 ### ① 소스 코드 (ZIP)
 
-권장: [Release v0.3.0](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases/tag/v0.3.0) → **Source code (zip)**  
+권장: [Release v0.4.0](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases/tag/v0.4.0) → **Source code (zip)**  
 (버전을 wheels·web-out과 맞추려면 Code 버튼 ZIP보다 **Release 소스 ZIP**이 안전합니다.)
 
 ### ② wheel 묶음 (패키지 설치용)

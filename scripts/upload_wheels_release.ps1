@@ -1,6 +1,6 @@
 # Release에 wheels zip 업로드 (사전: gh auth login)
 #   powershell -ExecutionPolicy Bypass -File .\scripts\upload_wheels_release.ps1
-#   powershell -ExecutionPolicy Bypass -File .\scripts\upload_wheels_release.ps1 -Tag v0.3.0
+#   powershell -ExecutionPolicy Bypass -File .\scripts\upload_wheels_release.ps1 -Tag v0.4.0
 
 param(
     [string]$Tag = "v0.3.0"

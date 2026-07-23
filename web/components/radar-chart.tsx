@@ -10,15 +10,22 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
-type Series = { name: string; values: Record<string, number | null> };
+type Series = { id?: string; name: string; values: Record<string, number | null> };
 
-/** 알고리즘별 고정 색 — RandomForest·EasyEnsemble이 비슷하지 않도록 분리 */
+/** 알고리즘별 고정 색 — family·버전별 구분 */
 const ALGO_COLORS: Record<string, string> = {
-  CatBoost: "#0f766e", // teal
-  "Stacked Ensemble": "#ca8a04", // gold
-  EasyEnsemble: "#db2777", // magenta (RandomForest와 구분)
-  "Gradient Boosting": "#2563eb", // blue
-  RandomForest: "#ea580c", // vivid orange
+  CatBoost: "#0f766e",
+  "Stacked Ensemble": "#ca8a04",
+  EasyEnsemble: "#db2777",
+  "Gradient Boosting": "#2563eb",
+  RandomForest: "#ea580c",
+  catboost_v1: "#0d9488",
+  catboost_v2: "#115e59",
+  stacked_ensemble_v1: "#ca8a04",
+  easy_ensemble_v1: "#db2777",
+  gradient_boosting_v1: "#2563eb",
+  random_forest_v1: "#ea580c",
+  random_forest_v2: "#c2410c",
   catboost: "#0f766e",
   stacked_ensemble: "#ca8a04",
   easy_ensemble: "#db2777",
@@ -26,10 +33,10 @@ const ALGO_COLORS: Record<string, string> = {
   random_forest: "#ea580c",
 };
 
-const FALLBACK = ["#6366f1", "#14b8a6", "#f59e0b", "#8b5cf6", "#06b6d4"];
+const FALLBACK = ["#6366f1", "#14b8a6", "#f59e0b", "#8b5cf6", "#06b6d4", "#ec4899"];
 
-function colorFor(name: string, index: number): string {
-  return ALGO_COLORS[name] || FALLBACK[index % FALLBACK.length];
+function colorFor(id: string, name: string, index: number): string {
+  return ALGO_COLORS[id] || ALGO_COLORS[name] || FALLBACK[index % FALLBACK.length];
 }
 
 export function ModelRadarChart({
@@ -49,8 +56,9 @@ export function ModelRadarChart({
 
   const data = metrics.map((m) => {
     const row: Record<string, string | number> = { metric: m };
-    series.forEach((s) => {
-      row[s.name] = s.values[m] ?? 0;
+    series.forEach((s, i) => {
+      const key = s.id || `series_${i}`;
+      row[key] = s.values[m] ?? 0;
     });
     return row;
   });
@@ -63,12 +71,13 @@ export function ModelRadarChart({
           <PolarAngleAxis dataKey="metric" tick={{ fontSize: 11 }} />
           <PolarRadiusAxis domain={[0, 1]} tick={false} />
           {series.map((s, i) => {
-            const color = colorFor(s.name, i);
+            const key = s.id || `series_${i}`;
+            const color = colorFor(key, s.name, i);
             return (
               <Radar
-                key={s.name}
+                key={key}
                 name={s.name}
-                dataKey={s.name}
+                dataKey={key}
                 stroke={color}
                 fill={color}
                 fillOpacity={0.15}

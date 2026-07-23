@@ -167,8 +167,9 @@ class OpsRepository:
                 conn.execute(
                     """
                     INSERT INTO model_ranking(
-                        run_id, rank, algo, role, pr_auc, roc_auc, top1_lift, f1
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        run_id, rank, algo, role, pr_auc, roc_auc, top1_lift, f1,
+                        top1_precision, top1_recall, top5_lift, top5_precision, top5_recall
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         run_id,
@@ -179,6 +180,11 @@ class OpsRepository:
                         row.get("roc_auc"),
                         row.get("top1_lift"),
                         row.get("f1"),
+                        row.get("top1_precision"),
+                        row.get("top1_recall"),
+                        row.get("top5_lift"),
+                        row.get("top5_precision"),
+                        row.get("top5_recall"),
                     ),
                 )
             conn.commit()
@@ -186,7 +192,7 @@ class OpsRepository:
     def get_ranking(self, run_id: str) -> list[dict[str, Any]]:
         with connect(self.cfg) as conn:
             rows = conn.execute(
-                "SELECT * FROM model_ranking WHERE run_id=? ORDER BY rank",
+                "SELECT * FROM model_ranking WHERE run_id=? ORDER BY rank, algo",
                 (run_id,),
             ).fetchall()
         return [dict(r) for r in rows]

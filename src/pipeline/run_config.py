@@ -69,6 +69,8 @@ def default_run_config(cfg: dict[str, Any]) -> dict[str, Any]:
         "raw_inference_files": [],
         # 추론 실행 시 --algo 로 선택한 algo_id (순서: 1=주, 2=보)
         "inference_algorithms": [],
+        "split_committed": False,
+        "algorithms_committed": False,
     }
 
 
@@ -125,6 +127,10 @@ def load_run_config(cfg: dict[str, Any], run_id: str) -> dict[str, Any]:
             base[k] = {**base[k], **v}
         else:
             base[k] = v
+    # 구 options_committed → split·algorithms 둘 다 committed
+    if base.get("options_committed") and "split_committed" not in loaded:
+        base["split_committed"] = True
+        base["algorithms_committed"] = True
     return base
 
 

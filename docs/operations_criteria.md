@@ -27,8 +27,8 @@
 | 단계 | 내용 |
 |------|------|
 | 1 | 5종 알고리즘 학습(05) · 평가(07) |
-| 2 | `08_update_ranking.py` — PR-AUC·리프트·F1 등으로 **순위** 산출 |
-| 3 | 웹 **모델 비교·평가** · 대시보드에서 순위·4×4 확인 |
+| 2 | `08_update_ranking.py` — **상위1% 리프트 → PR-AUC(근접 시)** 순위 · primary PR-AUC 가드 ([`ranking_methodology.md`](ranking_methodology.md)) |
+| 3 | 웹 **모델 비교·평가** · Test **4×4** 확인 (`ranking_confidence: low` 시 주·보 **확정**) |
 | 4 | `configs/default.yaml` → `ops_queue.primary_algo`(주), `aux_algo`(보) 반영 |
 | 5 | `10_ops_queue` · 추론 — 위 설정의 **주·보 점수**로 4×4·우선순위표 생성 |
 
@@ -67,9 +67,18 @@ algo_id 형식·마이그레이션: [`algo_id_migration.md`](algo_id_migration.m
 > **기준선 동결 (고도화용):** 위 스냅샷·Train/Test 구간·타겟·누수 제외 정책은  
 > 튜닝 비교의 **v0.3.0 Baseline** 이다. 상세·절차: [`model_tuning.md`](model_tuning.md).
 
-### 2.2 튜닝·재선정 시 최적화 목표
+### 2.2 Test 순위 (08) vs 튜닝 (12)
 
-하이퍼파라미터 탐색(`scripts/12_tune_hyperparams.py`)은 **Validation**(`split.valid_*`)만 사용한다. Test로 반복 튜닝하지 않는다.
+**08 Test 순위** ([`ranking_methodology.md`](ranking_methodology.md)):
+
+| 항목 | 규칙 |
+|------|------|
+| 정렬 | 상위1% **리프트** (Δ≥3%면 단독) → **PR-AUC** (근접 시) |
+| 순위 미사용 | F1, ROC-AUC |
+| primary | PR-AUC **풀 내 가드** 통과 필요 |
+| 애매 | `ranking_confidence: low` → **4×4**로 주·보 확정 |
+
+**12 Validation 튜닝** (하이퍼파라미터 탐색, `scripts/12_tune_hyperparams.py` — Test 미사용):
 
 | 순위 | 지표 | 비고 |
 |------|------|------|

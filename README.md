@@ -1,9 +1,10 @@
 # 지방보조금 부정수급 위험도 — 지도학습
 
-[![Release v0.4.0](https://img.shields.io/github/v/tag/lky9464/LocalSubsidies_SupervisedLearning?label=v0.4.0)](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases/tag/v0.4.0)
+[![Release v0.5.0](https://img.shields.io/github/v/tag/lky9464/LocalSubsidies_SupervisedLearning?label=v0.5.0)](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases/tag/v0.5.0)
 
 지방보조금 부정수급 **위험도 점수(0~1000)** 측정을 위한 지도학습 파이프라인 + **로컬 웹 UI**입니다.
 
+- **v0.5** — 학습 UI 2섹션 · Run별 모델 비교 · Job 취소 · ([`VERSION_HISTORY`](docs/VERSION_HISTORY.md))
 - **v0.4** — 하이퍼파라미터 튜닝·`random_forest_v2` / `catboost_v2` · algo_id `{family}_vN` · ([`VERSION_HISTORY`](docs/VERSION_HISTORY.md))
 - **v0.3** — Next.js + FastAPI 웹 UI(`127.0.0.1:8600`), 백그라운드 Job, 운영 DB(`ops.sqlite`), 추론 결과 조회
 - **v0.2** — Streamlit UI (제거됨) · **v0.1** — CLI 전용 ([`v0.1.0`](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases/tag/v0.1.0))
@@ -14,12 +15,12 @@
 ## 일반 사용자 — 오프라인 PC 설치·사용 (권장)
 
 대상: Windows 10/11 x64 · 인터넷이 없는 업무 PC ·  
-온라인에서는 **[Release v0.4.0](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases/tag/v0.4.0) 한곳**에서 소스·wheels·UI·Python·VC++까지 받은 뒤 USB로 옮김.  
+온라인에서는 **[Release v0.5.0](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases/tag/v0.5.0) 한곳**에서 소스·wheels·UI·Python·VC++까지 받은 뒤 USB로 옮김.  
 (학습·추론 raw CSV는 사용자가 별도 준비. Node.js·개발 환경 불필요.)
 
 ### A. 온라인 PC에서 받을 것 (USB에 복사)
 
-모두 같은 [Release v0.4.0](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases/tag/v0.4.0) Assets / Source:
+모두 같은 [Release v0.5.0](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases/tag/v0.5.0) Assets / Source:
 
 | # | 파일 | 비고 |
 |---|------|------|

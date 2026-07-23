@@ -11,7 +11,7 @@
 | 05 | `05_train.py` / `05_train_{family}_v1.py` | 학습 (`--algo` = algo_id) | `algorithms/{algo_id}/model.joblib` |
 | 06 | `06_feature_importance.py` | Feature TOP10 | `feature_top10.json` + Excel |
 | 07 | `07_evaluate.py` | 평가·점수 파일 | `scores/test/{algo}_test_scores*` |
-| 08 | `08_update_ranking.py` | 모델 1~5위 | `model_ranking.json` + SQLite |
+| 08 | `08_update_ranking.py` | 모델 순위·역할 | `model_ranking.json` (+ `ranking_confidence`) + SQLite · [`ranking_methodology.md`](ranking_methodology.md) |
 | 09 | `09_report.py` | 집계 리포트 | `outputs/reports/` |
 | 10 | `10_ops_queue.py` | 타겟 포착 분포 (Test 주/보 A~D · 4×4) | `algorithms/operations/ops_queue_test.*` |
 | 11 | `11_score_inference.py` | 라벨 미지 추론 · 점검 우선순위표 | `scores/inference/{algo}_inference_scores*` · `ops_queue_inference.*` |

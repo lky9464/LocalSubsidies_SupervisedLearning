@@ -8,6 +8,11 @@ from api.state import get_pipeline_abandon
 from src.pipeline.jobs import JobManager
 from src.pipeline.runner import TRAIN_PIPELINE_STEPS
 
+PREP_STEP_IDS = frozenset({"merge", "label", "preprocess", "leakage"})
+TRAIN_EVAL_STEP_IDS = frozenset(
+    {"train", "feature_importance", "evaluate", "ranking", "report", "ops_queue"}
+)
+
 
 def step_status_map(repo: Any, run_id: str) -> dict[str, str]:
     try:

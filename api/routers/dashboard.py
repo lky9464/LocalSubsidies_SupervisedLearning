@@ -18,7 +18,7 @@ router = APIRouter(tags=["dashboard"])
 def dashboard(run_id: str, cfg=Depends(get_cfg), repo=Depends(get_repo), mgr=Depends(get_job_manager)) -> dict:
     ranking = repo.get_ranking(run_id)
     ranking_empty = len(ranking) == 0
-    compare = build_compare_frame(cfg, ranking, allow_global_fallback=False)
+    compare = build_compare_frame(cfg, ranking, allow_global_fallback=False, run_id=run_id)
     primary, aux = repo.get_primary_aux(run_id)
 
     test_block: dict = {"empty": True}

@@ -7,7 +7,6 @@ import {
   BookOpen,
   ChevronDown,
   ChevronRight,
-  Database,
   History,
   LayoutDashboard,
   Monitor,
@@ -34,7 +33,6 @@ import {
 const nav = [
   { href: "/", label: "대시보드", icon: LayoutDashboard },
   { href: "/run-issue/", label: "Run ID 발급", icon: Activity },
-  { href: "/data/", label: "데이터 등록", icon: Database },
 ];
 
 const trainNav = [

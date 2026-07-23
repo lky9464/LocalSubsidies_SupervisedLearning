@@ -40,7 +40,9 @@ class JobCancel(BaseModel):
 class RunConfigUpdate(BaseModel):
     split: dict[str, Any] | None = None
     algorithms: list[str] | None = None
-    options_committed: bool | None = None
+    options_committed: bool | None = None  # legacy: both flags
+    split_committed: bool | None = None
+    algorithms_committed: bool | None = None
     exclude_features_extra: list[str] | None = None
 
 

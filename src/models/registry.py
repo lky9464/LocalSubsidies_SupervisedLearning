@@ -43,6 +43,37 @@ def normalize_algo_id(name: str) -> str:
     )
 
 
+def algo_lookup_ids(name: str) -> list[str]:
+    """DB·eval JSON·폴더 조회용 algo_id 변형 (신규 우선, legacy family 포함)."""
+    raw = (name or "").strip().lower()
+    if not raw:
+        return []
+    ordered: list[str] = []
+    for candidate in (raw,):
+        if candidate not in ordered:
+            ordered.append(candidate)
+    try:
+        norm = normalize_algo_id(raw)
+        if norm not in ordered:
+            ordered.append(norm)
+        family, _ver = parse_algo_id(norm)
+        if family not in ordered:
+            ordered.append(family)
+    except ValueError:
+        if raw in FAMILY_LABELS:
+            v1 = f"{raw}_v1"
+            if v1 not in ordered:
+                ordered.append(v1)
+    return ordered
+
+
+def resolve_algo_label(name: str, labels: dict[str, str]) -> str:
+    for key in algo_lookup_ids(name):
+        if key in labels:
+            return labels[key]
+    return name
+
+
 def parse_algo_id(name: str) -> tuple[str, str]:
     """algo_id → (family, version_tag) 예: ('catboost', 'v1')."""
     algo_id = normalize_algo_id(name)

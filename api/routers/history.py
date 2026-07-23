@@ -15,7 +15,7 @@ router = APIRouter(tags=["history"])
 def run_history(run_id: str, cfg=Depends(get_cfg), repo=Depends(get_repo)) -> dict:
     steps = repo.list_steps(run_id)
     ranking = repo.get_ranking(run_id)
-    compare = build_compare_frame(cfg, ranking, allow_global_fallback=False)
+    compare = build_compare_frame(cfg, ranking, allow_global_fallback=False, run_id=run_id)
 
     test_block: dict = {"empty": True}
     try:

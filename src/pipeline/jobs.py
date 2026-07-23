@@ -247,11 +247,26 @@ class JobManager:
         if pid and int(pid) != my_pid and int(pid) != os.getppid():
             _kill_pid(int(pid))
 
+        step_id = job.get("current_step")
+        run_id_str = str(job.get("run_id") or "")
         job = dict(job)
         job["status"] = "cancelled"
         job["ended_at"] = _now()
         job["message"] = "사용자 취소"
         self._write_job(job)
+        if step_id and run_id_str:
+            try:
+                from src.ops_db.repository import OpsRepository
+
+                OpsRepository(self.cfg).upsert_step(
+                    run_id_str,
+                    str(step_id),
+                    "failed",
+                    message="사용자 취소",
+                    ended=True,
+                )
+            except Exception:  # noqa: BLE001
+                pass
         return job
 
 

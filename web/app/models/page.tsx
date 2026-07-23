@@ -12,14 +12,16 @@ import { ModelRadarChart } from "@/components/radar-chart";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Checkbox } from "@/components/ui/checkbox";
 
+const DEFAULT_RADAR_METRICS = [
+  "PR-AUC",
+  "상위1%리프트",
+  "상위1%양성비중",
+  "상위1%양성포착",
+];
+
 export default function ModelsPage() {
   const { runId } = useRun();
-  const [metrics, setMetrics] = useState<string[]>([
-    "PR-AUC",
-    "상위1%리프트",
-    "상위1%양성포착",
-    "F1",
-  ]);
+  const [metrics, setMetrics] = useState<string[]>(DEFAULT_RADAR_METRICS);
 
   const { data, isLoading } = useQuery({
     queryKey: ["models", runId, metrics.join(",")],
@@ -71,8 +73,13 @@ export default function ModelsPage() {
                 </ul>
               </details>
               <DataTable rows={(data?.ranking as Record<string, unknown>[]) || []} />
+              {data?.ranking_confidence === "low" && data?.ranking_note ? (
+                <Alert variant="default">{String(data.ranking_note)}</Alert>
+              ) : null}
               <p className="text-xs text-muted-foreground">
-                순위: PR-AUC → 상위1% 리프트 → F1 · 1위=주, 2위=보
+                순위: 상위1% 리프트(Δ≥3%면 단독) → PR-AUC(근접 시) · F1·ROC-AUC는 참고 ·
+                1위=주·2위=보(primary PR-AUC 가드) · 애매 시 Test 4×4로 주·보 확정 (
+                docs/ranking_methodology.md)
               </p>
             </CardContent>
           </Card>

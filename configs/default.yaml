@@ -134,6 +134,14 @@ ops_queue:
   b_top_pct: 5
   c_top_pct: 10
 
+# 08 모델 순위 · 주·보 역할 (Test 07 eval_summary 기준)
+# 상세: docs/ranking_methodology.md
+ranking:
+  lift_tie_relative_pct: 3.0       # 리프트 상대차 < 3% → PR-AUC로 비교
+  pr_auc_tie_absolute: 0.005       # PR-AUC 차 < 0.005 → 동순
+  primary_pr_auc_abs_gap: 0.01     # primary PR-AUC 가드 (풀 최고 대비)
+  primary_pr_auc_rel_gap_pct: 3.0
+
 # 메모리 관련 (16GB RAM 환경)
 memory:
   sklearn_encoding: ordinal  # onehot 사용 금지

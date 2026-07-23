@@ -2,25 +2,22 @@
 
 from __future__ import annotations
 
-import json
 from typing import Any
 
 import pandas as pd
 
-from api.constants import ALGO_LABELS, COMPARE_COLUMNS
-from src.io.config import resolve_data_path
+from api.constants import COMPARE_COLUMNS, DEFAULT_RADAR_METRICS
+from src.evaluate.eval_snapshot import load_eval_maps_for_run, pick_eval_for_algo
+from src.models.registry import build_algo_labels_map, resolve_algo_label
 
 
-def load_eval_maps(cfg: dict[str, Any]) -> tuple[dict, dict]:
-    summary_path = resolve_data_path(cfg, "algorithms") / "eval_summary.json"
-    if not summary_path.exists():
-        return {}, {}
-    try:
-        with open(summary_path, encoding="utf-8") as f:
-            summary = json.load(f)
-        return summary.get("lift") or {}, summary.get("metrics") or {}
-    except OSError:
-        return {}, {}
+def load_eval_maps(
+    cfg: dict[str, Any],
+    *,
+    run_id: str | None = None,
+    algos: list[str] | None = None,
+) -> tuple[dict, dict]:
+    return load_eval_maps_for_run(cfg, run_id=run_id, algos=algos)
 
 
 def _lift_get(lf: dict, *keys: str) -> Any:
@@ -76,10 +73,11 @@ def _row_from_parts(
     ranking_row: dict,
     m: dict,
     lf: dict,
+    labels_map: dict[str, str],
 ) -> dict:
     return {
         "순위": rank,
-        "알고리즘": ALGO_LABELS.get(algo, algo),
+        "알고리즘": resolve_algo_label(algo, labels_map),
         "algo_key": algo,
         "역할": role,
         "PR-AUC": _coalesce(
@@ -88,30 +86,30 @@ def _row_from_parts(
         "ROC-AUC": _coalesce(ranking_row.get("roc_auc"), m.get("ROC_AUC(ROC_AUC)")),
         "F1": _coalesce(ranking_row.get("f1"), m.get("F1점수(F1)")),
         "상위1%리프트": _coalesce(
-            _lift_get(lf, "상위1%리프트(top_1pct_lift)", "top_1pct_lift"),
             ranking_row.get("top1_lift"),
+            _lift_get(lf, "상위1%리프트(top_1pct_lift)", "top_1pct_lift"),
         ),
         "상위1%양성비중": _coalesce(
+            ranking_row.get("top1_precision"),
             _lift_get(
                 lf, "상위1%양성비율(top_1pct_positive_rate)", "top_1pct_positive_rate"
             ),
-            ranking_row.get("top1_precision"),
         ),
         "상위1%양성포착": _coalesce(
-            _topk_recall(lf, 1), ranking_row.get("top1_recall")
+            ranking_row.get("top1_recall"), _topk_recall(lf, 1)
         ),
         "상위5%리프트": _coalesce(
-            _lift_get(lf, "상위5%리프트(top_5pct_lift)", "top_5pct_lift"),
             ranking_row.get("top5_lift"),
+            _lift_get(lf, "상위5%리프트(top_5pct_lift)", "top_5pct_lift"),
         ),
         "상위5%양성비중": _coalesce(
+            ranking_row.get("top5_precision"),
             _lift_get(
                 lf, "상위5%양성비율(top_5pct_positive_rate)", "top_5pct_positive_rate"
             ),
-            ranking_row.get("top5_precision"),
         ),
         "상위5%양성포착": _coalesce(
-            _topk_recall(lf, 5), ranking_row.get("top5_recall")
+            ranking_row.get("top5_recall"), _topk_recall(lf, 5)
         ),
     }
 
@@ -121,21 +119,26 @@ def build_compare_frame(
     ranking: list[dict],
     *,
     allow_global_fallback: bool = True,
+    run_id: str | None = None,
 ) -> pd.DataFrame:
-    lift_map, metrics_map = load_eval_maps(cfg)
+    algos = [r["algo"] for r in ranking] if ranking else []
+    lift_map, metrics_map = load_eval_maps(cfg, run_id=run_id, algos=algos)
+    labels_map = build_algo_labels_map(cfg)
     rows: list[dict] = []
 
     if ranking:
         for r in ranking:
             algo = r["algo"]
-            lf = lift_map.get(algo) or {}
-            m = metrics_map.get(algo) or {}
-            rows.append(_row_from_parts(r.get("rank"), algo, r.get("role"), r, m, lf))
+            m, lf = pick_eval_for_algo(lift_map, metrics_map, algo)
+            rows.append(
+                _row_from_parts(
+                    r.get("rank"), algo, r.get("role"), r, m, lf, labels_map
+                )
+            )
     elif allow_global_fallback and metrics_map:
         for i, algo in enumerate(metrics_map.keys(), start=1):
-            lf = lift_map.get(algo) or {}
-            m = metrics_map.get(algo) or {}
-            rows.append(_row_from_parts(i, algo, None, {}, m, lf))
+            m, lf = pick_eval_for_algo(lift_map, metrics_map, algo)
+            rows.append(_row_from_parts(i, algo, None, {}, m, lf, labels_map))
 
     df = pd.DataFrame(rows)
     if df.empty:
@@ -183,8 +186,17 @@ def format_ops_summary(summary: pd.DataFrame) -> pd.DataFrame:
     return summary.rename(columns={k: v for k, v in rename.items() if k in summary.columns})
 
 
+def _parse_metric_value(v: Any) -> float | None:
+    try:
+        if v is None or (isinstance(v, float) and pd.isna(v)):
+            return None
+        return float(v)
+    except (TypeError, ValueError):
+        return None
+
+
 def radar_chart_data(compare_df: pd.DataFrame, metrics: list[str] | None = None) -> dict:
-    """Min-max normalized radar series for Recharts."""
+    """Min-max normalized radar series for Recharts (모델별 algo_key 고유)."""
     if compare_df.empty:
         return {"metrics": [], "series": []}
 
@@ -200,7 +212,7 @@ def radar_chart_data(compare_df: pd.DataFrame, metrics: list[str] | None = None)
         "상위5%양성포착",
     ]
     available = [c for c in numeric_cols if c in compare_df.columns]
-    selected = metrics or ["PR-AUC", "상위1%리프트", "상위1%양성포착", "F1"]
+    selected = metrics or list(DEFAULT_RADAR_METRICS)
     selected = [m for m in selected if m in available]
     if len(selected) < 3:
         return {"metrics": selected, "series": []}
@@ -209,29 +221,38 @@ def radar_chart_data(compare_df: pd.DataFrame, metrics: list[str] | None = None)
     maxs = {m: float("-inf") for m in selected}
     for _, row in compare_df.iterrows():
         for m in selected:
-            v = row.get(m)
-            try:
-                fv = float(v)
-            except (TypeError, ValueError):
+            fv = _parse_metric_value(row.get(m))
+            if fv is None:
                 continue
             mins[m] = min(mins[m], fv)
             maxs[m] = max(maxs[m], fv)
 
+    for m in selected:
+        if mins[m] == float("inf") or maxs[m] == float("-inf"):
+            mins[m] = 0.0
+            maxs[m] = 1.0
+
     series = []
-    for _, row in compare_df.iterrows():
-        name = str(row.get("알고리즘", ""))
-        values: dict[str, float | None] = {}
+    seen_ids: set[str] = set()
+    for idx, row in compare_df.iterrows():
+        display = str(row.get("알고리즘") or "")
+        algo_key = str(row.get("algo_key") or display or f"model_{idx}")
+        series_id = algo_key
+        if series_id in seen_ids:
+            series_id = f"{algo_key}__{idx}"
+        seen_ids.add(series_id)
+        values: dict[str, float] = {}
         for m in selected:
-            try:
-                fv = float(row.get(m))
-            except (TypeError, ValueError):
-                values[m] = None
+            fv = _parse_metric_value(row.get(m))
+            if fv is None:
+                # 결측은 축 최솟값(0) — 다른 모델과 겹치지 않도록 id는 algo_key 유지
+                values[m] = 0.0
                 continue
             lo, hi = mins[m], maxs[m]
             if hi > lo:
                 values[m] = (fv - lo) / (hi - lo)
             else:
                 values[m] = 0.5
-        series.append({"name": name, "values": values})
+        series.append({"id": series_id, "name": display or algo_key, "values": values})
 
     return {"metrics": selected, "series": series}

@@ -12,6 +12,8 @@ from api.deps import get_cfg, get_job_manager, get_repo
 from api.schemas.common import LeakageResume, PipelineAbandonUpdate, RunConfigUpdate
 from api.serializers import df_to_records
 from api.services.pipeline import (
+    PREP_STEP_IDS,
+    TRAIN_EVAL_STEP_IDS,
     extra_for_steps,
     job_is_running,
     settings_locked,
@@ -69,10 +71,18 @@ def get_config(run_id: str, cfg=Depends(get_cfg), repo=Depends(get_repo)) -> dic
         )
     selected_raw = repo.list_selected_rel_paths(dataset_kind="train")
     frozen_raw = [str(x) for x in (run_cfg.get("raw_files") or [])]
+    split_committed = bool(
+        run_cfg.get("split_committed") or run_cfg.get("options_committed")
+    )
+    algorithms_committed = bool(
+        run_cfg.get("algorithms_committed") or run_cfg.get("options_committed")
+    )
     return {
         "run_id": run_id,
         "config": run_cfg,
-        "committed": bool(run_cfg.get("options_committed")),
+        "committed": split_committed and algorithms_committed,
+        "split_committed": split_committed,
+        "algorithms_committed": algorithms_committed,
         "locked": locked,
         "job_running": job_is_running(cfg),
         "opts_edit": get_opts_edit(cfg, run_id),
@@ -105,6 +115,12 @@ def put_config(run_id: str, body: RunConfigUpdate, cfg=Depends(get_cfg), repo=De
         run_cfg["algorithms"] = [normalize_algo_id(a) for a in body.algorithms]
     if body.options_committed is not None:
         run_cfg["options_committed"] = body.options_committed
+        run_cfg["split_committed"] = body.options_committed
+        run_cfg["algorithms_committed"] = body.options_committed
+    if body.split_committed is not None:
+        run_cfg["split_committed"] = body.split_committed
+    if body.algorithms_committed is not None:
+        run_cfg["algorithms_committed"] = body.algorithms_committed
     if body.exclude_features_extra is not None:
         run_cfg["exclude_features_extra"] = body.exclude_features_extra
 
@@ -115,7 +131,20 @@ def put_config(run_id: str, body: RunConfigUpdate, cfg=Depends(get_cfg), repo=De
 
 
 @router.post("/api/runs/{run_id}/pipeline/abandon")
-def pipeline_abandon(run_id: str, body: PipelineAbandonUpdate, cfg=Depends(get_cfg)) -> dict:
+def pipeline_abandon(
+    run_id: str,
+    body: PipelineAbandonUpdate,
+    cfg=Depends(get_cfg),
+    mgr=Depends(get_job_manager),
+) -> dict:
+    if body.abandon:
+        active = mgr.get_active_job(mutate=False)
+        if (
+            active
+            and active.get("run_id") == run_id
+            and active.get("status") in ("running", "starting")
+        ):
+            mgr.cancel_job(active.get("job_id"), run_id)
     set_pipeline_abandon(cfg, run_id, body.abandon)
     if body.opts_edit:
         set_opts_edit(cfg, run_id, True)
@@ -124,6 +153,8 @@ def pipeline_abandon(run_id: str, body: PipelineAbandonUpdate, cfg=Depends(get_c
 
 @router.post("/api/runs/{run_id}/pipeline/reopen")
 def pipeline_reopen(run_id: str, cfg=Depends(get_cfg)) -> dict:
+    if job_is_running(cfg):
+        raise HTTPException(409, "Job 실행 중에는 설정을 수정할 수 없습니다.")
     set_opts_edit(cfg, run_id, True)
     return {"ok": True}
 
@@ -172,11 +203,12 @@ def leakage_resume(
         run_id,
         "leakage_remediation",
         "succeeded",
-        message=f"제외 {len(body.features)}개 후 03부터 재개",
+        message=f"제외 {len(body.features)}개 후 01~04 재개",
         ended=True,
     )
+    prep_ids = [s["id"] for s in TRAIN_PIPELINE_STEPS if s["id"] in PREP_STEP_IDS]
     try:
-        job = mgr.start_steps(run_id, ["preprocess", "leakage"])
+        job = mgr.start_steps(run_id, prep_ids)
     except RuntimeError as exc:
         raise HTTPException(409, str(exc)) from exc
     return {"ok": True, "job_id": job.get("job_id")}
@@ -196,6 +228,23 @@ def pipeline_start(
         raise HTTPException(400, "step_ids required")
     run_cfg = load_run_config(cfg, run_id)
     algos = list(run_cfg.get("algorithms") or [])
+    split_ok = bool(run_cfg.get("split_committed") or run_cfg.get("options_committed"))
+    algos_ok = bool(run_cfg.get("algorithms_committed") or run_cfg.get("options_committed"))
+
+    prep_requested = any(s in PREP_STEP_IDS for s in step_ids)
+    train_requested = any(s in TRAIN_EVAL_STEP_IDS for s in step_ids)
+
+    if prep_requested and not split_ok:
+        raise HTTPException(400, "분할 옵션을 저장한 뒤 데이터 가공(01~04)을 실행하세요.")
+    if train_requested:
+        if len(algos) < 2:
+            raise HTTPException(400, "학습 알고리즘을 2개 이상 선택하세요.")
+        if not algos_ok:
+            raise HTTPException(
+                400,
+                "학습 알고리즘을 저장한 뒤 학습·평가(05~10)를 실행하세요.",
+            )
+
     if "train" in step_ids and len(algos) < 2:
         raise HTTPException(400, "학습 알고리즘을 2개 이상 선택하세요.")
 
@@ -211,7 +260,13 @@ def pipeline_start(
         except ValueError as exc:
             raise HTTPException(400, str(exc)) from exc
 
-    run_cfg["options_committed"] = True
+    if prep_requested:
+        run_cfg["split_committed"] = True
+    if train_requested:
+        run_cfg["algorithms_committed"] = True
+    run_cfg["options_committed"] = bool(
+        run_cfg.get("split_committed") and run_cfg.get("algorithms_committed")
+    )
     save_run_config(cfg, run_id, run_cfg)
     set_pipeline_abandon(cfg, run_id, False)
     set_opts_edit(cfg, run_id, False)

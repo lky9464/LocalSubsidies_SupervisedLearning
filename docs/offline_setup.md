@@ -4,7 +4,7 @@
 GitHub에서 **소스 + Release 자산**을 받아 USB 등으로 옮긴 뒤, 아래 순서대로 진행하면 됩니다.
 
 > **한 줄 요약**  
-> [Release v0.4.0](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases/tag/v0.4.0) 에서  
+> [Release v0.5.0](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases/tag/v0.5.0) 에서  
 > **Source + wheels + web-out + `python-3.12.10-amd64.exe` + `VC_redist.x64.exe`**  
 > → 설치 → `SetupOffline.bat` → `data_root`·raw 준비 → `RunWebNext.bat`  
 > (Python·VC++가 이미 있으면 해당 exe는 생략 가능)
@@ -21,6 +21,9 @@ GitHub에서 **소스 + Release 자산**을 받아 USB 등으로 옮긴 뒤, 아
 | 데이터 | raw CSV는 GitHub에 **없음** — 사용자가 `{data_root}`에 직접 둠 |
 | UI | FastAPI + Next 정적 export (`web/out`) · `http://127.0.0.1:8600` |
 | 배치 파일 | **ASCII 전용** — PC 코드페이지(UTF-8 / CP949 / EUC-KR 등)와 무관하게 동작. 한글 안내는 README·이 문서 참고 |
+| Python·API | 설정 YAML·JSON·Job 로그는 **UTF-8** 고정 (`PYTHONUTF8=1` 등). OS 로케일과 무관 |
+| raw CSV | `configs/default.yaml`의 `encoding_candidates`로 **파일별** 인코딩 자동 시도 (EUC-KR·cp949·UTF-8 등). PC 기본 코드페이지와 무관 |
+| UI (`web/out`) | Release에 **미리 빌드된 정적 HTML/JS** — Node.js·npm 불필요 · 브라우저 UTF-8 렌더 |
 
 이 저장소에는 **코드·문서·스키마**만 있습니다.  
 학습·추론용 CSV, 모델, 행단위 점수는 Release에도 포함되지 않습니다.
@@ -35,7 +38,7 @@ GitHub에서 **소스 + Release 자산**을 받아 USB 등으로 옮긴 뒤, 아
 
 ### ① 소스 코드 (ZIP)
 
-권장: [Release v0.4.0](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases/tag/v0.4.0) → **Source code (zip)**  
+권장: [Release v0.5.0](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases/tag/v0.5.0) → **Source code (zip)**  
 (버전을 wheels·web-out과 맞추려면 Code 버튼 ZIP보다 **Release 소스 ZIP**이 안전합니다.)
 
 ### ② wheel 묶음 (패키지 설치용)

@@ -14,6 +14,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+from src.evaluate.eval_snapshot import save_run_eval_summary
 from src.io.banner import print_banner  # noqa: E402
 from src.io.config import load_config, resolve_data_path  # noqa: E402
 from src.ops_db.repository import OpsRepository  # noqa: E402
@@ -36,17 +37,23 @@ def main() -> None:
         summary = json.load(f)
 
     algorithms = resolve_pipeline_algorithms(cfg)
-    ranking = build_model_ranking(summary, algorithms=algorithms)
+    ranking, meta = build_model_ranking(summary, algorithms=algorithms, cfg=cfg)
     out = algo_root / "operations" / "model_ranking.json"
-    save_model_ranking(ranking, out)
+    save_model_ranking(ranking, out, meta=meta)
 
     repo = OpsRepository(cfg)
     run_id = resolve_pipeline_run_id(cfg, repo=repo)
     repo.ensure_run(run_id, note="ranking")
     repo.save_ranking(run_id, ranking)
+    snap = save_run_eval_summary(cfg, run_id, summary)
+    print(f"[ranking] Run 평가 스냅샷: {snap}")
 
     print(f"[ranking] 저장: {out}")
     print(f"[ranking] DB run_id={run_id}")
+    print(
+        f"[ranking] confidence={meta.get('ranking_confidence')} — "
+        f"{meta.get('ranking_note', '')}"
+    )
     for r in ranking:
         print(
             f"  #{r['rank']} {r['algo']} role={r['role']} "

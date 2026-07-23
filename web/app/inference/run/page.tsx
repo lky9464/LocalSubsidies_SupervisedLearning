@@ -5,8 +5,10 @@ import { AppLink } from "@/components/app-link";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiGet, apiPost } from "@/lib/api";
 import { useRun } from "@/components/run-context";
+import { DataSection } from "@/components/data-section";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LoadingSpinner } from "@/components/loading-spinner";
 import type { ConfigMeta } from "@/lib/types";
 
@@ -55,7 +57,7 @@ export default function InferenceRunPage() {
   const [missingOpen, setMissingOpen] = useState(false);
   const [missingLabels, setMissingLabels] = useState<string[]>([]);
 
-  const { data: prereq } = useQuery({
+  const { data: prereq, refetch: refetchPrereq } = useQuery({
     queryKey: ["inferPrereq"],
     queryFn: () =>
       apiGet<{
@@ -79,8 +81,8 @@ export default function InferenceRunPage() {
 
   const trainedSet = new Set(trainedInfo?.trained || []);
   const labels = meta?.algo_labels || {};
+  const hasInferData = Boolean(prereq?.has_data);
 
-  // Run 변경 또는 학습 목록 갱신 시: 주·보조(평가 1·2위)만 기본 체크
   useEffect(() => {
     if (!runId || !trainedInfo) return;
     const nextDefaults = (trainedInfo.defaults || []).filter((a) =>
@@ -128,6 +130,10 @@ export default function InferenceRunPage() {
       setErr("Run ID가 없습니다. 「Run ID 발급」에서 Run을 선택하세요.");
       return;
     }
+    if (!hasInferData) {
+      setErr("추론 CSV를 선택 저장한 뒤 실행하세요.");
+      return;
+    }
     const allowed = selected.filter((a) => trainedSet.has(a));
     if (!allowed.length) {
       setErr("이 Run에서 학습된 알고리즘을 1개 이상 선택하세요.");
@@ -145,96 +151,104 @@ export default function InferenceRunPage() {
   const hasTrained = trainedSet.size > 0;
 
   return (
-    <div className="mx-auto max-w-xl space-y-6">
+    <div className="mx-auto max-w-3xl space-y-6">
       <div>
         <h1 className="text-2xl font-semibold">추론 실행</h1>
         <p className="mt-1 text-sm text-muted-foreground">Run: {runId || "(없음)"}</p>
       </div>
 
+      <Card>
+        <CardHeader>
+          <CardTitle>추론 raw 데이터</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <DataSection
+            title="추론용 CSV"
+            caption="동일 TLS4902R 레이아웃. data_root/raw_inference. 체크 → 선택 저장 → 추론 실행."
+            kind="inference"
+            defaultCollapsed={hasInferData}
+            onSelectionSaved={() => void refetchPrereq()}
+          />
+          {hasInferData && (prereq?.selected_files?.length || 0) > 0 ? (
+            <Alert className="mt-4">
+              선택 저장됨 ({prereq!.selected_files!.length}개):{" "}
+              {prereq!.selected_files!.join(", ")}
+            </Alert>
+          ) : (
+            <Alert variant="destructive" className="mt-4">
+              {prereq?.message || "추론 CSV를 등록·선택 저장하세요."}
+            </Alert>
+          )}
+        </CardContent>
+      </Card>
+
       <Alert>
         현재 Run에서 학습된 알고리즘만 선택할 수 있습니다. 기본값은 평가순위 주모델(1위)·보조모델(2위)입니다.
       </Alert>
 
-      {prereq?.has_data && (prereq.selected_files?.length || 0) > 0 ? (
-        <Alert>
-          추론에 사용할 CSV ({prereq.selected_files!.length}개): {prereq.selected_files!.join(", ")}
+      {!trainedInfo?.train_succeeded || !hasTrained ? (
+        <Alert variant="destructive">
+          이 Run에서 학습된 모델이 없습니다.{" "}
+          <AppLink href="/pipeline/" className="underline">
+            학습 실행
+          </AppLink>
+          에서 알고리즘을 학습한 뒤 추론하세요.
         </Alert>
+      ) : trainedInfo.primary || trainedInfo.aux ? (
+        <p className="text-sm text-muted-foreground">
+          기본 선택: 주 {trainedInfo.primary_label || trainedInfo.primary || "-"}
+          {" · "}
+          보 {trainedInfo.aux_label || trainedInfo.aux || "-"}
+        </p>
       ) : null}
 
-      {!prereq?.has_data ? (
-        <>
-          <Alert variant="destructive">
-            {prereq?.message || "선택된 추론 데이터가 없습니다."}{" "}
-            <AppLink href="/data/" className="underline">
-              데이터 등록
-            </AppLink>
-            에서 추론 CSV를 체크한 뒤 「선택 저장」하세요.
-          </Alert>
-          <Button disabled>추론 실행</Button>
-        </>
-      ) : (
-        <>
-          {!trainedInfo?.train_succeeded || !hasTrained ? (
-            <Alert variant="destructive">
-              이 Run에서 학습된 모델이 없습니다.{" "}
-              <AppLink href="/pipeline/" className="underline">
-                학습 실행
-              </AppLink>
-              에서 알고리즘을 학습한 뒤 추론하세요.
-            </Alert>
-          ) : trainedInfo.primary || trainedInfo.aux ? (
-            <p className="text-sm text-muted-foreground">
-              기본 선택: 주{" "}
-              {trainedInfo.primary_label || trainedInfo.primary || "-"}
-              {" · "}
-              보 {trainedInfo.aux_label || trainedInfo.aux || "-"}
-            </p>
-          ) : null}
+      <div>
+        <p className="text-sm font-medium">알고리즘 선택</p>
+        <div className="mt-2 space-y-2">
+          {(meta?.algorithms || []).map((a) => {
+            const ok = trainedSet.has(a);
+            const role = roleHint(a);
+            return (
+              <label
+                key={a}
+                className={`flex items-center gap-2 text-sm ${ok ? "" : "opacity-50"}`}
+              >
+                <input
+                  type="checkbox"
+                  disabled={!ok}
+                  checked={ok && selected.includes(a)}
+                  onChange={(e) => {
+                    if (!ok) return;
+                    setSelected(
+                      e.target.checked
+                        ? [...selected.filter((x) => trainedSet.has(x)), a]
+                        : selected.filter((x) => x !== a),
+                    );
+                  }}
+                />
+                <span>{labelOf(a)}</span>
+                {role ? (
+                  <span className="text-xs text-emerald-700">({role})</span>
+                ) : (
+                  <span className="text-xs text-muted-foreground">
+                    {ok ? "(이 Run 학습됨)" : "(미학습 · 선택 불가)"}
+                  </span>
+                )}
+              </label>
+            );
+          })}
+        </div>
+      </div>
 
-          <div>
-            <p className="text-sm font-medium">알고리즘 선택</p>
-            <div className="mt-2 space-y-2">
-              {(meta?.algorithms || []).map((a) => {
-                const ok = trainedSet.has(a);
-                const role = roleHint(a);
-                return (
-                  <label
-                    key={a}
-                    className={`flex items-center gap-2 text-sm ${ok ? "" : "opacity-50"}`}
-                  >
-                    <input
-                      type="checkbox"
-                      disabled={!ok}
-                      checked={ok && selected.includes(a)}
-                      onChange={(e) => {
-                        if (!ok) return;
-                        setSelected(
-                          e.target.checked
-                            ? [...selected.filter((x) => trainedSet.has(x)), a]
-                            : selected.filter((x) => x !== a),
-                        );
-                      }}
-                    />
-                    <span>{labelOf(a)}</span>
-                    {role ? (
-                      <span className="text-xs text-emerald-700">({role})</span>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">
-                        {ok ? "(이 Run 학습됨)" : "(미학습 · 선택 불가)"}
-                      </span>
-                    )}
-                  </label>
-                );
-              })}
-            </div>
-          </div>
-          {err ? <p className="text-sm text-red-600">{err}</p> : null}
-          <Button onClick={run} disabled={busy || !hasTrained}>
-            {busy ? <LoadingSpinner /> : null}
-            추론 실행
-          </Button>
-        </>
-      )}
+      {err ? <p className="text-sm text-red-600">{err}</p> : null}
+      <Button
+        onClick={run}
+        disabled={busy || !hasTrained || !hasInferData}
+        onFocus={() => void refetchPrereq()}
+      >
+        {busy ? <LoadingSpinner /> : null}
+        추론 실행
+      </Button>
 
       {missingOpen ? (
         <SimpleModal title="학습 필요" onClose={() => setMissingOpen(false)}>

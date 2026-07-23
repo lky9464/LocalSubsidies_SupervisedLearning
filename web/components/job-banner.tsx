@@ -1,7 +1,8 @@
 "use client";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { apiGet, apiPost } from "@/lib/api";
+import { apiGet } from "@/lib/api";
+import { cancelPipelineJob } from "@/lib/pipeline-cancel";
 import type { JobInfo } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/alert";
@@ -29,17 +30,8 @@ export function JobBanner() {
   const pct = Math.round((job.progress || 0) * 100);
 
   async function cancel() {
-    await apiPost("/api/jobs/cancel", {
-      job_id: job?.job_id,
-      run_id: job?.run_id,
-    });
-    if (job?.run_id) {
-      await apiPost(`/api/runs/${job.run_id}/pipeline/abandon`, {
-        abandon: true,
-        opts_edit: true,
-      });
-    }
-    qc.invalidateQueries({ queryKey: ["activeJob"] });
+    if (!job?.run_id) return;
+    await cancelPipelineJob(job.run_id, qc);
   }
 
   if (running) {

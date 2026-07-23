@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS model_ranking (
     roc_auc REAL,
     top1_lift REAL,
     f1 REAL,
-    PRIMARY KEY (run_id, rank),
+    PRIMARY KEY (run_id, algo),
     FOREIGN KEY (run_id) REFERENCES runs(run_id)
 );
 
@@ -174,3 +174,57 @@ def _migrate(conn: sqlite3.Connection) -> None:
 
     # Execution 스냅샷 기능 철회 — 잔여 테이블 제거
     conn.execute("DROP TABLE IF EXISTS executions")
+
+    _migrate_model_ranking_pk(conn)
+    _migrate_model_ranking_metrics(conn)
+
+
+def _migrate_model_ranking_metrics(conn: sqlite3.Connection) -> None:
+    """model_ranking에 top-k 부가 지표 컬럼 추가."""
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(model_ranking)").fetchall()}
+    if not cols:
+        return
+    for col in (
+        "top1_precision",
+        "top1_recall",
+        "top5_lift",
+        "top5_precision",
+        "top5_recall",
+    ):
+        if col not in cols:
+            conn.execute(f"ALTER TABLE model_ranking ADD COLUMN {col} REAL")
+
+
+def _migrate_model_ranking_pk(conn: sqlite3.Connection) -> None:
+    """동순 rank(1,1,3) 허용: PK (run_id,rank) → (run_id,algo)."""
+    row = conn.execute(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name='model_ranking'"
+    ).fetchone()
+    if not row or not row[0]:
+        return
+    ddl = row[0]
+    if "PRIMARY KEY (run_id, algo)" in ddl.replace("\n", " "):
+        return
+    conn.executescript(
+        """
+        CREATE TABLE model_ranking_new (
+            run_id TEXT NOT NULL,
+            rank INTEGER NOT NULL,
+            algo TEXT NOT NULL,
+            role TEXT NOT NULL,
+            pr_auc REAL,
+            roc_auc REAL,
+            top1_lift REAL,
+            f1 REAL,
+            PRIMARY KEY (run_id, algo),
+            FOREIGN KEY (run_id) REFERENCES runs(run_id)
+        );
+        INSERT INTO model_ranking_new(
+            run_id, rank, algo, role, pr_auc, roc_auc, top1_lift, f1
+        )
+        SELECT run_id, rank, algo, role, pr_auc, roc_auc, top1_lift, f1
+        FROM model_ranking;
+        DROP TABLE model_ranking;
+        ALTER TABLE model_ranking_new RENAME TO model_ranking;
+        """
+    )

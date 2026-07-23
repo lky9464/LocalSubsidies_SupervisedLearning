@@ -1,10 +1,28 @@
 # 버전 이력
 
-현재 버전: **v0.4.0**  
+현재 버전: **v0.5.0**  
 저장소: [LocalSubsidies_SupervisedLearning](https://github.com/lky9464/LocalSubsidies_SupervisedLearning)  
 릴리스: [Releases](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases)
 
 새 버전을 낼 때 이 문서 상단에 항목을 추가하고, GitHub Release/태그와 맞춥니다.
+
+---
+
+## Unreleased (작업 중)
+
+_(다음 릴리스 예정 항목)_
+
+---
+
+## v0.5.0 — 학습 UI 2섹션·모델 비교·Job 취소
+
+- **학습 실행 UI**: 데이터 가공(01~04) / 학습·평가(05~10) 2섹션 · raw·분할·알고리즘 분리 저장 · 「데이터 등록」 메뉴 제거(학습·추론 화면 내장)
+- **Job 취소**: 파이프라인 잠금 시 `/api/jobs/cancel` + abandon 연동 · 05~10 구간 취소 UI · ops 단계 `failed(사용자 취소)` 기록
+- **모델 비교·평가**: Run별 `eval_summary.json` 스냅샷 · legacy algo_id alias · `model_ranking` top-k 컬럼 · 방사형 차트 PR-AUC+상위1% 3종 기본·전 모델 표시
+- **08 순위 정책**: 상위1% 리프트 → PR-AUC · [`ranking_methodology.md`](ranking_methodology.md)
+- **오프라인**: 배치 ASCII · UTF-8 설정/API · raw `encoding_candidates` — PC 코드페이지와 무관 ([`offline_setup.md`](offline_setup.md) §0)
+
+[Release v0.5.0](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases/tag/v0.5.0)
 
 ---
 

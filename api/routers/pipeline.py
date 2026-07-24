@@ -14,10 +14,15 @@ from api.serializers import df_to_records
 from api.services.pipeline import (
     PREP_STEP_IDS,
     TRAIN_EVAL_STEP_IDS,
+    algorithms_config_editable,
+    config_update_allowed,
     extra_for_steps,
     job_is_running,
+    prep_steps_all_succeeded,
     settings_locked,
+    split_config_locked,
     step_status_map,
+    train_eval_started,
 )
 from api.state import get_opts_edit, get_pipeline_abandon, set_opts_edit, set_pipeline_abandon
 from src.io.config import resolve_repo_path
@@ -84,6 +89,10 @@ def get_config(run_id: str, cfg=Depends(get_cfg), repo=Depends(get_repo)) -> dic
         "split_committed": split_committed,
         "algorithms_committed": algorithms_committed,
         "locked": locked,
+        "split_locked": split_config_locked(step_map),
+        "algorithms_editable": algorithms_config_editable(cfg, run_id, step_map),
+        "prep_complete": prep_steps_all_succeeded(step_map),
+        "train_started": train_eval_started(step_map),
         "job_running": job_is_running(cfg),
         "opts_edit": get_opts_edit(cfg, run_id),
         "pipeline_abandon": get_pipeline_abandon(cfg, run_id),
@@ -102,8 +111,9 @@ def get_config(run_id: str, cfg=Depends(get_cfg), repo=Depends(get_repo)) -> dic
 def put_config(run_id: str, body: RunConfigUpdate, cfg=Depends(get_cfg), repo=Depends(get_repo)) -> dict:
     run_cfg = load_run_config(cfg, run_id)
     step_map = step_status_map(repo, run_id)
-    if settings_locked(cfg, run_id, step_map):
-        raise HTTPException(423, "현재 설정을 변경할 수 없습니다.")
+    ok, reason = config_update_allowed(body, cfg, run_id, step_map)
+    if not ok:
+        raise HTTPException(423, reason or "현재 설정을 변경할 수 없습니다.")
 
     if body.split is not None:
         run_cfg["split"] = {**(run_cfg.get("split") or {}), **body.split}

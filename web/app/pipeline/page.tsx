@@ -102,15 +102,28 @@ export default function PipelinePage() {
   const splitCommitted = Boolean(cfgData?.split_committed);
   const algorithmsCommitted = Boolean(cfgData?.algorithms_committed);
   const locked = Boolean(cfgData?.locked);
+  const splitLocked = Boolean(cfgData?.split_locked ?? locked);
+  const algorithmsEditable =
+    cfgData?.algorithms_editable !== undefined
+      ? Boolean(cfgData.algorithms_editable)
+      : !locked;
+  const prepComplete = Boolean(cfgData?.prep_complete);
   const jobRunning = Boolean(cfgData?.job_running);
   const stepStatus =
     cfgData?.step_status && typeof cfgData.step_status === "object"
       ? (cfgData.step_status as Record<string, string>)
       : {};
   const optsEdit = Boolean(cfgData?.opts_edit);
-  const showSplitEditor = !splitCommitted || (optsEdit && !locked);
-  const showAlgoEditor = !algorithmsCommitted || (optsEdit && !locked);
+  const showSplitEditor = !splitCommitted || (optsEdit && !splitLocked);
+  const showAlgoEditor = !algorithmsCommitted || (optsEdit && algorithmsEditable);
   const algoLabels = asStringArray(cfgData?.algo_labels);
+
+  useEffect(() => {
+    if (prepComplete && !algorithmsCommitted) {
+      setAlgoCollapsed(false);
+    }
+  }, [prepComplete, algorithmsCommitted]);
+
   const trainSteps = Array.isArray(meta?.train_steps) ? meta!.train_steps : [];
   const stepRows = Array.isArray(stepsData?.steps) ? stepsData!.steps : [];
   const algoRegistry: AlgoFamilyMeta[] = Array.isArray(meta?.algorithm_registry)
@@ -318,7 +331,7 @@ export default function PipelinePage() {
         </Alert>
       ) : null}
 
-      {locked ? (
+      {jobRunning ? (
         <PipelineLockAlert onAbandon={abandon} busy={busy} />
       ) : null}
 
@@ -346,12 +359,12 @@ export default function PipelinePage() {
 
             <div className="min-w-0 rounded-md border p-4">
               <h3 className="text-sm font-semibold">
-                Train/Test 분할 {locked ? "(잠금)" : splitCommitted ? "(저장됨)" : ""}
+                Train/Test 분할 {splitLocked ? "(잠금)" : splitCommitted ? "(저장됨)" : ""}
               </h3>
               {!showSplitEditor ? (
                 <div className="mt-2 space-y-2">
                   <p className="text-sm">{String(cfgData?.split_summary ?? "")}</p>
-                  {!locked ? (
+                  {!splitLocked ? (
                     <Button
                       variant="outline"
                       size="sm"
@@ -509,7 +522,8 @@ export default function PipelinePage() {
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div className="min-w-0 flex-1">
                 <h3 className="text-sm font-semibold">
-                  학습 알고리즘 {locked ? "(잠금)" : algorithmsCommitted ? "(저장됨)" : ""}
+                  학습 알고리즘{" "}
+                  {!algorithmsEditable ? "(잠금)" : algorithmsCommitted ? "(저장됨)" : ""}
                 </h3>
                 {!algoCollapsed ? (
                   <p className="mt-1 text-xs text-muted-foreground">
@@ -533,7 +547,7 @@ export default function PipelinePage() {
             ) : !showAlgoEditor ? (
               <div className="mt-3 space-y-2">
                 <p className="text-sm">알고리즘: {algoLabels.join(", ") || "(없음)"}</p>
-                {!locked ? (
+                {!algorithmsEditable ? null : (
                   <Button
                     variant="outline"
                     size="sm"
@@ -548,7 +562,7 @@ export default function PipelinePage() {
                   >
                     학습 알고리즘 수정
                   </Button>
-                ) : null}
+                )}
               </div>
             ) : (
               <div className="mt-3 space-y-4">
@@ -592,7 +606,11 @@ export default function PipelinePage() {
           </div>
 
           {!algorithmsCommitted ? (
-            <Alert>학습 알고리즘을 저장한 뒤 05~10 단계를 실행할 수 있습니다.</Alert>
+            <Alert>
+              {prepComplete
+                ? "01~04가 완료되었습니다. 위에서 학습 알고리즘(2개 이상)을 선택·저장한 뒤 05~10을 실행하세요."
+                : "학습 알고리즘을 저장한 뒤 05~10 단계를 실행할 수 있습니다."}
+            </Alert>
           ) : null}
 
           <div>

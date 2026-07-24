@@ -150,6 +150,24 @@ data_root: "C:/work/LocalSubsidies_ML_Data"
 
 ---
 
+## 5-1. (오프라인 PC) 버전 업데이트 — 변동분만
+
+**최초 설치(§1~§4)가 끝난 PC**는 프로젝트 통째 교체 없이 패치할 수 있습니다.
+
+| 보존 (건드리지 않음) | 갱신 (릴리스마다 안내) |
+|----------------------|-------------------------|
+| `configs\local.yaml` | `api\`, `src\`, `scripts\`, `web\out\` 등 |
+| `.venv`, `vendor\wheels` | `UpdateOffline.bat` + `update-vX.Y.Z.zip` |
+| `{data_root}` (raw·모델·DB) | `requirements.txt` 변경 시에만 `SetupOffline.bat` |
+
+1. 온라인 PC: Release **`update-vX.Y.Z.zip`** (또는 `scripts\build_offline_update_package.ps1`로 생성) → USB  
+2. 오프라인 PC: **`UpdateOffline.bat D:\USB\update-v0.5.1.zip`**  
+3. 안내에 따라 **`RunWebNext.bat restart`** (whl 재설치 메시지가 없을 때)
+
+상세·수동 복사 표: [`offline_update.md`](offline_update.md)
+
+---
+
 ## 6. 문제 해결
 
 | 증상 | 확인할 것 |
@@ -186,8 +204,11 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build_offline_wheels.ps1
 # UI
 cmd /c "echo.| scripts\build_web.bat"
 # web\out 을 zip으로 묶어 Releases에 첨부 (wheels와 함께)
+# 오프라인 변동분 패키지 (update-vX.Y.Z.zip)
+powershell -ExecutionPolicy Bypass -File .\scripts\build_offline_update_package.ps1
 ```
 
 - wheels: `dist\wheels-win-amd64-py312.zip`  
 - UI: `web\out\` → 예: `web-out.zip`  
+- **업데이트 패키지**: `dist\update-vX.Y.Z.zip` → Release Assets · [`offline_update.md`](offline_update.md)  
 - Streamlit 제거 후 wheels를 다시 만들면 용량이 줄어듭니다.

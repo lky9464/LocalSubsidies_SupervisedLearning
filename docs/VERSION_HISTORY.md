@@ -19,6 +19,7 @@ _(다음 릴리스 예정 항목)_
 - **설정 잠금 분리**: 01 merge 이후 Train/Test 분할만 잠금 · 05~10 시작 전까지 학습 알고리즘 저장·수정 허용
 - **학습 실행 UI**: 01~04 완료 시 알고리즘 패널 자동 펼침 · 안내 문구 · Job 실행 중에만 상단 취소 배너
 - **회귀 테스트**: `tests/test_pipeline_config.py` — prep 완료 후 algo commit PUT 허용 검증
+- **오프라인 업데이트**: `app_code` · `UpdateOffline.bat` / `update-v0.5.1.zip` · yaml·raw·whl 재설치 불필요 ([`offline_update.md`](offline_update.md))
 
 [Release v0.5.1](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases/tag/v0.5.1)
 

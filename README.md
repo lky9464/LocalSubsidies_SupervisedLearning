@@ -46,6 +46,16 @@
 
 설치·폴더 그림·문제 해결 상세: [`docs/offline_setup.md`](docs/offline_setup.md)
 
+### B-2. 이미 설치된 PC — 버전 업데이트 (변동분만)
+
+최초 설치(§B)가 끝난 PC는 **프로젝트 통째 교체 없이** 패치할 수 있습니다.
+
+1. USB: Release **`update-vX.Y.Z.zip`** (또는 Source에서 릴리스 노트 경로만 복사 + `web-out.zip`)
+2. **`UpdateOffline.bat D:\USB\update-v0.5.1.zip`**
+3. **`RunWebNext.bat restart`** (릴리스가 whl 재설치를 요구할 때만 `SetupOffline.bat`)
+
+`configs\local.yaml` · raw · wheels는 **보통 그대로** 둡니다. 상세: [`docs/offline_update.md`](docs/offline_update.md)
+
 ### C. 일상 사용 (웹 UI)
 
 | 순서 | 메뉴 | 할 일 |

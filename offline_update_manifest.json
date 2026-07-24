@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "target_version": "0.5.1",
+  "preserve_always": [
+    "configs/local.yaml",
+    ".venv",
+    "vendor/wheels",
+    "vendor/python"
+  ],
+  "update_types": {
+    "ui_only": {
+      "label": "UI만",
+      "copy_paths": [],
+      "copy_root_files": [],
+      "copy_config_examples": [],
+      "web_out_zip": true,
+      "wheels_reinstall": false
+    },
+    "app_code": {
+      "label": "API·파이프라인·UI",
+      "copy_paths": ["api", "src", "scripts"],
+      "copy_root_files": [],
+      "copy_config_examples": [],
+      "web_out_zip": true,
+      "wheels_reinstall": false
+    },
+    "app_full": {
+      "label": "코드·문서·배치·설정 예제",
+      "copy_paths": ["api", "src", "scripts", "tests", "docs"],
+      "copy_root_files": [
+        "requirements.txt",
+        "requirements.lock.txt",
+        "RunWebNext.bat",
+        "SetupOffline.bat",
+        "InitDataRoot.bat",
+        "UpdateOffline.bat",
+        "README.md",
+        "offline_update_manifest.json"
+      ],
+      "copy_config_examples": ["configs/default.yaml", "configs/local.yaml.example"],
+      "web_out_zip": true,
+      "wheels_reinstall": false
+    },
+    "deps_changed": {
+      "label": "Python 패키지(whl) 변경",
+      "copy_paths": [],
+      "copy_root_files": ["requirements.txt", "requirements.lock.txt"],
+      "copy_config_examples": [],
+      "web_out_zip": false,
+      "wheels_reinstall": true
+    }
+  },
+  "releases": [
+    {
+      "version": "0.5.1",
+      "from_versions": ["0.5.0"],
+      "update_type": "app_code",
+      "extra_copy_paths": ["tests", "docs"],
+      "extra_root_files": [
+        "README.md",
+        "offline_update_manifest.json",
+        "UpdateOffline.bat",
+        "scripts/apply_offline_update.ps1",
+        "scripts/build_offline_update_package.ps1"
+      ],
+      "wheels_reinstall": false,
+      "notes": "01~04 완료 후 학습 알고리즘 저장·05~10 진행. yaml·raw·whl 재설치 불필요."
+    }
+  ]
+}

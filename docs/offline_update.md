@@ -13,10 +13,10 @@
 ## 1. 권장 절차 (더블클릭)
 
 1. **`RunWebNext.bat` 창을 닫아** 서버 중지  
-2. GitHub Release에서 **`update-to-vX.Y.Z.zip`** 을 받아 **프로젝트 루트**에 복사  
-   - **압축은 풀지 않음** (`.zip` 그대로 둠)  
-   - **v0.5.2 기준(최초 full sync)**: 같은 폴더에 **`wheels-win-amd64-py312.zip`** 도 함께 둠  
-   - 이후 릴리스는 `requirements.txt`가 바뀔 때만 wheels zip 필요  
+2. GitHub **최신 Release**에서 아래 3종을 받아 **프로젝트 루트**에 복사  
+   - **`update-to-vX.Y.Z.zip`** (대상 버전)  
+   - **`web-out.zip`** · **`wheels-win-amd64-py312.zip`** (복구·baseline용 — 매 Release에 동봉)  
+   - **압축은 풀지 않음** (`update-to-*.zip`은 `.zip` 그대로)  
 3. **`UpdateOffline.bat` 실행**  
    - **신버전**(문구: `Offline update to latest`): 더블클릭만 하면 zip 자동 탐색  
    - **구버전**(문구: `Offline update (changed files only)` / Usage만 표시): zip 안의 새 배치를 먼저 꺼낸 뒤 재실행 — [§5-1](#5-1-updateofflinebat)  
@@ -52,10 +52,9 @@
 powershell -ExecutionPolicy Bypass -File scripts\build_offline_update_package.ps1
 ```
 
-→ `dist\update-to-v0.5.2.zip` 생성. USB에 복사.
+→ `dist\update-to-vX.Y.Z.zip` 생성. USB에 복사.
 
-Release에 `update-to-v*.zip`이 있으면 그 파일만 받아도 됩니다.  
-**wheels_baseline / requirements 변경** 릴리스면 **`wheels-win-amd64-py312.zip`**도 같이 넣습니다.
+Release Assets는 **`update-to-vX.Y.Z.zip`** · **`web-out.zip`** · **`wheels-win-amd64-py312.zip`** 3종을 함께 받습니다 (`requirements.txt` 변경 없어도 동일).
 
 ### 방법 B — 경로 지정
 
@@ -152,10 +151,28 @@ UpdateOffline.bat D:\USB\update-to-v0.5.2.zip /autowheels
 1. [`offline_update_manifest.json`](../offline_update_manifest.json)  
    - `target_version` / `releases[]` (보통 `full_sync`, `from_min: 0.3.0`)  
    - deps 바뀌면 `wheels_reinstall: true` · 최초 baseline은 `wheels_baseline: true`  
-2. [`VERSION_HISTORY.md`](VERSION_HISTORY.md)에 **「오프라인 업데이트」** 한 줄  
+2. [`VERSION_HISTORY.md`](VERSION_HISTORY.md) — 변경 요약만 (Release 노트 전체 복사 금지)  
 3. `build_offline_update_package.ps1` → `dist\update-to-vX.Y.Z.zip`  
-4. GitHub Release Assets: **`update-to-vX.Y.Z.zip`** · **`web-out.zip`**  
-5. baseline/deps 시 **`wheels-win-amd64-py312.zip`**도 첨부
+4. GitHub Release Assets (**매 Release 3종 고정**):  
+   - **`update-to-vX.Y.Z.zip`** · **`web-out.zip`** · **`wheels-win-amd64-py312.zip`**  
+   - `gh release upload` 로 첨부 확인 (`gh release create`만으로는 누락될 수 있음)  
+5. **Release 본문(노트)** — 아래 [§6.1](#61-release-본문-템플릿) 따름
+
+### 6.1 Release 본문 템플릿
+
+**매 Release마다 「업데이트 절차 (권장)」 전체를 다시 쓰지 않습니다.**  
+오프라인 절차·Assets 표·§5 트러블슈팅은 **[Release v0.5.2](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases/tag/v0.5.2)** 를 기준 문서로 두고, 이후 버전 Release에는 **한 줄 참조**만 넣습니다.
+
+```markdown
+## Summary
+- (이번 버전 변경 bullet 3~5줄)
+
+## 오프라인
+Assets: `update-to-vX.Y.Z.zip` · `web-out.zip` · `wheels-win-amd64-py312.zip` (본 Release)
+업데이트 절차·트러블슈팅: [Release v0.5.2](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases/tag/v0.5.2) 참고
+```
+
+**예외:** deps·manifest·업데이트 방식이 바뀌는 Release만 Summary 아래에 **추가 안내** (예: `wheels_reinstall` 필수 · `from_min` 상향).
 
 `update_types` 요약:
 

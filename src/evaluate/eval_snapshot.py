@@ -24,10 +24,12 @@ def save_run_eval_summary(cfg: dict[str, Any], run_id: str, summary: dict[str, A
 
 
 def copy_run_eval_summary_from_global(cfg: dict[str, Any], run_id: str) -> Path | None:
-    src = resolve_data_path(cfg, "algorithms") / "eval_summary.json"
+    src = resolve_data_path(cfg, "algorithms", run_id=run_id) / "eval_summary.json"
     if not src.exists():
         return None
     dst = run_eval_summary_path(cfg, run_id)
+    if src.resolve() == dst.resolve():
+        return dst
     dst.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(src, dst)
     return dst
@@ -62,9 +64,14 @@ def register_eval_entry(
             metrics_map[alias] = m
 
 
-def load_per_algo_eval(cfg: dict[str, Any], algo: str) -> tuple[dict, dict]:
+def load_per_algo_eval(
+    cfg: dict[str, Any],
+    algo: str,
+    *,
+    run_id: str | None = None,
+) -> tuple[dict, dict]:
     for key in algo_lookup_ids(algo):
-        path = resolve_algo_dir(cfg, key) / "eval_metrics.json"
+        path = resolve_algo_dir(cfg, key, run_id=run_id) / "eval_metrics.json"
         if not path.exists():
             continue
         try:
@@ -122,7 +129,7 @@ def load_eval_maps_for_run(
             lift, metrics = read_eval_summary_file(run_path)
             merge_eval_maps(lift_map, metrics_map, lift, metrics)
 
-    summary_path = resolve_data_path(cfg, "algorithms") / "eval_summary.json"
+    summary_path = resolve_data_path(cfg, "algorithms", run_id=run_id) / "eval_summary.json"
     if summary_path.exists():
         lift, metrics = read_eval_summary_file(summary_path)
         merge_eval_maps(lift_map, metrics_map, lift, metrics)
@@ -136,7 +143,7 @@ def load_eval_maps_for_run(
             m, lf = pick_eval_for_algo(lift_map, metrics_map, key)
             if lf and m:
                 continue
-            file_m, file_lf = load_per_algo_eval(cfg, key)
+            file_m, file_lf = load_per_algo_eval(cfg, key, run_id=run_id)
             register_eval_entry(
                 lift_map,
                 metrics_map,

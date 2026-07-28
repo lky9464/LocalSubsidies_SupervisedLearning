@@ -4,8 +4,9 @@ project_name: LocalSubsidies_SupervisedLearning
 random_seed: 42
 
 # data_root 하위 상대 경로
-# - raw/interim/processed: 알고리즘 공통(1벌)
-# - algorithms/{algo}/: 알고리즘별 학습·평가·점수 (5개 폴더)
+# - raw / raw_inference: 공유
+# - interim / processed / algorithms: Run 실행 시 {data_root}/runs/{run_id}/ 아래로 격리 (LSL_RUN_ID)
+# - algorithms/{algo}/: 알고리즘별 학습·평가·점수
 paths:
   raw: raw
   interim: interim

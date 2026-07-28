@@ -159,6 +159,29 @@ class OpsRepository:
         row = self.get_step(run_id, step_id)
         return bool(row and row.get("status") == "succeeded")
 
+    def delete_steps(self, run_id: str, step_ids: list[str]) -> int:
+        """단계 이력 행 삭제 (미실행으로 되돌림)."""
+        if not step_ids:
+            return 0
+        with connect(self.cfg) as conn:
+            placeholders = ",".join("?" * len(step_ids))
+            cur = conn.execute(
+                f"DELETE FROM run_steps WHERE run_id=? AND step_id IN ({placeholders})",
+                (run_id, *step_ids),
+            )
+            conn.commit()
+            return int(cur.rowcount or 0)
+
+    def clear_ranking(self, run_id: str) -> None:
+        with connect(self.cfg) as conn:
+            conn.execute("DELETE FROM model_ranking WHERE run_id=?", (run_id,))
+            conn.commit()
+
+    def clear_ops_queue(self, run_id: str) -> None:
+        with connect(self.cfg) as conn:
+            conn.execute("DELETE FROM ops_queue_rows WHERE run_id=?", (run_id,))
+            conn.commit()
+
     def save_ranking(self, run_id: str, ranking: list[dict[str, Any]]) -> None:
         self.ensure_run(run_id)
         with connect(self.cfg) as conn:

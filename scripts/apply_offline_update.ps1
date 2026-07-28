@@ -1,14 +1,17 @@
-# Apply incremental offline update (method 1: changed paths only).
+# Apply offline update (full sync to latest, or legacy hop).
+# ASCII messages only (codepage-safe).
+#
 # Usage:
-#   powershell -ExecutionPolicy Bypass -File scripts\apply_offline_update.ps1 -ProjectRoot . -Source D:\USB\update-v0.5.1
-#   powershell -ExecutionPolicy Bypass -File scripts\apply_offline_update.ps1 -ProjectRoot . -Source D:\USB\update-v0.5.1.zip
+#   powershell -ExecutionPolicy Bypass -File scripts\apply_offline_update.ps1 -ProjectRoot .
+#   powershell -ExecutionPolicy Bypass -File scripts\apply_offline_update.ps1 -ProjectRoot . -Source D:\USB\update-to-v0.5.2.zip
+#   powershell ... -AutoWheels   # unpack wheels zip + run SetupOffline when needed
 param(
     [Parameter(Mandatory = $true)]
     [string]$ProjectRoot,
-    [Parameter(Mandatory = $true)]
-    [string]$Source,
+    [string]$Source = "",
     [switch]$Force,
-    [switch]$WhatIf
+    [switch]$WhatIf,
+    [switch]$AutoWheels
 )
 
 Set-StrictMode -Version Latest
@@ -22,12 +25,6 @@ function Normalize-Rel([string]$Path) {
     return ($Path -replace '\\', '/').Trim('/')
 }
 
-function Parse-Version([string]$Text) {
-    $v = ($Text -replace '^v', '').Trim()
-    if (-not $v) { return $null }
-    return [version]$v
-}
-
 function Read-CurrentVersion([string]$HistoryPath) {
     if (-not (Test-Path -LiteralPath $HistoryPath)) { return $null }
     foreach ($line in Get-Content -LiteralPath $HistoryPath -Encoding UTF8) {
@@ -36,6 +33,15 @@ function Read-CurrentVersion([string]$HistoryPath) {
         }
     }
     return $null
+}
+
+function Test-VersionAtLeast([string]$Installed, [string]$Min) {
+    if (-not $Installed -or -not $Min) { return $true }
+    try {
+        return ([version]($Installed -replace '^v', '')) -ge ([version]($Min -replace '^v', ''))
+    } catch {
+        return $true
+    }
 }
 
 function Test-Preserved([string]$RelPath, [string[]]$PreserveList) {
@@ -48,18 +54,73 @@ function Test-Preserved([string]$RelPath, [string[]]$PreserveList) {
     return $false
 }
 
+function Find-UpdateZip([string]$ProjectRoot, [string]$HintDir) {
+    $dirs = @()
+    if ($HintDir) { $dirs += $HintDir }
+    $dirs += $ProjectRoot
+    $dirs += (Join-Path $ProjectRoot "update")
+    $dirs += (Join-Path $ProjectRoot "patch")
+    $cands = @()
+    foreach ($d in ($dirs | Select-Object -Unique)) {
+        if (-not (Test-Path -LiteralPath $d -PathType Container)) { continue }
+        $cands += Get-ChildItem -LiteralPath $d -File -ErrorAction SilentlyContinue |
+            Where-Object {
+                $_.Name -match '^update-to-v\d+\.\d+\.\d+\.zip$' -or
+                $_.Name -match '^update-v\d+\.\d+\.\d+\.zip$' -or
+                $_.Name -match '^patch-to-v\d+\.\d+\.\d+\.zip$'
+            }
+    }
+    if (-not $cands -or $cands.Count -eq 0) { return $null }
+    $best = $null
+    $bestVer = $null
+    foreach ($f in $cands) {
+        if ($f.Name -match 'v(\d+\.\d+\.\d+)') {
+            $v = [version]$matches[1]
+            if ($null -eq $bestVer -or $v -gt $bestVer) {
+                $bestVer = $v
+                $best = $f.FullName
+            }
+        }
+    }
+    return $best
+}
+
+function Find-WheelsZip([string]$ProjectRoot, [string]$BesideSource) {
+    $dirs = @()
+    if ($BesideSource) {
+        $p = Split-Path -Parent $BesideSource
+        if ($p) { $dirs += $p }
+    }
+    $dirs += $ProjectRoot
+    $dirs += (Join-Path $ProjectRoot "vendor")
+    foreach ($d in ($dirs | Select-Object -Unique)) {
+        if (-not (Test-Path -LiteralPath $d -PathType Container)) { continue }
+        $hit = Get-ChildItem -LiteralPath $d -File -Filter "wheels-win-amd64-py312.zip" -ErrorAction SilentlyContinue |
+            Select-Object -First 1
+        if ($hit) { return $hit.FullName }
+    }
+    return $null
+}
+
 function Copy-RelTree {
     param(
         [string]$SourceRoot,
         [string]$DestRoot,
         [string]$RelPath,
         [string[]]$PreserveList,
+        [string[]]$SkipFiles,
         [switch]$WhatIf
     )
     $rel = Normalize-Rel $RelPath
     if (Test-Preserved $rel $PreserveList) {
         Write-Step "skip (preserve): $rel"
         return
+    }
+    foreach ($skip in $SkipFiles) {
+        if ((Normalize-Rel $skip) -eq $rel) {
+            Write-Step "skip (local): $rel"
+            return
+        }
     }
     $src = Join-Path $SourceRoot ($rel -replace '/', '\')
     if (-not (Test-Path -LiteralPath $src)) {
@@ -69,13 +130,28 @@ function Copy-RelTree {
     $dst = Join-Path $DestRoot ($rel -replace '/', '\')
     Write-Step "copy: $rel"
     if ($WhatIf) { return }
-    $parent = Split-Path -Parent $dst
-    if ($parent -and -not (Test-Path -LiteralPath $parent)) {
-        New-Item -ItemType Directory -Path $parent -Force | Out-Null
-    }
+
     if (Test-Path -LiteralPath $src -PathType Container) {
-        Copy-Item -LiteralPath $src -Destination $dst -Recurse -Force
+        # Directory copy: merge, but never overwrite preserved files inside
+        Get-ChildItem -LiteralPath $src -Recurse -File | ForEach-Object {
+            $sub = $_.FullName.Substring($src.Length).TrimStart('\', '/')
+            $subNorm = Normalize-Rel (($rel + '/' + ($sub -replace '\\', '/')).Trim('/'))
+            if (Test-Preserved $subNorm $PreserveList) { return }
+            foreach ($skip in $SkipFiles) {
+                if ((Normalize-Rel $skip) -eq $subNorm) { return }
+            }
+            $destFile = Join-Path $dst $sub
+            $parent = Split-Path -Parent $destFile
+            if (-not (Test-Path -LiteralPath $parent)) {
+                New-Item -ItemType Directory -Path $parent -Force | Out-Null
+            }
+            Copy-Item -LiteralPath $_.FullName -Destination $destFile -Force
+        }
     } else {
+        $parent = Split-Path -Parent $dst
+        if ($parent -and -not (Test-Path -LiteralPath $parent)) {
+            New-Item -ItemType Directory -Path $parent -Force | Out-Null
+        }
         Copy-Item -LiteralPath $src -Destination $dst -Force
     }
 }
@@ -86,10 +162,7 @@ function Expand-WebOutZip {
         [string]$ProjectRoot,
         [switch]$WhatIf
     )
-    if (-not (Test-Path -LiteralPath $ZipPath)) {
-        Write-Warning "web-out.zip not found: $ZipPath"
-        return
-    }
+    if (-not (Test-Path -LiteralPath $ZipPath)) { return }
     Write-Step "extract UI: web-out.zip -> web/out"
     if ($WhatIf) { return }
     $temp = Join-Path $env:TEMP ("lsl_webout_" + [guid]::NewGuid().ToString("n"))
@@ -98,22 +171,78 @@ function Expand-WebOutZip {
         Expand-Archive -LiteralPath $ZipPath -DestinationPath $temp -Force
         $dest = Join-Path $ProjectRoot "web\out"
         New-Item -ItemType Directory -Path $dest -Force | Out-Null
-        Get-ChildItem -LiteralPath $dest -Force | Remove-Item -Recurse -Force
+        Get-ChildItem -LiteralPath $dest -Force -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force
         Copy-Item -LiteralPath (Join-Path $temp '*') -Destination $dest -Recurse -Force
     } finally {
         Remove-Item -LiteralPath $temp -Recurse -Force -ErrorAction SilentlyContinue
     }
 }
 
+function Install-WheelsZip {
+    param(
+        [string]$WheelsZip,
+        [string]$ProjectRoot,
+        [switch]$WhatIf
+    )
+    $vendor = Join-Path $ProjectRoot "vendor\wheels"
+    Write-Step "extract wheels -> vendor/wheels"
+    if ($WhatIf) { return }
+    New-Item -ItemType Directory -Path $vendor -Force | Out-Null
+    $temp = Join-Path $env:TEMP ("lsl_wheels_" + [guid]::NewGuid().ToString("n"))
+    New-Item -ItemType Directory -Path $temp -Force | Out-Null
+    try {
+        Expand-Archive -LiteralPath $WheelsZip -DestinationPath $temp -Force
+        $whl = Get-ChildItem -LiteralPath $temp -Recurse -Filter "*.whl" -ErrorAction SilentlyContinue
+        if (-not $whl -or $whl.Count -eq 0) {
+            throw "No .whl files inside wheels zip"
+        }
+        Get-ChildItem -LiteralPath $vendor -Filter "*.whl" -ErrorAction SilentlyContinue | Remove-Item -Force
+        foreach ($f in $whl) {
+            Copy-Item -LiteralPath $f.FullName -Destination (Join-Path $vendor $f.Name) -Force
+        }
+    } finally {
+        Remove-Item -LiteralPath $temp -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
+function Get-JsonProp($Obj, [string]$Name, $Default = $null) {
+    if ($null -eq $Obj) { return $Default }
+    if ($Obj.PSObject.Properties.Name -contains $Name) {
+        return $Obj.$Name
+    }
+    return $Default
+}
+
+# --- resolve Source ---
 $ProjectRoot = (Resolve-Path -LiteralPath $ProjectRoot).Path
+$sourceHint = ""
+if (-not $Source) {
+    $Source = Find-UpdateZip -ProjectRoot $ProjectRoot -HintDir ""
+    if (-not $Source) {
+        throw "No update zip found. Put update-to-vX.Y.Z.zip next to UpdateOffline.bat / project root."
+    }
+    Write-Step "auto-selected: $Source"
+} elseif (-not (Test-Path -LiteralPath $Source)) {
+    throw "Not found: $Source"
+} else {
+    $Source = (Resolve-Path -LiteralPath $Source).Path
+}
+$sourceHint = $Source
+
 $tempSource = $null
 $sourceRoot = $Source
-
 if ($Source -match '\.zip$') {
     $tempSource = Join-Path $env:TEMP ("lsl_update_" + [guid]::NewGuid().ToString("n"))
     New-Item -ItemType Directory -Path $tempSource -Force | Out-Null
     Expand-Archive -LiteralPath $Source -DestinationPath $tempSource -Force
-    $sourceRoot = $tempSource
+    # zip may contain a single top folder
+    $manifestProbe = Join-Path $tempSource "offline_update_manifest.json"
+    if (-not (Test-Path -LiteralPath $manifestProbe)) {
+        $inner = Get-ChildItem -LiteralPath $tempSource -Directory | Select-Object -First 1
+        if ($inner) { $sourceRoot = $inner.FullName } else { $sourceRoot = $tempSource }
+    } else {
+        $sourceRoot = $tempSource
+    }
 } else {
     $sourceRoot = (Resolve-Path -LiteralPath $Source).Path
 }
@@ -121,7 +250,7 @@ if ($Source -match '\.zip$') {
 try {
     $manifestPath = Join-Path $sourceRoot "offline_update_manifest.json"
     if (-not (Test-Path -LiteralPath $manifestPath)) {
-        throw "offline_update_manifest.json not found in update package: $sourceRoot"
+        throw "offline_update_manifest.json not found in update package"
     }
     $manifest = Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
 
@@ -132,71 +261,170 @@ try {
     }
 
     $currentVersion = Read-CurrentVersion (Join-Path $ProjectRoot "docs\VERSION_HISTORY.md")
-    $fromList = @($release.from_versions | ForEach-Object { [string]$_ })
-    if ($currentVersion -and $fromList.Count -gt 0 -and ($fromList -notcontains $currentVersion)) {
-        $msg = "installed=$currentVersion expected one of: $($fromList -join ', ')"
-        if (-not $Force) {
-            throw "Version mismatch ($msg). Re-run with -Force if intentional."
-        }
-        Write-Warning "Version mismatch ($msg) — continuing due to -Force"
+    $fromMin = [string](Get-JsonProp $release "from_min" "")
+    if (-not $fromMin) { $fromMin = [string](Get-JsonProp $manifest "from_min" "") }
+    $fromList = @()
+    $fromVersions = Get-JsonProp $release "from_versions" $null
+    if ($fromVersions) {
+        $fromList = @($fromVersions | ForEach-Object { [string]$_ })
     }
 
-    $typeName = [string]$release.update_type
+    $mode = [string](Get-JsonProp $manifest "mode" "hop")
+    if (-not $mode) { $mode = "hop" }
+
+    if ($currentVersion) {
+        Write-Step "installed v$currentVersion"
+        if ($mode -eq "full_sync" -or $fromMin) {
+            if (-not (Test-VersionAtLeast $currentVersion $fromMin)) {
+                $msg = "installed=v$currentVersion below from_min=v$fromMin"
+                if (-not $Force) { throw "Version too old ($msg). Use Force or reinstall from Source zip." }
+                Write-Warning $msg
+            }
+        } elseif ($fromList.Count -gt 0 -and ($fromList -notcontains $currentVersion)) {
+            $msg = "installed=$currentVersion expected one of: $($fromList -join ', ')"
+            if (-not $Force) { throw "Version mismatch ($msg). Re-run with -Force if intentional." }
+            Write-Warning $msg
+        }
+    } else {
+        Write-Step "installed version unknown (ok for full_sync)"
+    }
+
+    $typeName = [string](Get-JsonProp $release "update_type" "full_sync")
+    if (-not $typeName) { $typeName = "full_sync" }
     $updateType = $manifest.update_types.$typeName
     if (-not $updateType) {
         throw "unknown update_type: $typeName"
     }
 
-    $preserve = @($manifest.preserve_always | ForEach-Object { [string]$_ })
+    $preserve = @()
+    $preserveAlways = Get-JsonProp $manifest "preserve_always" $null
+    if ($preserveAlways) {
+        $preserve = @($preserveAlways | ForEach-Object { [string]$_ })
+    }
+    $skipFiles = @()
+    $skipRel = Get-JsonProp $updateType "skip_relative_files" $null
+    if ($skipRel) {
+        $skipFiles += @($skipRel | ForEach-Object { [string]$_ })
+    }
+
     $paths = @()
-    $paths += @($updateType.copy_paths | ForEach-Object { [string]$_ })
-    $paths += @($release.extra_copy_paths | ForEach-Object { [string]$_ })
+    $copyPaths = Get-JsonProp $updateType "copy_paths" $null
+    if ($copyPaths) {
+        $paths += @($copyPaths | ForEach-Object { [string]$_ })
+    }
+    $extraCopy = Get-JsonProp $release "extra_copy_paths" $null
+    if ($extraCopy) {
+        $paths += @($extraCopy | ForEach-Object { [string]$_ })
+    }
     $rootFiles = @()
-    $rootFiles += @($updateType.copy_root_files | ForEach-Object { [string]$_ })
-    $rootFiles += @($release.extra_root_files | ForEach-Object { [string]$_ })
-    $configExamples = @($updateType.copy_config_examples | ForEach-Object { [string]$_ })
+    $copyRoot = Get-JsonProp $updateType "copy_root_files" $null
+    if ($copyRoot) {
+        $rootFiles += @($copyRoot | ForEach-Object { [string]$_ })
+    }
+    $extraRoot = Get-JsonProp $release "extra_root_files" $null
+    if ($extraRoot) {
+        $rootFiles += @($extraRoot | ForEach-Object { [string]$_ })
+    }
 
     Write-Step "target v$targetVersion ($($updateType.label))"
-    if ($currentVersion) { Write-Step "installed v$currentVersion" }
-    if ($release.notes) { Write-Step $release.notes }
+    $notes = Get-JsonProp $release "notes" $null
+    if ($notes) { Write-Step ([string]$notes) }
+
+    # Hash installed requirements BEFORE overwrite (for wheels decision)
+    $reqBeforeHash = $null
+    $reqDstPath = Join-Path $ProjectRoot "requirements.txt"
+    if (Test-Path -LiteralPath $reqDstPath) {
+        $reqBeforeHash = (Get-FileHash -LiteralPath $reqDstPath -Algorithm SHA256).Hash
+    }
+    $reqSrcPath = Join-Path $sourceRoot "requirements.txt"
+    $reqPkgHash = $null
+    if (Test-Path -LiteralPath $reqSrcPath) {
+        $reqPkgHash = (Get-FileHash -LiteralPath $reqSrcPath -Algorithm SHA256).Hash
+    }
 
     foreach ($rel in ($paths | Select-Object -Unique)) {
-        Copy-RelTree -SourceRoot $sourceRoot -DestRoot $ProjectRoot -RelPath $rel -PreserveList $preserve -WhatIf:$WhatIf
+        if ($rel -eq "web/out" -and (Test-Path -LiteralPath (Join-Path $sourceRoot "web-out.zip"))) {
+            # prefer zip extract below
+            continue
+        }
+        Copy-RelTree -SourceRoot $sourceRoot -DestRoot $ProjectRoot -RelPath $rel `
+            -PreserveList $preserve -SkipFiles $skipFiles -WhatIf:$WhatIf
     }
 
     foreach ($rel in ($rootFiles | Select-Object -Unique)) {
-        Copy-RelTree -SourceRoot $sourceRoot -DestRoot $ProjectRoot -RelPath $rel -PreserveList $preserve -WhatIf:$WhatIf
+        Copy-RelTree -SourceRoot $sourceRoot -DestRoot $ProjectRoot -RelPath $rel `
+            -PreserveList $preserve -SkipFiles $skipFiles -WhatIf:$WhatIf
     }
 
-    foreach ($rel in ($configExamples | Select-Object -Unique)) {
-        Copy-RelTree -SourceRoot $sourceRoot -DestRoot $ProjectRoot -RelPath $rel -PreserveList $preserve -WhatIf:$WhatIf
+    # Always refresh apply scripts if present in package
+    foreach ($extra in @(
+            "scripts/apply_offline_update.ps1",
+            "scripts/build_offline_update_package.ps1",
+            "scripts/cleanup_legacy_artifacts.py"
+        )) {
+        $p = Join-Path $sourceRoot ($extra -replace '/', '\')
+        if (Test-Path -LiteralPath $p) {
+            Copy-RelTree -SourceRoot $sourceRoot -DestRoot $ProjectRoot -RelPath $extra `
+                -PreserveList $preserve -SkipFiles $skipFiles -WhatIf:$WhatIf
+        }
     }
 
-    if ($updateType.web_out_zip) {
+    $webOutCopied = Test-Path -LiteralPath (Join-Path $ProjectRoot "web\out\index.html")
+    $wantWebZip = [bool](Get-JsonProp $updateType "web_out_zip" $false)
+    if ($wantWebZip -or (Test-Path -LiteralPath (Join-Path $sourceRoot "web-out.zip"))) {
         $zip = Join-Path $sourceRoot "web-out.zip"
-        Expand-WebOutZip -ZipPath $zip -ProjectRoot $ProjectRoot -WhatIf:$WhatIf
+        if (Test-Path -LiteralPath $zip) {
+            Expand-WebOutZip -ZipPath $zip -ProjectRoot $ProjectRoot -WhatIf:$WhatIf
+            $webOutCopied = $true
+        }
+    }
+    if (-not $webOutCopied -and (Test-Path -LiteralPath (Join-Path $sourceRoot "web\out\index.html"))) {
+        Copy-RelTree -SourceRoot $sourceRoot -DestRoot $ProjectRoot -RelPath "web/out" `
+            -PreserveList $preserve -SkipFiles $skipFiles -WhatIf:$WhatIf
     }
 
-    $wheelsReinstall = [bool]$release.wheels_reinstall -or [bool]$updateType.wheels_reinstall
-    $reqSrc = Join-Path $sourceRoot "requirements.txt"
-    $reqDst = Join-Path $ProjectRoot "requirements.txt"
-    if ((Test-Path -LiteralPath $reqSrc) -and (Test-Path -LiteralPath $reqDst)) {
-        $hashSrc = (Get-FileHash -LiteralPath $reqSrc -Algorithm SHA256).Hash
-        $hashDst = (Get-FileHash -LiteralPath $reqDst -Algorithm SHA256).Hash
-        if ($hashSrc -ne $hashDst) {
-            $wheelsReinstall = $true
-            Write-Warning "requirements.txt changed — run SetupOffline.bat after update."
+    $wheelsReinstall = [bool](Get-JsonProp $release "wheels_reinstall" $false) `
+        -or [bool](Get-JsonProp $updateType "wheels_reinstall" $false) `
+        -or [bool](Get-JsonProp $release "wheels_baseline" $false)
+    if (-not $wheelsReinstall -and $reqBeforeHash -and $reqPkgHash -and ($reqBeforeHash -ne $reqPkgHash)) {
+        $wheelsReinstall = $true
+        Write-Step "requirements.txt changed -> wheels refresh needed"
+    }
+
+    $wheelsZip = Find-WheelsZip -ProjectRoot $ProjectRoot -BesideSource $sourceHint
+    $didWheels = $false
+    if ($wheelsReinstall) {
+        if ($wheelsZip) {
+            Write-Step "wheels zip found: $wheelsZip"
+            Install-WheelsZip -WheelsZip $wheelsZip -ProjectRoot $ProjectRoot -WhatIf:$WhatIf
+            $didWheels = $true
+            if ($AutoWheels -and -not $WhatIf) {
+                $setup = Join-Path $ProjectRoot "SetupOffline.bat"
+                if (Test-Path -LiteralPath $setup) {
+                    Write-Step "running SetupOffline.bat _run ..."
+                    $p = Start-Process -FilePath "cmd.exe" -ArgumentList "/c", "`"$setup`" _run" -WorkingDirectory $ProjectRoot -Wait -PassThru
+                    if ($p.ExitCode -ne 0) {
+                        Write-Warning "SetupOffline exit code $($p.ExitCode)"
+                    }
+                }
+            }
+        } else {
+            Write-Warning "wheels-win-amd64-py312.zip not found next to update zip / project root."
+            Write-Warning "Copy it from the GitHub Release, then run SetupOffline.bat"
         }
     }
 
     Write-Host ""
     Write-Host "Update applied (target v$targetVersion)." -ForegroundColor Green
-    if ($wheelsReinstall) {
-        Write-Host "Next: SetupOffline.bat (wheels / .venv refresh required)" -ForegroundColor Yellow
+    Write-Host "Preserved: configs\local.yaml, .venv, vendor\wheels, data_root"
+    if ($wheelsReinstall -and -not $didWheels) {
+        Write-Host "Next: copy wheels-win-amd64-py312.zip, then SetupOffline.bat" -ForegroundColor Yellow
+    } elseif ($wheelsReinstall -and $didWheels -and -not $AutoWheels) {
+        Write-Host "Next: SetupOffline.bat   then   RunWebNext.bat restart" -ForegroundColor Yellow
     } else {
         Write-Host "Next: RunWebNext.bat restart" -ForegroundColor Yellow
     }
-    Write-Host "configs\local.yaml and data_root were not modified."
+    Write-Host "Optional: if UI shows mixed old results, run CleanupLegacy.bat (keeps raw)."
 }
 finally {
     if ($tempSource -and (Test-Path -LiteralPath $tempSource)) {

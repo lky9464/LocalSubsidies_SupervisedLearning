@@ -3,11 +3,10 @@
 import { useEffect, useState } from "react";
 import { AppLink } from "@/components/app-link";
 import { useQuery } from "@tanstack/react-query";
-import { apiGet, apiPost } from "@/lib/api";
+import { apiGet } from "@/lib/api";
 import { formatDisplayValue } from "@/lib/utils";
 import { useRun } from "@/components/run-context";
 import { Alert } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DataTable, MatrixTable } from "@/components/matrix-table";
 import {
@@ -27,7 +26,6 @@ export default function InferenceResultsPage() {
   const [limit, setLimit] = useState(30);
   const [algo, setAlgo] = useState("");
   const [sortDesc, setSortDesc] = useState(true);
-  const [exportMsg, setExportMsg] = useState("");
 
   const { data: meta } = useQuery({
     queryKey: ["configMeta"],
@@ -56,27 +54,22 @@ export default function InferenceResultsPage() {
   }, [available, algo]);
 
   const { data: scores } = useQuery({
-    queryKey: ["inferScores", algo, limit, sortDesc],
+    queryKey: ["inferScores", runId, algo, limit, sortDesc],
     queryFn: () =>
       apiGet<Record<string, unknown>>(
-        `/api/inference/scores/${algo}?limit=${limit}&sort_desc=${sortDesc}`,
+        `/api/inference/scores/${algo}?run_id=${encodeURIComponent(runId || "")}&limit=${limit}&sort_desc=${sortDesc}`,
       ),
-    enabled: view === "algo" && !!algo,
+    enabled: view === "algo" && !!algo && !!runId,
   });
-
-  async function exportExcel() {
-    const res = await apiPost<Record<string, unknown>>(`/api/inference/export?run_id=${runId}`);
-    setExportMsg(
-      `${res.row_count}건 · ${res.export_dir_hint}${res.xlsx_basename} (로컬 저장됨)`,
-    );
-  }
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold">결과 확인</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          점수·점검 우선순위표 · Excel 내보내기 (미리보기 상한 적용)
+          점수·점검 우선순위표 미리보기. 추론 완료 시 CSV·Excel은{" "}
+          <code className="text-xs">runs/&#123;run_id&#125;/algorithms/operations/</code> 에
+          자동 저장됩니다.
         </p>
       </div>
 
@@ -100,21 +93,6 @@ export default function InferenceResultsPage() {
             </CardHeader>
             <CardContent>
               <DataTable rows={(metaRes?.available as Record<string, unknown>[]) || []} />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>점검 우선순위표 Excel 내보내기</CardTitle>
-              <p className="text-xs text-muted-foreground">
-                시트: 전체 / 우선순위요약 / 4x4매트릭스 / 주A·주B·주C
-              </p>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <Button variant="secondary" onClick={exportExcel}>
-                Excel·CSV 생성
-              </Button>
-              {exportMsg && <Alert variant="success">{exportMsg}</Alert>}
             </CardContent>
           </Card>
 

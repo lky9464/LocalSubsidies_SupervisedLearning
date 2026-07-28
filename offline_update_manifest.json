@@ -1,6 +1,8 @@
 {
-  "schema_version": 1,
-  "target_version": "0.5.1",
+  "schema_version": 2,
+  "target_version": "0.5.2",
+  "from_min": "0.3.0",
+  "mode": "full_sync",
   "preserve_always": [
     "configs/local.yaml",
     ".venv",
@@ -8,25 +10,9 @@
     "vendor/python"
   ],
   "update_types": {
-    "ui_only": {
-      "label": "UI만",
-      "copy_paths": [],
-      "copy_root_files": [],
-      "copy_config_examples": [],
-      "web_out_zip": true,
-      "wheels_reinstall": false
-    },
-    "app_code": {
-      "label": "API·파이프라인·UI",
-      "copy_paths": ["api", "src", "scripts"],
-      "copy_root_files": [],
-      "copy_config_examples": [],
-      "web_out_zip": true,
-      "wheels_reinstall": false
-    },
-    "app_full": {
-      "label": "코드·문서·배치·설정 예제",
-      "copy_paths": ["api", "src", "scripts", "tests", "docs"],
+    "full_sync": {
+      "label": "Full sync to latest (v0.3.0+)",
+      "copy_paths": ["api", "src", "scripts", "tests", "docs", "web/out", "configs"],
       "copy_root_files": [
         "requirements.txt",
         "requirements.lock.txt",
@@ -34,23 +20,43 @@
         "SetupOffline.bat",
         "InitDataRoot.bat",
         "UpdateOffline.bat",
+        "CleanupLegacy.bat",
         "README.md",
-        "offline_update_manifest.json"
+        "offline_update_manifest.json",
+        "TLS4902R_Layout.csv"
       ],
-      "copy_config_examples": ["configs/default.yaml", "configs/local.yaml.example"],
+      "skip_relative_files": [
+        "configs/local.yaml"
+      ],
       "web_out_zip": true,
       "wheels_reinstall": false
     },
-    "deps_changed": {
-      "label": "Python 패키지(whl) 변경",
+    "ui_only": {
+      "label": "UI only",
       "copy_paths": [],
-      "copy_root_files": ["requirements.txt", "requirements.lock.txt"],
-      "copy_config_examples": [],
-      "web_out_zip": false,
-      "wheels_reinstall": true
+      "copy_root_files": [],
+      "skip_relative_files": [],
+      "web_out_zip": true,
+      "wheels_reinstall": false
+    },
+    "app_code": {
+      "label": "API/pipeline/UI",
+      "copy_paths": ["api", "src", "scripts"],
+      "copy_root_files": [],
+      "skip_relative_files": [],
+      "web_out_zip": true,
+      "wheels_reinstall": false
     }
   },
   "releases": [
+    {
+      "version": "0.5.2",
+      "from_min": "0.3.0",
+      "update_type": "full_sync",
+      "wheels_reinstall": true,
+      "wheels_baseline": true,
+      "notes": "Full sync from any v0.3.0+ install. Include wheels-win-amd64-py312.zip next to this zip (one-time baseline). Optional CleanupLegacy.bat keeps raw."
+    },
     {
       "version": "0.5.1",
       "from_versions": ["0.5.0"],
@@ -64,7 +70,7 @@
         "scripts/build_offline_update_package.ps1"
       ],
       "wheels_reinstall": false,
-      "notes": "01~04 완료 후 학습 알고리즘 저장·05~10 진행. yaml·raw·whl 재설치 불필요."
+      "notes": "Legacy hop 0.5.0->0.5.1 (prefer full_sync package for 0.5.2+)."
     }
   ]
 }

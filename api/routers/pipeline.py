@@ -171,13 +171,25 @@ def pipeline_reopen(run_id: str, cfg=Depends(get_cfg)) -> dict:
 
 @router.get("/api/runs/{run_id}/leakage")
 def get_leakage(run_id: str, cfg=Depends(get_cfg)) -> dict:
-    summary_path = resolve_repo_path(cfg, "reports_comparison") / "leakage_audit_summary.json"
-    if not summary_path.exists():
-        return {"available": False}
-    try:
-        with open(summary_path, encoding="utf-8") as f:
-            meta = json.load(f)
-    except OSError:
+    from src.io.config import resolve_run_reports_dir
+
+    run_reports = resolve_run_reports_dir(cfg, run_id)
+    candidates = []
+    if run_reports is not None:
+        candidates.append(run_reports / "leakage_audit_summary.json")
+    candidates.append(resolve_repo_path(cfg, "reports_comparison") / "leakage_audit_summary.json")
+
+    meta = None
+    for summary_path in candidates:
+        if not summary_path.exists():
+            continue
+        try:
+            with open(summary_path, encoding="utf-8") as f:
+                meta = json.load(f)
+            break
+        except OSError:
+            continue
+    if meta is None:
         return {"available": False}
 
     verdict = meta.get("verdict", "")
@@ -218,6 +230,9 @@ def leakage_resume(
     )
     prep_ids = [s["id"] for s in TRAIN_PIPELINE_STEPS if s["id"] in PREP_STEP_IDS]
     try:
+        from src.pipeline.reset import reset_pipeline_from
+
+        reset_pipeline_from(cfg, repo, run_id, "merge")
         job = mgr.start_steps(run_id, prep_ids)
     except RuntimeError as exc:
         raise HTTPException(409, str(exc)) from exc
@@ -280,6 +295,15 @@ def pipeline_start(
     save_run_config(cfg, run_id, run_cfg)
     set_pipeline_abandon(cfg, run_id, False)
     set_opts_edit(cfg, run_id, False)
+
+    # 재실행 전: 요청 구간의 가장 앞 단계 ~ 10 이력·산출물 초기화
+    from src.pipeline.reset import earliest_step_id, reset_pipeline_from
+
+    try:
+        from_step = earliest_step_id(list(step_ids))
+        reset_pipeline_from(cfg, repo, run_id, from_step)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
 
     try:
         job = mgr.start_steps(

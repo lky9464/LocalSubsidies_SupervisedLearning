@@ -58,17 +58,21 @@ def ops_queue(
 @router.get("/scores/{algo}")
 def algo_scores(
     algo: str,
+    run_id: str | None = None,
     limit: int = Query(30, ge=1, le=100),
     sort_desc: bool = Query(True),
     cfg=Depends(get_cfg),
 ) -> dict:
     if limit not in PREVIEW_OPTIONS:
         limit = min(PREVIEW_OPTIONS, key=lambda x: abs(x - limit))
-    return inference_algo_scores(cfg, algo, limit=limit, sort_desc=sort_desc)
+    return inference_algo_scores(
+        cfg, algo, run_id=run_id, limit=limit, sort_desc=sort_desc
+    )
 
 
 @router.post("/export")
 def export_queue(run_id: str, cfg=Depends(get_cfg)) -> dict:
+    """Deprecated: 추론 완료 시 11_score_inference 가 자동 저장. 호환용 유지."""
     try:
         return do_export(cfg, run_id)
     except FileNotFoundError as exc:

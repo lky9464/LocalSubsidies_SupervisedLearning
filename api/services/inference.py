@@ -65,7 +65,7 @@ def trained_algos_for_run(cfg: dict[str, Any], run_id: str) -> list[str]:
     configured = [str(a) for a in (run_cfg.get("algorithms") or [])]
     trained: list[str] = []
     for algo in configured:
-        model_path = resolve_algo_dir(cfg, algo) / "model.joblib"
+        model_path = resolve_algo_dir(cfg, algo, run_id=run_id) / "model.joblib"
         if model_path.is_file():
             trained.append(algo)
     return trained
@@ -124,8 +124,8 @@ def inference_results_meta(cfg: dict[str, Any], run_id: str) -> dict[str, Any]:
 
     rows = []
     for algo in available:
-        score_path = inference_score_path(cfg, algo)
-        top_path = inference_top_xlsx_path(cfg, algo)
+        score_path = inference_score_path(cfg, algo, run_id=run_id)
+        top_path = inference_top_xlsx_path(cfg, algo, run_id=run_id)
         sm = file_meta(score_path)
         tm = file_meta(top_path)
         rows.append(
@@ -211,10 +211,11 @@ def inference_algo_scores(
     cfg: dict[str, Any],
     algo: str,
     *,
+    run_id: str | None = None,
     limit: int = 30,
     sort_desc: bool = True,
 ) -> dict[str, Any]:
-    path = inference_score_path(cfg, algo)
+    path = inference_score_path(cfg, algo, run_id=run_id)
     if not path.exists():
         return {"empty": True}
 
@@ -254,5 +255,5 @@ def do_export(cfg: dict[str, Any], run_id: str) -> dict[str, Any]:
         "row_count": n,
         "csv_basename": csv_path.name,
         "xlsx_basename": xlsx_path.name,
-        "export_dir_hint": "algorithms/operations/",
+        "export_dir_hint": "runs/{run_id}/algorithms/operations/",
     }

@@ -24,17 +24,23 @@ from src.scoring.ops_queue import (
 from src.scoring.score_table import SCORE_COL
 
 
-def inference_score_path(cfg: dict[str, Any], algo: str) -> Path:
-    """scores/inference/{algo}_inference_scores.csv (구 경로 호환)."""
-    return resolve_algo_score_csv(cfg, algo, "inference")
+def inference_score_path(
+    cfg: dict[str, Any], algo: str, *, run_id: str | None = None
+) -> Path:
+    """scores/inference/{algo}_inference_scores.csv (Run 격리 경로)."""
+    return resolve_algo_score_csv(cfg, algo, "inference", run_id=run_id)
 
 
-def inference_top_xlsx_path(cfg: dict[str, Any], algo: str) -> Path:
-    return resolve_algo_score_top_xlsx(cfg, algo, "inference")
+def inference_top_xlsx_path(
+    cfg: dict[str, Any], algo: str, *, run_id: str | None = None
+) -> Path:
+    return resolve_algo_score_top_xlsx(cfg, algo, "inference", run_id=run_id)
 
 
-def inference_export_paths(cfg: dict[str, Any]) -> tuple[Path, Path]:
-    out_dir = resolve_data_path(cfg, "algorithms") / "operations"
+def inference_export_paths(
+    cfg: dict[str, Any], *, run_id: str | None = None
+) -> tuple[Path, Path]:
+    out_dir = resolve_data_path(cfg, "algorithms", run_id=run_id) / "operations"
     return out_dir / "ops_queue_inference.csv", out_dir / "ops_queue_inference.xlsx"
 
 
@@ -56,12 +62,12 @@ def _order_algos_by_ranking(cfg: dict[str, Any], run_id: str, algos: list[str]) 
     return ordered
 
 
-def _algos_from_latest_inference_batch(cfg: dict[str, Any], run_cfg: dict[str, Any]) -> list[str]:
+def _algos_from_latest_inference_batch(cfg: dict[str, Any], run_cfg: dict[str, Any], run_id: str) -> list[str]:
     """run_config 학습 대상 중, 가장 최근 추론 실행 묶음(점수 mtime)만 반환."""
     configured = [str(a) for a in (run_cfg.get("algorithms") or []) if str(a).strip()]
     scored: list[tuple[str, float]] = []
     for algo in configured:
-        path = inference_score_path(cfg, algo)
+        path = inference_score_path(cfg, algo, run_id=run_id)
         if path.is_file():
             scored.append((algo, path.stat().st_mtime))
     if not scored:
@@ -81,7 +87,7 @@ def inference_algorithms_for_run(cfg: dict[str, Any], run_id: str) -> list[str]:
     if saved:
         return saved
 
-    batch = _algos_from_latest_inference_batch(cfg, run_cfg)
+    batch = _algos_from_latest_inference_batch(cfg, run_cfg, run_id)
     if batch:
         return _order_algos_by_ranking(cfg, run_id, batch)
 
@@ -94,7 +100,7 @@ def available_inference_algos(cfg: dict[str, Any], run_id: str | None = None) ->
         return [
             a
             for a in inference_algorithms_for_run(cfg, run_id)
-            if inference_score_path(cfg, a).exists()
+            if inference_score_path(cfg, a, run_id=run_id).exists()
         ]
     algos = list_algo_ids(cfg)
     return [a for a in algos if inference_score_path(cfg, a).exists()]
@@ -143,7 +149,7 @@ def resolve_inference_primary_aux(cfg: dict[str, Any], run_id: str) -> tuple[str
 
 
 def run_has_inference_step(cfg: dict[str, Any], run_id: str) -> bool:
-    """점수 파일은 전역(scores/inference)이라, Run에 inference step 성공 기록이 있을 때만 표시."""
+    """Run에 inference step 성공 기록이 있을 때만 결과 표시."""
     if not run_id:
         return False
     try:
@@ -164,12 +170,17 @@ def _read_inference_score_csv_lite(path: Path, encoding: str, keys: list[str]) -
     return pd.read_csv(path, encoding=encoding, dtype=str, low_memory=False, usecols=usecols)
 
 
-def load_inference_queue_lite(cfg: dict[str, Any], run_id: str) -> pd.DataFrame | None:
+def load_inference_queue_lite(
+    cfg: dict[str, Any],
+    run_id: str,
+    *,
+    require_step: bool = True,
+) -> pd.DataFrame | None:
     """주·보조 inference 4×4 집계용 (키·점수만). 주 모델 파일 없으면 None."""
-    if not run_has_inference_step(cfg, run_id):
+    if require_step and not run_has_inference_step(cfg, run_id):
         return None
     primary, aux = resolve_inference_primary_aux(cfg, run_id)
-    primary_path = inference_score_path(cfg, primary)
+    primary_path = inference_score_path(cfg, primary, run_id=run_id)
     if not primary_path.exists():
         return None
 
@@ -178,7 +189,7 @@ def load_inference_queue_lite(cfg: dict[str, Any], run_id: str) -> pd.DataFrame 
     keys = list(cfg.get("key_columns") or [])
 
     primary_df = _read_inference_score_csv_lite(primary_path, encoding, keys)
-    aux_path = inference_score_path(cfg, aux)
+    aux_path = inference_score_path(cfg, aux, run_id=run_id)
     aux_df = None
     if aux_path.exists():
         aux_df = _read_inference_score_csv_lite(aux_path, encoding, keys)
@@ -186,12 +197,17 @@ def load_inference_queue_lite(cfg: dict[str, Any], run_id: str) -> pd.DataFrame 
     return build_ops_queue(primary_df, aux_df, keys, ops_cfg)
 
 
-def load_inference_queue(cfg: dict[str, Any], run_id: str) -> pd.DataFrame | None:
+def load_inference_queue(
+    cfg: dict[str, Any],
+    run_id: str,
+    *,
+    require_step: bool = True,
+) -> pd.DataFrame | None:
     """주·보조 inference 점수로 우선순위표 생성. 주 모델 파일 없으면 None."""
-    if not run_has_inference_step(cfg, run_id):
+    if require_step and not run_has_inference_step(cfg, run_id):
         return None
     primary, aux = resolve_inference_primary_aux(cfg, run_id)
-    primary_path = inference_score_path(cfg, primary)
+    primary_path = inference_score_path(cfg, primary, run_id=run_id)
     if not primary_path.exists():
         return None
 
@@ -200,7 +216,7 @@ def load_inference_queue(cfg: dict[str, Any], run_id: str) -> pd.DataFrame | Non
     keys = list(cfg.get("key_columns") or [])
 
     primary_df = pd.read_csv(primary_path, encoding=encoding, dtype=str, low_memory=False)
-    aux_path = inference_score_path(cfg, aux)
+    aux_path = inference_score_path(cfg, aux, run_id=run_id)
     aux_df = None
     if aux_path.exists():
         aux_df = pd.read_csv(aux_path, encoding=encoding, dtype=str, low_memory=False)
@@ -217,16 +233,21 @@ def inference_grade_counts(queue: pd.DataFrame) -> dict[str, int]:
     return {g: int(vc.get(g, 0)) for g in PRIMARY_LABELS}
 
 
-def export_inference_ops_queue(cfg: dict[str, Any], run_id: str) -> tuple[Path, Path, int]:
+def export_inference_ops_queue(
+    cfg: dict[str, Any],
+    run_id: str,
+    *,
+    require_step: bool = True,
+) -> tuple[Path, Path, int]:
     """추론 점검 우선순위표 CSV·Excel 저장 (구간 규칙은 10과 동일, 시트는 추론용)."""
-    queue = load_inference_queue(cfg, run_id)
+    queue = load_inference_queue(cfg, run_id, require_step=require_step)
     if queue is None or queue.empty:
         primary, _ = resolve_inference_primary_aux(cfg, run_id)
         raise FileNotFoundError(
             f"주 모델 scores/inference/{primary}_inference_scores.csv 가 없습니다."
         )
 
-    csv_path, xlsx_path = inference_export_paths(cfg)
+    csv_path, xlsx_path = inference_export_paths(cfg, run_id=run_id)
     csv_path.parent.mkdir(parents=True, exist_ok=True)
     encoding = cfg.get("encoding", "EUC-KR")
     queue.to_csv(csv_path, index=False, encoding=encoding)
@@ -243,7 +264,7 @@ def dashboard_inference_line(cfg: dict[str, Any], run_id: str) -> str | None:
         return None
 
     primary, _ = resolve_inference_primary_aux(cfg, run_id)
-    primary_path = inference_score_path(cfg, primary)
+    primary_path = inference_score_path(cfg, primary, run_id=run_id)
     meta = file_meta(primary_path)
     if not meta["exists"]:
         algos = ", ".join(available[:3])

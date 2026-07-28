@@ -51,7 +51,7 @@ def models_compare(
     radar = radar_chart_data(compare, metric_list)
 
     rank_meta: dict[str, str] = {}
-    rank_path = resolve_data_path(cfg, "algorithms") / "operations" / "model_ranking.json"
+    rank_path = resolve_data_path(cfg, "algorithms", run_id=run_id) / "operations" / "model_ranking.json"
     _, rank_meta = load_ranking_artifact(rank_path)
 
     labels_map = build_algo_labels_map(cfg)

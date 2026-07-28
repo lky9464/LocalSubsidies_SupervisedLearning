@@ -1,9 +1,10 @@
 # 지방보조금 부정수급 위험도 — 지도학습
 
-[![Release v0.5.1](https://img.shields.io/github/v/tag/lky9464/LocalSubsidies_SupervisedLearning?label=v0.5.1)](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases/tag/v0.5.1)
+[![Release v0.5.2](https://img.shields.io/github/v/tag/lky9464/LocalSubsidies_SupervisedLearning?label=v0.5.2)](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases/tag/v0.5.2)
 
 지방보조금 부정수급 **위험도 점수(0~1000)** 측정을 위한 지도학습 파이프라인 + **로컬 웹 UI**입니다.
 
+- **v0.5.2** — Run 격리·재실행 초기화 · 오프라인 full sync · ([`VERSION_HISTORY`](docs/VERSION_HISTORY.md))
 - **v0.5.1** — 01~04 완료 후 알고리즘 저장·05~10 진행 (설정 잠금 분리) · ([`VERSION_HISTORY`](docs/VERSION_HISTORY.md))
 - **v0.5** — 학습 UI 2섹션 · Run별 모델 비교 · Job 취소 · ([`VERSION_HISTORY`](docs/VERSION_HISTORY.md))
 - **v0.4** — 하이퍼파라미터 튜닝·`random_forest_v2` / `catboost_v2` · algo_id `{family}_vN` · ([`VERSION_HISTORY`](docs/VERSION_HISTORY.md))
@@ -16,12 +17,12 @@
 ## 일반 사용자 — 오프라인 PC 설치·사용 (권장)
 
 대상: Windows 10/11 x64 · 인터넷이 없는 업무 PC ·  
-온라인에서는 **[Release v0.5.1](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases/tag/v0.5.1) 한곳**에서 소스·wheels·UI·Python·VC++까지 받은 뒤 USB로 옮김.  
+온라인에서는 **[Release v0.5.2](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases/tag/v0.5.2) 한곳**에서 소스·wheels·UI·Python·VC++까지 받은 뒤 USB로 옮김.  
 (학습·추론 raw CSV는 사용자가 별도 준비. Node.js·개발 환경 불필요.)
 
 ### A. 온라인 PC에서 받을 것 (USB에 복사)
 
-모두 같은 [Release v0.5.1](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases/tag/v0.5.1) Assets / Source:
+모두 같은 [Release v0.5.2](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases/tag/v0.5.2) Assets / Source:
 
 | # | 파일 | 비고 |
 |---|------|------|
@@ -46,15 +47,16 @@
 
 설치·폴더 그림·문제 해결 상세: [`docs/offline_setup.md`](docs/offline_setup.md)
 
-### B-2. 이미 설치된 PC — 버전 업데이트 (변동분만)
+### B-2. 이미 설치된 PC — 버전 업데이트 (full sync)
 
-최초 설치(§B)가 끝난 PC는 **프로젝트 통째 교체 없이** 패치할 수 있습니다.
+최초 설치(§B)가 끝난 PC(**v0.3.0 이상**)는 **프로젝트 통째 교체 없이** 최신으로 동기화합니다.
 
-1. USB: Release **`update-vX.Y.Z.zip`** (또는 Source에서 릴리스 노트 경로만 복사 + `web-out.zip`)
-2. **`UpdateOffline.bat D:\USB\update-v0.5.1.zip`**
-3. **`RunWebNext.bat restart`** (릴리스가 whl 재설치를 요구할 때만 `SetupOffline.bat`)
+1. USB: Release **`update-to-vX.Y.Z.zip`** 을 프로젝트 루트에 복사  
+   - **v0.5.2 기준**: 같은 폴더에 **`wheels-win-amd64-py312.zip`** 도 둠 (이후는 deps 변경 시에만)
+2. **`UpdateOffline.bat` 더블클릭** (zip 자동 탐색 · 경로 인자도 가능)
+3. 안내에 따라 필요 시 **`SetupOffline.bat`** → **`RunWebNext.bat restart`**
 
-`configs\local.yaml` · raw · wheels는 **보통 그대로** 둡니다. 상세: [`docs/offline_update.md`](docs/offline_update.md)
+`configs\local.yaml` · raw · `{data_root}`는 **그대로** 둡니다. 상세: [`docs/offline_update.md`](docs/offline_update.md)
 
 ### C. 일상 사용 (웹 UI)
 

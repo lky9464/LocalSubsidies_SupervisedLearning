@@ -5,8 +5,8 @@
 
 입력: data_root/raw_inference/ 또는 --input-dir
 출력 (Test 점수와 동일 양식·명명 규칙, scores/inference/ 하위):
-  {data_root}/algorithms/{algo}/scores/inference/{algo}_inference_scores.csv
-  {data_root}/algorithms/{algo}/scores/inference/{algo}_inference_scores_top.xlsx
+  {data_root}/runs/{run_id}/algorithms/{algo}/scores/inference/{algo}_inference_scores.csv
+  {data_root}/runs/{run_id}/algorithms/{algo}/scores/inference/{algo}_inference_scores_top.xlsx
   - 키 + 명칭/금액 → 위험도점수 → 양성확률 → 예측라벨 → 실제라벨(비움) → 기여도 TOP10
 
 Cursor Agent는 이 스크립트를 실행하지 마세요.
@@ -203,6 +203,19 @@ def main() -> None:
             f"[inference] 상위1%/5% Excel 저장 "
             f"(상위1%≈{n_top1:,}행, 상위5%≈{n_top5:,}행): {top_xlsx}"
         )
+
+    # 10 ops_queue_test 와 동일: 추론 완료 시 우선순위표 자동 저장
+    if run_id and algorithms:
+        from src.scoring.inference_helpers import export_inference_ops_queue
+
+        try:
+            csv_path, xlsx_path, n_q = export_inference_ops_queue(
+                cfg, run_id, require_step=False
+            )
+            print(f"[inference] 점검 우선순위표 저장(로컬전용): {csv_path} ({n_q:,}건)")
+            print(f"[inference] 점검 우선순위표 저장(로컬전용): {xlsx_path}")
+        except FileNotFoundError as exc:
+            print(f"[inference] 경고: 우선순위표 자동 저장 생략 — {exc}")
 
 
 if __name__ == "__main__":

@@ -675,6 +675,10 @@ export default function PipelinePage() {
           title={`${stepDialog.label} — 실행 방식`}
           onClose={() => setStepDialog(null)}
         >
+          <Alert className="mb-4">
+            이 단계부터 이후(해당 단계~10)의 기존 결과·이력·저장 파일은 복구 없이 삭제된 뒤
+            실행됩니다. 01~04를 다시 돌리면 05~10·추론 결과도 함께 초기화됩니다.
+          </Alert>
           <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
             <Button disabled={busy} onClick={() => startSteps([stepDialog.sid])}>
               현재 단계만 실행
@@ -696,7 +700,10 @@ export default function PipelinePage() {
 
       {prepBatchOpen ? (
         <SimpleModal title="01~04 일괄 실행 확인" onClose={() => setPrepBatchOpen(false)}>
-          <p className="mb-4 text-sm">데이터 가공 4단계를 순서대로 실행합니다.</p>
+          <Alert className="mb-4">
+            기존 01~10 단계의 결과·이력·저장 파일은 모두 초기화됩니다(복구 불가). 그다음
+            01~04만 순서대로 실행합니다.
+          </Alert>
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setPrepBatchOpen(false)}>
               취소
@@ -710,7 +717,10 @@ export default function PipelinePage() {
 
       {trainBatchOpen ? (
         <SimpleModal title="05~10 일괄 실행 확인" onClose={() => setTrainBatchOpen(false)}>
-          <p className="mb-4 text-sm">학습·평가 6단계를 순서대로 실행합니다. 시간이 오래 걸릴 수 있습니다.</p>
+          <Alert className="mb-4">
+            기존 05~10 결과·이력·저장 파일(추론 산출물 포함)은 모두 초기화됩니다(복구 불가).
+            시간이 오래 걸릴 수 있습니다.
+          </Alert>
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setTrainBatchOpen(false)}>
               취소
@@ -724,9 +734,10 @@ export default function PipelinePage() {
 
       {fullBatchOpen ? (
         <SimpleModal title="01~10 일괄 실행 확인" onClose={() => setFullBatchOpen(false)}>
-          <p className="mb-4 text-sm text-amber-700">
-            수 분~수 시간 소요될 수 있습니다. 절전을 끄고 진행하세요.
-          </p>
+          <Alert className="mb-4">
+            기존 01~10 결과·이력·저장 파일은 모두 초기화됩니다(복구 불가). 수 분~수 시간 소요될 수
+            있으니 절전을 끄고 진행하세요.
+          </Alert>
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setFullBatchOpen(false)}>
               취소

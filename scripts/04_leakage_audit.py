@@ -16,6 +16,7 @@ Cursor Agent는 이 스크립트를 실행하지 마세요.
 from __future__ import annotations
 
 import json
+import shutil
 import sys
 from pathlib import Path
 
@@ -75,8 +76,13 @@ def main() -> None:
     cfg = load_config()
     interim = resolve_data_path(cfg, "interim")
     processed = resolve_data_path(cfg, "processed")
+    from src.io.config import resolve_run_reports_dir
+
     reports = resolve_repo_path(cfg, "reports_comparison")
     reports.mkdir(parents=True, exist_ok=True)
+    run_reports = resolve_run_reports_dir(cfg)
+    if run_reports is not None:
+        run_reports.mkdir(parents=True, exist_ok=True)
     labeled = interim / "labeled.csv"
     bundle_path = processed / "preprocess_bundle.joblib"
     masks_path = processed / "split_masks.joblib"
@@ -239,6 +245,8 @@ def main() -> None:
         pd.DataFrame({"피처목록(features)": features}).to_excel(
             writer, sheet_name="피처목록(feature_list)", index=False
         )
+    if run_reports is not None:
+        shutil.copy2(out, run_reports / "leakage_audit.xlsx")
 
     # 콘솔: 집계만
     print(f"[leakage] 판정: {verdict}")
@@ -253,20 +261,19 @@ def main() -> None:
             )
     print(f"[leakage] 저장: {out}")
 
+    meta_payload = {
+        "verdict": verdict,
+        "suspect_count": n_suspect,
+        "forbidden_in_features": forbidden_in_features,
+        "base_rate": base_rate,
+        "suspect_features": suspects["피처(feature)"].head(30).tolist(),
+    }
     meta_path = reports / "leakage_audit_summary.json"
     with open(meta_path, "w", encoding="utf-8") as f:
-        json.dump(
-            {
-                "verdict": verdict,
-                "suspect_count": n_suspect,
-                "forbidden_in_features": forbidden_in_features,
-                "base_rate": base_rate,
-                "suspect_features": suspects["피처(feature)"].head(30).tolist(),
-            },
-            f,
-            ensure_ascii=False,
-            indent=2,
-        )
+        json.dump(meta_payload, f, ensure_ascii=False, indent=2)
+    if run_reports is not None:
+        with open(run_reports / "leakage_audit_summary.json", "w", encoding="utf-8") as f:
+            json.dump(meta_payload, f, ensure_ascii=False, indent=2)
     print(f"[leakage] 요약 JSON: {meta_path}")
 
     # 하드 FAIL(제외 컬럼이 Feature에 잔존) 시 파이프라인 Job 중단 → UI에서 제외 후 03부터 재개

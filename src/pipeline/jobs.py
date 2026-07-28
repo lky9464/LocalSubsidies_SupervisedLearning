@@ -257,14 +257,11 @@ class JobManager:
         if step_id and run_id_str:
             try:
                 from src.ops_db.repository import OpsRepository
+                from src.pipeline.reset import reset_pipeline_from
 
-                OpsRepository(self.cfg).upsert_step(
-                    run_id_str,
-                    str(step_id),
-                    "failed",
-                    message="사용자 취소",
-                    ended=True,
-                )
+                repo = OpsRepository(self.cfg)
+                # 취소된 단계~이후: 이력·산출물 삭제 (failed로 남기지 않음)
+                reset_pipeline_from(self.cfg, repo, run_id_str, str(step_id))
             except Exception:  # noqa: BLE001
                 pass
         return job

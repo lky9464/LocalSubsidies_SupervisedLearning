@@ -1,6 +1,7 @@
 @echo off
 setlocal EnableExtensions
-REM Incremental offline update — preserves configs\local.yaml, .venv, vendor\wheels.
+REM Offline update to latest (full sync). ASCII only - codepage safe.
+REM Double-click OK: auto-finds update-to-vX.Y.Z.zip in this folder / project root.
 if /I not "%~1"=="_run" (
   cmd /k "%~f0" _run %*
   exit /b
@@ -11,46 +12,57 @@ title Local Subsidies Offline Update
 
 echo.
 echo ========================================
-echo  Offline update (changed files only)
+echo  Offline update to latest
 echo ========================================
 echo.
-echo Preserved: configs\local.yaml, .venv, vendor\wheels, data_root (outside project)
+echo Preserved: configs\local.yaml, .venv, vendor\wheels, data_root
 echo Guide: docs\offline_update.md
 echo.
 
-if "%~2"=="" (
-  echo Usage:
-  echo   UpdateOffline.bat [update_folder_or_zip]
-  echo.
-  echo Examples:
-  echo   UpdateOffline.bat D:\USB\update-v0.5.1
-  echo   UpdateOffline.bat D:\USB\update-v0.5.1.zip
-  echo.
-  echo Prepare package on online PC:
-  echo   powershell -ExecutionPolicy Bypass -File scripts\build_offline_update_package.ps1
-  echo   ^(creates dist\update-vX.Y.Z.zip^)
-  echo.
-  goto :fail
-)
-
 set "SRC=%~2"
-if not exist "%SRC%" (
-  echo [ERROR] Not found: %SRC%
-  goto :fail
+set "AUTO_WHEELS="
+
+REM Optional arg: /autowheels (2nd or 3rd)
+if /I "%~2"=="/autowheels" (
+  set "SRC="
+  set "AUTO_WHEELS=1"
+)
+if /I "%~3"=="/autowheels" set "AUTO_WHEELS=1"
+
+if "%SRC%"=="" (
+  echo No zip path given - searching for update-to-v*.zip / update-v*.zip ...
+  echo.
 )
 
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\apply_offline_update.ps1" -ProjectRoot "%CD%" -Source "%SRC%"
+if "%SRC%"=="" (
+  if "%AUTO_WHEELS%"=="1" (
+    powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\apply_offline_update.ps1" -ProjectRoot "%CD%" -AutoWheels
+  ) else (
+    powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\apply_offline_update.ps1" -ProjectRoot "%CD%"
+  )
+) else (
+  if "%AUTO_WHEELS%"=="1" (
+    powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\apply_offline_update.ps1" -ProjectRoot "%CD%" -Source "%SRC%" -AutoWheels
+  ) else (
+    powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\apply_offline_update.ps1" -ProjectRoot "%CD%" -Source "%SRC%"
+  )
+)
 set "EC=%ERRORLEVEL%"
 if not "%EC%"=="0" goto :fail
 
 echo.
-echo Done. If SetupOffline was NOT requested above, run:
-echo   RunWebNext.bat restart
+echo Done. Follow Next: lines above.
 echo.
 pause
 exit /b 0
 
 :fail
+echo.
+echo [ERROR] Update failed. See messages above.
+echo Usage:
+echo   UpdateOffline.bat
+echo   UpdateOffline.bat D:\USB\update-to-v0.5.2.zip
+echo   UpdateOffline.bat D:\USB\update-to-v0.5.2.zip /autowheels
 echo.
 pause
 exit /b 1

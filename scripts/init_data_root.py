@@ -22,11 +22,8 @@ from src.io.config import ensure_algo_dirs, get_data_root, load_config  # noqa: 
 BASE_DIRS = (
     "raw",
     "raw_inference",
-    "interim",
-    "processed",
-    "ops",
-    "algorithms/operations",
-    "runs",
+    "ops",  # ops.sqlite (공유)
+    "runs",  # Run별 interim/processed/algorithms
 )
 
 
@@ -67,13 +64,15 @@ def main() -> int:
         mark = "+" if created else "="
         print(f"  {mark} {rel}")
 
+    # reports only (no global algorithms/interim/processed)
     ensure_algo_dirs(cfg)
-    print("  = algorithms/*/scores/test|inference (ensured)")
+    print("  = outputs/reports/* (repo); Run algorithms under runs/{{run_id}}/")
 
     print()
     print("Done.")
     print("  Training/eval CSV  -> raw\\")
     print("  Inference CSV      -> raw_inference\\")
+    print("  Pipeline outputs   -> runs\\{run_id}\\interim|processed|algorithms\\")
     print("  Schema: TLS4902R_Layout.csv")
     return 0
 

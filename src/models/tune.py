@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import itertools
 import json
+import time
 from pathlib import Path
 from typing import Any
 
@@ -18,7 +19,7 @@ from src.evaluate.metrics import compute_classification_metrics, top_k_lift
 from src.features.preprocess import encode_target, transform_features
 from src.io.config import load_config, resolve_data_path, resolve_repo_path
 from src.io.encoding_util import read_csv_auto
-from src.models.factory import ALGORITHM_NAMES, build_model, resolve_model_params
+from src.models.factory import build_model, resolve_model_params
 from src.models.registry import family_of, normalize_algo_id
 
 
@@ -258,10 +259,6 @@ def tune_one_algorithm(
     """단일 알고리즘 격자 탐색. 집계 결과만 반환·저장."""
     algo = normalize_algo_id(algo)
     family = family_of(algo)
-    if family not in ("random_forest", "catboost"):
-        raise ValueError(
-            f"튜닝 지원: random_forest_v*, catboost_v* (요청={algo}, family={family})"
-        )
 
     import joblib
 
@@ -323,6 +320,7 @@ def tune_one_algorithm(
         params = {**base_params, **delta}
         if show_progress:
             print(f"[tune] [{i}/{len(combos)}] {algo} {delta or '(baseline)'}")
+        t0 = time.perf_counter()
 
         if family == "catboost":
             pre = bundle["preprocessor_catboost"]
@@ -350,9 +348,22 @@ def tune_one_algorithm(
             model.fit(X_tr, y_fit)
 
         y_proba = _predict_proba_positive(model, X_va)
+        elapsed = round(time.perf_counter() - t0, 1)
         scored = score_candidate(np.asarray(y_val), y_proba, top_k_percents=top_k)
-        row = {"algorithm": algo, "trial": i, "params": params, "delta": delta, **scored}
+        row = {
+            "algorithm": algo,
+            "trial": i,
+            "params": params,
+            "delta": delta,
+            "elapsed_sec": elapsed,
+            **scored,
+        }
         rows.append(row)
+        if show_progress:
+            print(
+                f"[tune]   → {elapsed:,.1f}s "
+                f"top1_lift={scored.get('top1_lift')} pr_auc={scored.get('pr_auc')}"
+            )
         del model, X_tr, X_va
 
     baseline_precision = None
@@ -398,6 +409,7 @@ def _save_tune_report(cfg: dict[str, Any], algo: str, result: dict[str, Any]) ->
             "algorithm": t.get("algorithm"),
             "trial": t.get("trial"),
             "precision_guard_pass": t.get("precision_guard_pass"),
+            "elapsed_sec": t.get("elapsed_sec"),
             "pr_auc": t.get("pr_auc"),
             "roc_auc": t.get("roc_auc"),
             "precision": t.get("precision"),

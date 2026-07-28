@@ -78,9 +78,9 @@ python scripts/12_tune_hyperparams.py --algo catboost_v1
 5. 주·보 변경 시 `ops_queue` + `operations_criteria.md` §2.1 갱신
 6. [`VERSION_HISTORY.md`](VERSION_HISTORY.md) 기록
 
-**현재:** `random_forest_v2` · `catboost_v2` 등록 완료. Test 확정 대기.
+**현재 (v0.6.0):** 5 family 모두 v2 등록·Test 채택 완료. 주·보 4×4 조합 비교·`ops_queue` 갱신은 다음 세션.
 
-EasyEnsemble / Stacked / HGB는 전면 격자 탐색하지 않고, 주·보 확정 후 필요 시만 재평가한다.
+EasyEnsemble은 절대 리프트가 낮아 참고용. Stacked·HGB v2는 Validation `12` + Test 확정 완료.
 
 > **단계별 로드맵**(RF/CB v2 STOP → HistGB → Optuna) 및 **`tune.method` 설계**는  
 > [`hyperparam_methodology.md`](hyperparam_methodology.md) **§8·§9** 참고.

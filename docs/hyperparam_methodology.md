@@ -275,9 +275,9 @@ for delta in [{}] + all_combinations(tune.grids):
 |---------|-----------|----------------|--------------|
 | `random_forest_v1` | Bagging (다수 트리) | **예** (28 trial) | n_estimators, max_depth, min_samples_leaf |
 | `catboost_v1` | Boosting | **예** (28 trial) | iterations, depth, learning_rate |
-| `gradient_boosting_v1` | Hist Boosting | 아니오 | max_iter, max_depth, learning_rate, max_bins |
-| `stacked_ensemble_v1` | Stacking (RF+HGB→LR) | 아니오 | rf_*, hgb_*, cv, meta_max_iter |
-| `easy_ensemble_v1` | 불균형 앙상블 | 아니오 | n_estimators |
+| `gradient_boosting_v1` | Hist Boosting | **예** (28 trial) | max_iter, max_depth, learning_rate, max_bins |
+| `stacked_ensemble_v1` | Stacking (RF+HGB→LR) | **예** (9 trial) | rf_*, hgb_*, cv, meta_max_iter |
+| `easy_ensemble_v1` | 불균형 앙상블 | **예** (5 trial) | n_estimators |
 
 ---
 
@@ -343,14 +343,17 @@ for delta in [{}] + all_combinations(tune.grids):
 4. `05`~`10`으로 Test 확정 · 주·보·`operations_criteria` 갱신
 5. [`VERSION_HISTORY.md`](VERSION_HISTORY.md) 기록
 
-### 5.1 적용 현황 (Validation 채택 · Test 확정 전)
+### 5.1 적용 현황 (Validation 채택 · Test v2 채택)
 
 | algo_id | 채택 하이퍼 (요약) | 상태 |
 |---------|-------------------|------|
-| `random_forest_v2` | `n_estimators=200`, `max_depth=24`, `min_samples_leaf=8` | **등록됨** · Test `05`~`10` 대기 |
-| `catboost_v2` | `iterations=500`, `depth=7`, `learning_rate=0.08` | **등록됨** · Test `05`~`10` 대기 |
+| `random_forest_v2` | `n_estimators=200`, `max_depth=24`, `min_samples_leaf=8` | **Test v2 채택** (run_20260728_200201) |
+| `catboost_v2` | `iterations=500`, `depth=7`, `learning_rate=0.08` | **Test v2 채택** (run_20260728_200201) |
+| `gradient_boosting_v2` | `max_iter=400`, `max_depth=8`, `learning_rate=0.05` | **Test v2 채택** (run_20260728_200201) |
+| `stacked_ensemble_v2` | `rf_max_depth=20`, `hgb_max_depth=7`, `hgb_max_iter=250` | **Test v2 채택** (run_20260728_200201) |
+| `easy_ensemble_v2` | `n_estimators=10` | **Test v2 채택** (run_20260728_200201 · 절대 리프트仍 낮음) |
 
-v1은 기준선으로 유지. `ops_queue` 주·보는 Test 확정 전까지 `*_v1` 유지.
+v1은 기준선으로 유지. **`ops_queue` 주·보·4×4 조합 확정**은 다음 세션(현재 `random_forest_v1` · `catboost_v1` 유지).
 
 ---
 

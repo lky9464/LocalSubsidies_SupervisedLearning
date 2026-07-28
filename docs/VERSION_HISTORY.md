@@ -1,10 +1,21 @@
 # 버전 이력
 
-현재 버전: **v0.5.2**  
+현재 버전: **v0.6.0**  
 저장소: [LocalSubsidies_SupervisedLearning](https://github.com/lky9464/LocalSubsidies_SupervisedLearning)  
 릴리스: [Releases](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases)
 
 새 버전을 낼 때 이 문서 상단에 항목을 추가하고, GitHub Release/태그와 맞춥니다.
+
+---
+
+## v0.6.0 — GBM·Stacked·EasyEnsemble v2 튜닝·등록
+
+- **Validation 튜닝 (`12`)**: `gradient_boosting` · `stacked_ensemble` · `easy_ensemble` — `tune.grids` · `--run-id` Run-scoped `03` 산출물
+- **v2 등록**: `model_params` · `algorithm_registry` · `05_train_*_v2.py` ×3 · `DEFAULT_ALGO_IDS` 갱신
+- **튜닝 모듈**: `tune.py` family 화이트리스트 해제 · trial `elapsed_sec` 기록
+- **Test**: 5 family 모두 v2 채택(새 raw · `run_20260728_200201`) · 주·보 4×4 조합 비교는 **다음 세션**
+
+[Release v0.6.0](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases/tag/v0.6.0)
 
 ---
 

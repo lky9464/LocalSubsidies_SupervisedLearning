@@ -19,8 +19,11 @@ DEFAULT_ALGO_IDS: list[str] = [
     "catboost_v1",
     "catboost_v2",
     "stacked_ensemble_v1",
+    "stacked_ensemble_v2",
     "easy_ensemble_v1",
+    "easy_ensemble_v2",
     "gradient_boosting_v1",
+    "gradient_boosting_v2",
     "random_forest_v1",
     "random_forest_v2",
 ]

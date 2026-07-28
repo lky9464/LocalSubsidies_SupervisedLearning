@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "target_version": "0.5.2",
+  "target_version": "0.6.0",
   "from_min": "0.3.0",
   "mode": "full_sync",
   "preserve_always": [
@@ -49,6 +49,13 @@
     }
   },
   "releases": [
+    {
+      "version": "0.6.0",
+      "from_min": "0.3.0",
+      "update_type": "full_sync",
+      "wheels_reinstall": false,
+      "notes": "Full sync. GBM/Stacked/EasyEnsemble v2 tuning + train scripts. No deps change — wheels zip optional if already on v0.5.2+."
+    },
     {
       "version": "0.5.2",
       "from_min": "0.3.0",

@@ -168,18 +168,30 @@ algorithm_registry:
       v1:
         algo_id: stacked_ensemble_v1
         script: scripts/05_train_stacked_ensemble_v1.py
+      v2:
+        algo_id: stacked_ensemble_v2
+        label: Stacked Ensemble (v2)
+        script: scripts/05_train_stacked_ensemble_v2.py
   easy_ensemble:
     label: EasyEnsemble
     versions:
       v1:
         algo_id: easy_ensemble_v1
         script: scripts/05_train_easy_ensemble_v1.py
+      v2:
+        algo_id: easy_ensemble_v2
+        label: EasyEnsemble (v2)
+        script: scripts/05_train_easy_ensemble_v2.py
   gradient_boosting:
     label: Gradient Boosting
     versions:
       v1:
         algo_id: gradient_boosting_v1
         script: scripts/05_train_gradient_boosting_v1.py
+      v2:
+        algo_id: gradient_boosting_v2
+        label: Gradient Boosting (v2)
+        script: scripts/05_train_gradient_boosting_v2.py
   random_forest:
     label: RandomForest
     versions:
@@ -219,6 +231,12 @@ model_params:
     learning_rate: 0.05
     max_bins: 128
     class_weight: balanced
+  gradient_boosting_v2:
+    max_iter: 400
+    max_depth: 8
+    learning_rate: 0.05
+    max_bins: 128
+    class_weight: balanced
   stacked_ensemble_v1:
     cv: 3
     rf_n_estimators: 100
@@ -229,8 +247,20 @@ model_params:
     hgb_max_iter: 150
     hgb_max_bins: 128
     meta_max_iter: 500
+  stacked_ensemble_v2:
+    cv: 3
+    rf_n_estimators: 100
+    rf_max_depth: 20
+    rf_min_samples_leaf: 5
+    hgb_max_depth: 7
+    hgb_learning_rate: 0.05
+    hgb_max_iter: 250
+    hgb_max_bins: 128
+    meta_max_iter: 500
   easy_ensemble_v1:
     n_estimators: 8
+  easy_ensemble_v2:
+    n_estimators: 10
 
 # Validation 소규모 격자 탐색 (scripts/12_tune_hyperparams.py)
 # nested_random|random: 03의 train_mask 안에서만 fit/valid (Test 미사용, 권장)
@@ -240,6 +270,7 @@ tune:
   split_mode: nested_random
   valid_size: 0.2
   random_state: 42
+  # 인자 없이 12를 실행할 때의 기본 대상. 나머지 family는 --algo 로 개별 실행
   algorithms:
     - random_forest_v1
     - catboost_v1
@@ -250,6 +281,7 @@ tune:
   # n_trials: 25              # method=optuna
   # optuna_sampler: tpe       # tpe | random
   # catboost_pruning: true
+  # trial 수 = 격자 전수 조합 + 기준선(현재 model_params) 1회
   grids:
     random_forest_v1:
       n_estimators: [150, 200, 300]
@@ -259,6 +291,18 @@ tune:
       iterations: [300, 400, 500]
       depth: [5, 6, 7]
       learning_rate: [0.03, 0.05, 0.08]
+    # max_bins는 RAM 부담이 커 1차 탐색에서 고정
+    gradient_boosting_v1:
+      max_iter: [200, 300, 400]
+      max_depth: [4, 6, 8]
+      learning_rate: [0.03, 0.05, 0.08]
+    # trial마다 CV 3-fold × (RF + HGB) + 메타 학습 → 축소 격자만 사용
+    stacked_ensemble_v1:
+      rf_max_depth: [16, 20]
+      hgb_max_depth: [5, 7]
+      hgb_max_iter: [150, 250]
+    easy_ensemble_v1:
+      n_estimators: [5, 10, 12, 15]
 
 # 기본 학습 대상 algo_id 목록
 algorithms:

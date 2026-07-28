@@ -12,7 +12,7 @@
 
 - **Run 산출물 격리**: `runs/{run_id}/interim|processed|algorithms|reports/` · 재실행 시 클릭 단계~10 이력·파일 초기화 · 취소 시 미실행으로 되돌림
 - **레거시 정리**: `CleanupLegacy.bat` (raw 유지 · 선택 실행)
-- **오프라인 full sync**: `update-to-vX.Y.Z.zip` · `UpdateOffline.bat` 더블클릭 자동 탐색 · v0.3.0+ → 최신 · baseline wheels ([`offline_update.md`](offline_update.md))
+- **오프라인 full sync**: `update-to-vX.Y.Z.zip` · `UpdateOffline.bat` 더블클릭 자동 탐색 · v0.3.0+ → 최신 · baseline wheels · 현장 오류 대처(구버전 bat · `.venv` 경로 · `web\out`) ([`offline_update.md`](offline_update.md) §5)
 - **추론**: Run 경로 조회 수정 · ops 큐 Excel/CSV 자동 저장 · 결과 화면 수동보내기 제거
 
 [Release v0.5.2](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases/tag/v0.5.2)

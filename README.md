@@ -51,12 +51,14 @@
 
 최초 설치(§B)가 끝난 PC(**v0.3.0 이상**)는 **프로젝트 통째 교체 없이** 최신으로 동기화합니다.
 
-1. USB: Release **`update-to-vX.Y.Z.zip`** 을 프로젝트 루트에 복사  
+1. USB: Release **`update-to-vX.Y.Z.zip`** 을 프로젝트 루트에 복사 (**zip은 풀지 않음**)  
    - **v0.5.2 기준**: 같은 폴더에 **`wheels-win-amd64-py312.zip`** 도 둠 (이후는 deps 변경 시에만)
-2. **`UpdateOffline.bat` 더블클릭** (zip 자동 탐색 · 경로 인자도 가능)
-3. 안내에 따라 필요 시 **`SetupOffline.bat`** → **`RunWebNext.bat restart`**
+2. **`UpdateOffline.bat`** 실행 (신버전: 더블클릭 · zip 자동 탐색)  
+3. 안내에 따라 **`SetupOffline.bat`** → **`RunWebNext.bat`**
 
-`configs\local.yaml` · raw · `{data_root}`는 **그대로** 둡니다. 상세: [`docs/offline_update.md`](docs/offline_update.md)
+`configs\local.yaml` · raw · `{data_root}`는 **그대로** 둡니다.  
+구버전 UpdateOffline Usage만 뜨거나 · Setup `Fatal error in launcher` · UI(`web\out`) 비어 있음 → [`docs/offline_update.md`](docs/offline_update.md) **§5**.  
+Release 노트: [v0.5.2](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases/tag/v0.5.2)
 
 ### C. 일상 사용 (웹 UI)
 
@@ -83,10 +85,12 @@
 
 | 증상 | 확인 |
 |------|------|
+| `UpdateOffline` — Usage만 / `changed files only` | 구버전 bat → zip에서 새 `UpdateOffline.bat`·`apply_offline_update.ps1` 덮어쓴 뒤 재실행 ([`offline_update.md`](docs/offline_update.md) §5-1) |
 | `SetupOffline` — wheels 없음 | Release zip을 `vendor\wheels\`에 풀었는지 |
+| `SetupOffline` — `Fatal error in launcher` · 경로에 `0.5.0`/`0.5.1` 혼재 | 폴더 이동·이름 변경 후 깨진 `.venv` → **`.venv`만 삭제** 후 SetupOffline 재실행 ([`offline_update.md`](docs/offline_update.md) §5-2) |
 | `SetupOffline.bat` 더블클릭 후 창이 바로 닫힘 | 최신 `SetupOffline.bat` 사용(창 유지). 또는 `cmd`에서 `SetupOffline.bat` 실행. `SetupOffline.log` 확인 |
 | `InitDataRoot.bat` 경로/명령 오류·깨진 한글 | 최신 `InitDataRoot.bat` + `scripts\init_data_root.py` 사용. `configs\local.yaml`의 `data_root` 확인 후 재실행. 배치 파일은 ASCII 전용(코드페이지 무관) |
-| UI 안 뜸 / 빈 화면 | `web\out\index.html` 존재 여부 (`web-out.zip`) |
+| UI 안 뜸 / 빈 화면 · `web\out` 없음 | `web-out.zip` 또는 update zip 안 UI → `web\out\` ([`offline_update.md`](docs/offline_update.md) §5-3) |
 | `file://` 로 HTML만 연 경우 | 반드시 `RunWebNext.bat` → `http://127.0.0.1:8600` |
 | import / catboost 오류 | Python **3.12 x64**, Release의 `VC_redist.x64.exe` 설치 |
 | 데이터 오류 | `configs\local.yaml`의 `data_root`, raw 위치 |

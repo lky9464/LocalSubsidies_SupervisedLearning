@@ -24,11 +24,12 @@
 클릭 단계~10 연쇄 초기화 · Job 취소 시 미실행으로 삭제 · `CleanupLegacy.bat`은 선택(raw 유지)
 
 ### 오프라인 업데이트
-1. `update-to-v0.5.2.zip` + `wheels-win-amd64-py312.zip`을 프로젝트 루트에 복사  
-2. `UpdateOffline.bat` 더블클릭  
-3. (필요 시) `SetupOffline.bat` → `RunWebNext.bat restart`
+1. `update-to-v0.5.2.zip` + `wheels-win-amd64-py312.zip`을 프로젝트 루트에 복사 (**zip 풀지 않음**)  
+2. `UpdateOffline.bat` → `SetupOffline.bat` → `RunWebNext.bat`  
+3. 현장 이슈 대처: 구버전 UpdateOffline Usage · `.venv` 경로 꼬임 · `web\out` 비어 있음  
+   → [`offline_update.md`](offline_update.md) §5 · [Release v0.5.2](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases/tag/v0.5.2)
 
-상세: `docs/offline_update.md` · `docs/VERSION_HISTORY.md`
+상세: `docs/offline_update.md` · `docs/VERSION_HISTORY.md` · README §B-2 / §D
 
 ## Agent 경계
 data_root / ops.sqlite / raw 내용 읽기·학습 스크립트·웹 서버 기동(데이터 유발) 금지.  

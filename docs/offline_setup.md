@@ -157,14 +157,20 @@ data_root: "C:/work/LocalSubsidies_ML_Data"
 | 보존 | 갱신 |
 |------|------|
 | `configs\local.yaml` | `api\`, `src\`, `scripts\`, `docs\`, `web\out\` 등 |
-| `.venv`, `vendor\python` | `UpdateOffline.bat` + `update-to-vX.Y.Z.zip` (더블클릭) |
+| `.venv`, `vendor\python` | `UpdateOffline.bat` + `update-to-vX.Y.Z.zip` (**zip은 풀지 않음**) |
 | `{data_root}` (raw·모델·DB) | baseline / `requirements.txt` 변경 시 wheels + `SetupOffline.bat` |
 
 1. 온라인 PC: Release **`update-to-vX.Y.Z.zip`** (+ 필요 시 **`wheels-win-amd64-py312.zip`**) → USB  
-2. 오프라인 PC: zip을 프로젝트 루트에 두고 **`UpdateOffline.bat` 더블클릭**  
-3. 안내에 따라 **`SetupOffline.bat`**(필요 시) → **`RunWebNext.bat restart`**
+2. 오프라인 PC: zip을 **프로젝트 루트**에 두고 **`UpdateOffline.bat`** 실행  
+3. **`SetupOffline.bat`**(필요 시) → **`RunWebNext.bat`**
 
-상세: [`offline_update.md`](offline_update.md)
+**자주 막히는 경우** (상세는 [`offline_update.md`](offline_update.md) §5 · [Release v0.5.2](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases/tag/v0.5.2))
+
+| 단계 | 증상 | 대처 요약 |
+|------|------|-----------|
+| UpdateOffline | Usage / `changed files only`만 표시 | zip에서 새 `UpdateOffline.bat` + `apply_offline_update.ps1` 덮어쓴 뒤 재실행 |
+| SetupOffline | `Fatal error in launcher` · 경로에 옛 폴더명 | **`.venv`만 삭제** 후 SetupOffline 재실행 |
+| RunWebNext | `web\out` 비어 있음 / UI 빈 화면 | `web-out.zip` 또는 update zip 안 UI → `web\out\` |
 
 ---
 
@@ -173,12 +179,13 @@ data_root: "C:/work/LocalSubsidies_ML_Data"
 | 증상 | 확인할 것 |
 |------|-----------|
 | `vendor\wheels` 없음 / .whl 없음 | Release zip을 `vendor\wheels\`에 풀었는지 |
-| Setup에서 패키지 설치 실패 | Python이 **3.12 x64**인지 |
+| Setup에서 패키지 설치 실패 | Python **3.12 x64**인지 · 폴더 이동 후 `.venv` 경로 꼬임은 [§5-1](#5-1-오프라인-pc-버전-업데이트--full-sync) |
 | `RunWebNext.bat` → `.venv` 없음 | `SetupOffline.bat`을 먼저 실행했는지 |
 | fastapi / catboost import 오류 | Setup 재실행, VC++ Redistributable x64 |
-| UI가 안 뜨거나 빈 페이지 | `web\out\` 존재 여부 (Release `web-out.zip` 또는 `build_web.bat`) |
+| UI가 안 뜨거나 빈 페이지 | `web\out\index.html` · Release `web-out.zip` 또는 update zip 안 UI ([`offline_update.md`](offline_update.md) §5-3) |
 | `file://` 로 HTML만 연 경우 | 반드시 `RunWebNext.bat` → `http://127.0.0.1:8600` |
 | 포트 사용 중 | 기존 RunWebNext 창을 닫은 뒤 재실행 |
+| 오프라인 패치 전반 | [`offline_update.md`](offline_update.md) |
 
 ---
 

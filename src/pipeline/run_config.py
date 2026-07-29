@@ -51,6 +51,7 @@ def default_run_config(cfg: dict[str, Any]) -> dict[str, Any]:
     return {
         "split": {
             "mode": str(split.get("mode", "random")),
+            "group_key": str(split.get("group_key", "PFM_BIZ_ID+INST_ID")),
             "train_start": split.get("train_start", "202401"),
             "train_end": split.get("train_end", "202512"),
             "test_start": split.get("test_start", "202507"),

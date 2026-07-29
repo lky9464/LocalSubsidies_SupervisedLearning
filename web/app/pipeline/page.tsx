@@ -186,6 +186,9 @@ export default function PipelinePage() {
           test_start: splitForm.test_start,
           test_end: splitForm.test_end,
           test_size: splitForm.test_size,
+          ...(mode === "group_random"
+            ? { group_key: splitForm.group_key ?? "PFM_BIZ_ID+INST_ID" }
+            : {}),
         },
         split_committed: true,
       });
@@ -380,7 +383,7 @@ export default function PipelinePage() {
                 </div>
               ) : (
                 <div className="mt-3 space-y-4">
-                  <div className="flex gap-4">
+                  <div className="flex flex-wrap gap-x-4 gap-y-2">
                     <label className="flex items-center gap-2 text-sm">
                       <input
                         type="radio"
@@ -397,7 +400,16 @@ export default function PipelinePage() {
                         checked={mode === "random"}
                         onChange={() => setMode("random")}
                       />
-                      랜덤(random)
+                      랜덤(random · 행)
+                    </label>
+                    <label className="flex items-center gap-2 text-sm">
+                      <input
+                        type="radio"
+                        name="split-mode"
+                        checked={mode === "group_random"}
+                        onChange={() => setMode("group_random")}
+                      />
+                      사업단위 랜덤(무중복)
                     </label>
                   </div>
                   {mode === "time" ? (
@@ -418,18 +430,63 @@ export default function PipelinePage() {
                       ) : null}
                     </div>
                   ) : (
-                    <div>
-                      <Label>Test 비중</Label>
-                      <Input
-                        type="number"
-                        step="0.05"
-                        min="0.1"
-                        max="0.5"
-                        value={String(splitForm.test_size ?? 0.3)}
-                        onChange={(e) =>
-                          setSplitForm({ ...splitForm, test_size: parseFloat(e.target.value) })
-                        }
-                      />
+                    <div className="space-y-3">
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div>
+                          <Label>풀 시작 (train_start)</Label>
+                          <Input
+                            value={String(splitForm.train_start ?? "")}
+                            onChange={(e) =>
+                              setSplitForm({ ...splitForm, train_start: e.target.value })
+                            }
+                          />
+                        </div>
+                        <div>
+                          <Label>풀 끝 (train_end)</Label>
+                          <Input
+                            value={String(splitForm.train_end ?? "")}
+                            onChange={(e) =>
+                              setSplitForm({ ...splitForm, train_end: e.target.value })
+                            }
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <Label>
+                          {mode === "group_random" ? "Test 비중 (엔티티)" : "Test 비중 (행)"}
+                        </Label>
+                        <Input
+                          type="number"
+                          step="0.05"
+                          min="0.1"
+                          max="0.5"
+                          value={String(splitForm.test_size ?? 0.3)}
+                          onChange={(e) =>
+                            setSplitForm({ ...splitForm, test_size: parseFloat(e.target.value) })
+                          }
+                        />
+                      </div>
+                      {mode === "group_random" ? (
+                        <>
+                          <div>
+                            <Label>그룹 키 (group_key)</Label>
+                            <Input
+                              readOnly
+                              className="bg-muted/40"
+                              value={String(splitForm.group_key ?? "PFM_BIZ_ID+INST_ID")}
+                            />
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            동일 사업·기관(PFM_BIZ_ID+INST_ID)의 모든 월이 Train 또는 Test 한쪽만
+                            배정됩니다. baseline(random) Run과 Test 지표를 직접 비교하지 마세요.
+                          </p>
+                        </>
+                      ) : (
+                        <p className="text-xs text-muted-foreground">
+                          행 단위 무작위 분할입니다. v0.6.0 baseline·튜닝 비교용. 같은 사업의 다른
+                          달이 Train/Test에 나뉠 수 있습니다.
+                        </p>
+                      )}
                     </div>
                   )}
                   <Button onClick={saveSplitOptions} disabled={busy}>

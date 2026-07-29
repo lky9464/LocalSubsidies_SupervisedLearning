@@ -42,7 +42,10 @@ router = APIRouter(tags=["pipeline"])
 def _split_summary(split: dict) -> str:
     mode = split.get("mode", "time")
     if mode == "random":
-        return f"랜덤 · test_size={split.get('test_size', 0.3)}"
+        return f"랜덤(행) · test_size={split.get('test_size', 0.3)}"
+    if mode == "group_random":
+        gk = split.get("group_key", "PFM_BIZ_ID+INST_ID")
+        return f"사업단위 랜덤 · {gk} · test_size={split.get('test_size', 0.3)}"
     return (
         f"기간 · Train {split.get('train_start')}~{split.get('train_end')} / "
         f"Test {split.get('test_start')}~{split.get('test_end')}"
@@ -117,8 +120,11 @@ def put_config(run_id: str, body: RunConfigUpdate, cfg=Depends(get_cfg), repo=De
 
     if body.split is not None:
         run_cfg["split"] = {**(run_cfg.get("split") or {}), **body.split}
-        if run_cfg["split"].get("mode") == "random":
+        split_mode = str(run_cfg["split"].get("mode") or "")
+        if split_mode in ("random", "group_random"):
             run_cfg["split"]["random_state"] = 42
+        if split_mode == "group_random":
+            run_cfg["split"].setdefault("group_key", "PFM_BIZ_ID+INST_ID")
     if body.algorithms is not None:
         if len(body.algorithms) < 2:
             raise HTTPException(400, "알고리즘을 2개 이상 선택하세요.")

@@ -1,10 +1,22 @@
 # 버전 이력
 
-현재 버전: **v0.6.0**  
+현재 버전: **v0.6.1**  
 저장소: [LocalSubsidies_SupervisedLearning](https://github.com/lky9464/LocalSubsidies_SupervisedLearning)  
 릴리스: [Releases](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases)
 
 새 버전을 낼 때 이 문서 상단에 항목을 추가하고, GitHub Release/태그와 맞춥니다.
+
+---
+
+## v0.6.1 — 사업·기관 무중복 분할 (`group_random`)
+
+- **분할 모드 `group_random`**: `PFM_BIZ_ID+INST_ID` 엔티티 단위 Train/Test — 교집합 0 · `group_random_split_masks()` · `03` 연동
+- **04 그룹 감사**: `group_audit.py` · `leakage_audit` 그룹중복 시트·콘솔 · `PASS_그룹중복_낮음` 판정
+- **웹 UI**: 학습 실행 분할 3종(기간 / 행 random / **사업단위 랜덤**) · API `split_summary` · `web/out` 갱신
+- **baseline 유지**: `random` 기본값·v0.6.0 튜닝 Run과 **Test 지표 직접 비교 금지** (무결 vs baseline)
+- **미완**: 웹 `group_random` Run **05~10 중단** — 다른 PC에서 동일 Run 이어 실행 ([`SESSION_HANDOFF.md`](SESSION_HANDOFF.md))
+
+[Release v0.6.1](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases/tag/v0.6.1)
 
 ---
 

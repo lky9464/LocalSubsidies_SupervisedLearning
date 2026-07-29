@@ -29,12 +29,15 @@ interim_encoding: utf-8-sig
 csv_sep: ","
 
 # 분할 (run_config로 오버라이드 가능)
-# mode: time | random
-# random: pool(train_start~train_end 또는 pool_*) 안에서 test_size 비율로 Test 고정, 나머지가 Train
+# mode: time | random | group_random
+# random: pool(train_start~train_end) 안에서 행 단위 test_size 비율 분할
+# group_random: 동일 group_key 엔티티는 Train 또는 Test 한쪽만 (사업·기관 무중복)
 #         → 12 튜닝은 Train 안에서만 Validation (nested_random)
 split:
   mode: random
-  # random 풀 기간 (라벨 있는 학습·평가 구간). time 모드에서는 train/test 기간으로 사용
+  # group_random 전용 — 04 audit.group_keys 와 동일 문법 (A 또는 A+B)
+  group_key: PFM_BIZ_ID+INST_ID
+  # random / group_random 풀 기간. time 모드에서는 train/test 기간으로 사용
   train_start: "202401"
   train_end: "202512"
   test_start: "202507"
@@ -55,6 +58,17 @@ key_columns:
   - CRTR_YM
   - PFM_BIZ_ID
   - INST_ID
+
+# 04 누수 감사 — 그룹(엔티티) 중복 점검
+# 같은 사업·기관의 다른 기준년월 행이 Train/Test에 나뉘면 모델이 엔티티를 암기할 수 있다.
+# group_keys 항목은 `A` 또는 `A+B` (복합 키) 형태. 집계 비율만 산출하며 ID는 출력하지 않는다.
+audit:
+  group_keys:
+    - PFM_BIZ_ID
+    - PFM_BIZ_ID+INST_ID
+  # Test 양성 엔티티 중 Train에서 이미 양성으로 등장한 비율 임계
+  group_warn_ratio: 0.5
+  group_strong_warn_ratio: 0.8
 
 # Feature에서 반드시 제외
 exclude_features:

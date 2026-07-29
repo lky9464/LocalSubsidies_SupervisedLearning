@@ -1,7 +1,7 @@
 """
 [로컬 전용] 분할 + 전처리 객체/피처목록 저장 → data_root/processed/
 
-분할: run_config.split.mode = time | random
+분할: run_config.split.mode = time | random | group_random
 메모리: OrdinalEncoder. Cursor Agent는 실행하지 마세요.
 """
 
@@ -22,6 +22,7 @@ from src.features.preprocess import (  # noqa: E402
     build_feature_lists,
     encode_target,
     fit_preprocessor,
+    group_random_split_masks,
     random_split_masks,
     time_split_masks,
 )
@@ -61,22 +62,44 @@ def main() -> None:
     print(f"[preprocess] encoding={used}")
 
     split_cfg = run_cfg.get("split") or cfg.get("split", {})
-    mode = split_cfg.get("mode", "random")
+    mode = str(split_cfg.get("mode", "random")).lower().strip()
+    pool_start = split_cfg.get("pool_start") or split_cfg.get("train_start")
+    pool_end = split_cfg.get("pool_end") or split_cfg.get("train_end")
+    pool_start_s = str(pool_start) if pool_start else None
+    pool_end_s = str(pool_end) if pool_end else None
+    pool_note = f" pool={pool_start}~{pool_end}" if pool_start and pool_end else ""
+    test_size = float(split_cfg.get("test_size", 0.3))
+    random_state = int(split_cfg.get("random_state", cfg.get("random_seed", 42)))
+    target = cfg.get("target_column", "TAET_YN")
+    pos = cfg.get("positive_label", "Y")
+
     if mode == "random":
-        pool_start = split_cfg.get("pool_start") or split_cfg.get("train_start")
-        pool_end = split_cfg.get("pool_end") or split_cfg.get("train_end")
         train_m, test_m = random_split_masks(
             df,
-            test_size=float(split_cfg.get("test_size", 0.3)),
-            random_state=int(split_cfg.get("random_state", cfg.get("random_seed", 42))),
-            pool_start=str(pool_start) if pool_start else None,
-            pool_end=str(pool_end) if pool_end else None,
-        )
-        pool_note = (
-            f" pool={pool_start}~{pool_end}" if pool_start and pool_end else ""
+            test_size=test_size,
+            random_state=random_state,
+            pool_start=pool_start_s,
+            pool_end=pool_end_s,
         )
         print(
-            f"[preprocess] 분할=random test_size={split_cfg.get('test_size', 0.3)}"
+            f"[preprocess] 분할=random test_size={test_size}"
+            f"{pool_note} "
+            f"train={int(train_m.sum()):,} / test={int(test_m.sum()):,}"
+        )
+    elif mode == "group_random":
+        group_key = str(split_cfg.get("group_key") or "PFM_BIZ_ID+INST_ID")
+        train_m, test_m = group_random_split_masks(
+            df,
+            group_key=group_key,
+            target_col=target,
+            positive_label=pos,
+            test_size=test_size,
+            random_state=random_state,
+            pool_start=pool_start_s,
+            pool_end=pool_end_s,
+        )
+        print(
+            f"[preprocess] 분할=group_random group_key={group_key} test_size={test_size}"
             f"{pool_note} "
             f"train={int(train_m.sum()):,} / test={int(test_m.sum()):,}"
         )
@@ -95,8 +118,6 @@ def main() -> None:
         )
 
     features, categorical, numeric = build_feature_lists(df, cfg)
-    target = cfg.get("target_column", "TAET_YN")
-    pos = cfg.get("positive_label", "Y")
 
     y_train = encode_target(df.loc[train_m, target], pos)
     y_test = encode_target(df.loc[test_m, target], pos)
@@ -139,6 +160,7 @@ def main() -> None:
         "test_positive_rate": test_pos,
         "sklearn_encoding": "ordinal",
         "split_mode": mode,
+        "split_group_key": split_cfg.get("group_key") if mode == "group_random" else None,
         "features": features,
         "categorical": categorical,
         "numeric": numeric,

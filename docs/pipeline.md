@@ -6,8 +6,8 @@
 |------|----------|------|-----------|
 | 01 | `01_merge_raw.py` | 원본 CSV 통합 | `{data_root}/interim/merged.csv` |
 | 02 | `02_fix_target.py` | 타겟 `TAET_YN` 수정 | `interim/labeled.csv` |
-| 03 | `03_preprocess.py` | 분할(time/random)+전처리 | `processed/` |
-| 04 | `04_leakage_audit.py` | 누수 점검 | `outputs/reports/comparison/leakage_audit*` |
+| 03 | `03_preprocess.py` | 분할(time/random/**group_random**)+전처리 | `processed/` |
+| 04 | `04_leakage_audit.py` | 누수 점검 (피처 + 그룹 중복) | `outputs/reports/comparison/leakage_audit*` |
 | 05 | `05_train.py` / `05_train_{family}_v1.py` | 학습 (`--algo` = algo_id) | `algorithms/{algo_id}/model.joblib` |
 | 06 | `06_feature_importance.py` | Feature TOP10 | `feature_top10.json` + Excel |
 | 07 | `07_evaluate.py` | 평가·점수 파일 | `scores/test/{algo}_test_scores*` |

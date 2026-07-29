@@ -8,6 +8,7 @@
 - 제외 컬럼이 Feature에 남았는지
 - Feature별 단변량 ROC-AUC / PR-AUC (Train)
 - 의심 임계값 초과 Feature 목록
+- 그룹(사업·기관) 단위 Train/Test 중복 비율 — 랜덤 분할 누수 진단
 - (행·PII·개별 ID 출력 없음)
 
 Cursor Agent는 이 스크립트를 실행하지 마세요.
@@ -29,6 +30,7 @@ from sklearn.preprocessing import LabelEncoder
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+from src.features.group_audit import group_overlap_stats, group_verdict  # noqa: E402
 from src.features.preprocess import encode_target, time_split_masks  # noqa: E402
 from src.io.banner import print_banner  # noqa: E402
 from src.io.config import load_config, resolve_data_path, resolve_repo_path  # noqa: E402
@@ -36,6 +38,41 @@ from src.io.config import load_config, resolve_data_path, resolve_repo_path  # n
 # 단변량 AUC가 이 값 이상이면 "타겟과 과도하게 유사" 후보로 표시
 SUSPECT_ROC_AUC = 0.90
 SUSPECT_PR_AUC_RATIO = 20.0  # PR-AUC / base_rate 배수
+
+# 그룹 중복 리포트 컬럼 라벨
+GROUP_LABELS = {
+    "group_key": "그룹키(group_key)",
+    "n_rows": "전체행수(n_rows)",
+    "n_rows_train": "Train행수(n_rows_train)",
+    "n_rows_test": "Test행수(n_rows_test)",
+    "n_entities": "엔티티수(n_entities)",
+    "n_entities_train": "Train엔티티수(n_entities_train)",
+    "n_entities_test": "Test엔티티수(n_entities_test)",
+    "rows_per_entity_mean": "엔티티당평균행수(rows_per_entity_mean)",
+    "rows_per_entity_max": "엔티티당최대행수(rows_per_entity_max)",
+    "n_pos_rows": "양성행수(n_pos_rows)",
+    "n_pos_rows_test": "Test양성행수(n_pos_rows_test)",
+    "n_pos_entities": "양성엔티티수(n_pos_entities)",
+    "n_pos_entities_train": "Train양성엔티티수(n_pos_entities_train)",
+    "n_pos_entities_test": "Test양성엔티티수(n_pos_entities_test)",
+    "pos_rows_per_pos_entity": "양성엔티티당양성행수(pos_rows_per_pos_entity)",
+    "label_stickiness": "라벨고착성(label_stickiness)",
+    "entity_overlap_ratio": "Test엔티티_Train중복비율(entity_overlap_ratio)",
+    "pos_entity_seen_ratio": "Test양성엔티티_Train등장비율(pos_entity_seen_ratio)",
+    "pos_entity_seen_positive_ratio": (
+        "Test양성엔티티_Train에서이미양성비율(pos_entity_seen_positive_ratio)"
+    ),
+    "pos_row_seen_positive_ratio": "Test양성행_이미양성엔티티비율(pos_row_seen_positive_ratio)",
+    "expected_overlap_under_random": "랜덤분할기대중복비율(expected_overlap_under_random)",
+}
+
+
+def _fmt_ratio(v: float | None) -> str:
+    return "-" if v is None else f"{v * 100:.1f}%"
+
+
+def _fmt_num(v: float | None) -> str:
+    return "-" if v is None else f"{v:.1f}"
 
 
 def _safe_roc_auc(y: np.ndarray, score: np.ndarray) -> float | None:
@@ -98,6 +135,7 @@ def main() -> None:
     bundle = joblib.load(bundle_path)
     masks = joblib.load(masks_path)
     train_m = masks["train_mask"]
+    test_m = masks["test_mask"]
 
     features: list[str] = list(bundle["features"])
     target_col = cfg.get("target_column", "TAET_YN")
@@ -200,6 +238,23 @@ def main() -> None:
             }
         )
 
+    # 3-1) 그룹(엔티티) 중복 — 랜덤 분할에서 같은 사업의 다른 월이 Train/Test로 갈리는 문제
+    audit_cfg = cfg.get("audit") or {}
+    group_keys = [str(k) for k in (audit_cfg.get("group_keys") or [])]
+    y_all = encode_target(df[target_col], cfg.get("positive_label", "Y"))
+    group_stats: list[dict] = []
+    group_notes: list[str] = []
+    for key in group_keys:
+        try:
+            group_stats.append(group_overlap_stats(df, key, y_all, train_m, test_m))
+        except (KeyError, ValueError) as exc:
+            group_notes.append(f"{key}: 건너뜀 ({exc})")
+    group_vd, group_worst = group_verdict(
+        group_stats,
+        warn_ratio=float(audit_cfg.get("group_warn_ratio", 0.5)),
+        strong_warn_ratio=float(audit_cfg.get("group_strong_warn_ratio", 0.8)),
+    )
+
     # 4) 요약 판정
     n_suspect = int(suspects.shape[0])
     hard_fail = bool(forbidden_in_features)
@@ -232,6 +287,20 @@ def main() -> None:
                     "다만 여러 피처가 중정도(0.7~0.85)만으로도 앙상블 AUC 0.97대는 충분히 가능."
                 ),
             },
+            {"항목(item)": "그룹중복판정(group_verdict)", "값(value)": group_vd},
+            {
+                "항목(item)": "최대_이미양성으로본비율(group_worst_ratio)",
+                "값(value)": group_worst,
+            },
+            {
+                "항목(item)": "그룹중복_해석가이드",
+                "값(value)": (
+                    "Test 양성 엔티티 중 Train에서 이미 양성으로 등장한 비율이 높으면, "
+                    "지표가 '신규 대상 탐지'가 아니라 '기존 대상 재탐지' 성능을 재고 있을 수 있음. "
+                    "랜덤분할기대중복비율과 비슷하면 원인은 행 단위 random 분할. "
+                    "시간 분할(split.mode=time, 기간 겹침 금지) 또는 사업 단위 그룹 분할로 대조 권장."
+                ),
+            },
         ]
     )
 
@@ -242,6 +311,13 @@ def main() -> None:
         uni.to_excel(writer, sheet_name="단변량(univariate)", index=False)
         suspects.to_excel(writer, sheet_name="의심피처(suspects)", index=False)
         pd.DataFrame(label_agree).to_excel(writer, sheet_name="라벨정의검증(label_def)", index=False)
+        if group_stats:
+            group_df = pd.DataFrame(
+                [{GROUP_LABELS.get(k, k): v for k, v in s.items()} for s in group_stats]
+            )
+        else:
+            group_df = pd.DataFrame({"비고(note)": group_notes or ["audit.group_keys 미설정"]})
+        group_df.to_excel(writer, sheet_name="그룹중복(group_overlap)", index=False)
         pd.DataFrame({"피처목록(features)": features}).to_excel(
             writer, sheet_name="피처목록(feature_list)", index=False
         )
@@ -259,6 +335,21 @@ def main() -> None:
                 f"  - {r['피처(feature)']}: "
                 f"ROC={r['단변량_ROC_AUC(univariate_roc_auc)']}"
             )
+    print(f"[leakage] 그룹중복 판정: {group_vd}")
+    for s in group_stats:
+        print(
+            f"  - {s['group_key']}: 엔티티 {s['n_entities']:,} · "
+            f"엔티티당 평균 {_fmt_num(s['rows_per_entity_mean'])}행 · "
+            f"Test 양성 엔티티 {s['n_pos_entities_test']:,}"
+        )
+        print(
+            f"      Train에 등장 {_fmt_ratio(s['pos_entity_seen_ratio'])} · "
+            f"이미 양성으로 등장 {_fmt_ratio(s['pos_entity_seen_positive_ratio'])} "
+            f"(랜덤 기대 {_fmt_ratio(s['expected_overlap_under_random'])}) · "
+            f"라벨고착성 {_fmt_ratio(s['label_stickiness'])}"
+        )
+    for note in group_notes:
+        print(f"  - {note}")
     print(f"[leakage] 저장: {out}")
 
     meta_payload = {
@@ -267,6 +358,10 @@ def main() -> None:
         "forbidden_in_features": forbidden_in_features,
         "base_rate": base_rate,
         "suspect_features": suspects["피처(feature)"].head(30).tolist(),
+        "group_verdict": group_vd,
+        "group_worst_seen_positive_ratio": group_worst,
+        "group_overlap": group_stats,
+        "group_notes": group_notes,
     }
     meta_path = reports / "leakage_audit_summary.json"
     with open(meta_path, "w", encoding="utf-8") as f:

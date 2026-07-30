@@ -16,6 +16,60 @@ import pandas as pd
 DEFAULT_WARN_RATIO = 0.5
 DEFAULT_STRONG_WARN_RATIO = 0.8
 
+# 행 PK(CRTR_YM·PFM_BIZ_ID·INST_ID) 중 하나라도 null이면 학습·감사에 사용하지 않음
+DEFAULT_ROW_PK_COLUMNS = ("CRTR_YM", "PFM_BIZ_ID", "INST_ID")
+
+
+def drop_rows_missing_group_keys(
+    df: pd.DataFrame,
+    *,
+    key_columns: tuple[str, ...] | list[str] = DEFAULT_ROW_PK_COLUMNS,
+    reset_index: bool = True,
+) -> tuple[pd.DataFrame, dict[str, Any]]:
+    """행 PK(CRTR_YM·PFM_BIZ_ID·INST_ID 등) 결측 행 제외 — 어느 한 컬럼이라도 null이면 제거."""
+    cols = [c for c in key_columns if c in df.columns]
+    n_before = len(df)
+    if not cols:
+        return df, {
+            "n_rows_before": n_before,
+            "n_rows_dropped": 0,
+            "n_rows_after": n_before,
+            "key_columns_checked": [],
+        }
+    missing = df[cols].isna().any(axis=1)
+    n_drop = int(missing.sum())
+    if n_drop:
+        df = df.loc[~missing]
+        if reset_index:
+            df = df.reset_index(drop=True)
+    return df, {
+        "n_rows_before": n_before,
+        "n_rows_dropped": n_drop,
+        "n_rows_after": int(len(df)),
+        "key_columns_checked": cols,
+    }
+
+
+def align_labeled_to_split_masks(
+    df: pd.DataFrame,
+    train_mask: np.ndarray,
+    test_mask: np.ndarray,
+    *,
+    key_columns: tuple[str, ...] | list[str] = DEFAULT_ROW_PK_COLUMNS,
+) -> tuple[pd.DataFrame, np.ndarray, np.ndarray, dict[str, Any]]:
+    """03 전처리와 동일한 PK 결측 제거 후 split_masks 길이와 labeled를 맞춘다."""
+    df, pk_drop = drop_rows_missing_group_keys(df, key_columns=key_columns)
+    tr = np.asarray(train_mask, dtype=bool)
+    te = np.asarray(test_mask, dtype=bool)
+    n = len(df)
+    if len(tr) != n or len(te) != n:
+        raise ValueError(
+            f"split_masks(train={len(tr)}, test={len(te)})와 labeled PK 정렬 후 "
+            f"행 수({n:,}, 원본 {pk_drop['n_rows_before']:,})가 일치하지 않습니다. "
+            "labeled.csv 변경 없이 03_preprocess부터 재실행하세요."
+        )
+    return df, tr, te, pk_drop
+
 
 def entity_codes(df: pd.DataFrame, key: str) -> np.ndarray:
     """`A` 또는 `A+B` 형태의 키를 정수 코드 배열로 변환 (ID 값은 반환하지 않음)."""

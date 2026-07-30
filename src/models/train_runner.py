@@ -12,6 +12,7 @@ import joblib
 import numpy as np
 import pandas as pd
 
+from src.features.group_audit import align_labeled_to_split_masks
 from src.features.preprocess import encode_target, transform_features
 from src.io.config import (
     ensure_algo_dirs,
@@ -70,7 +71,14 @@ def load_train_context(cfg: dict[str, Any] | None = None) -> dict[str, Any]:
     print(f"[train] encoding={used}")
     bundle = joblib.load(bundle_path)
     masks = joblib.load(masks_path)
-    train_m = masks["train_mask"]
+    df, train_m, _, pk_drop = align_labeled_to_split_masks(
+        df, masks["train_mask"], masks["test_mask"]
+    )
+    if pk_drop["n_rows_dropped"]:
+        print(
+            f"[train] PK 결측 행 정렬: {pk_drop['n_rows_dropped']:,} / "
+            f"{pk_drop['n_rows_before']:,}"
+        )
     features = bundle["features"]
     categorical = bundle["categorical"]
     numeric = bundle["numeric"]

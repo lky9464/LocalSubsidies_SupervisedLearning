@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from src.features.group_audit import group_overlap_stats
+from src.features.group_audit import drop_rows_missing_group_keys, group_overlap_stats, align_labeled_to_split_masks
 from src.features.preprocess import encode_target, group_random_split_masks
 
 
@@ -133,6 +133,85 @@ def test_too_few_pool_rows_raises() -> None:
         assert "풀 행 수 부족" in str(exc)
     else:
         raise AssertionError("RuntimeError expected")
+
+
+def test_drop_rows_missing_group_keys() -> None:
+    df = pd.DataFrame(
+        {
+            "CRTR_YM": ["202401", None, "202403", "202404"],
+            "PFM_BIZ_ID": ["B1", "B2", None, "B4"],
+            "INST_ID": ["I1", "I2", None, "I4"],
+            "TAET_YN": ["N", "N", "Y", "N"],
+        }
+    )
+    df2, info = drop_rows_missing_group_keys(df)
+    assert info["n_rows_dropped"] == 2
+    assert info["n_rows_after"] == 2
+    assert info["key_columns_checked"] == ["CRTR_YM", "PFM_BIZ_ID", "INST_ID"]
+    assert list(df2["PFM_BIZ_ID"]) == ["B1", "B4"]
+
+
+def test_drop_rows_missing_crtr_ym_only() -> None:
+    df = pd.DataFrame(
+        {
+            "CRTR_YM": ["202401", None],
+            "PFM_BIZ_ID": ["B1", "B2"],
+            "INST_ID": ["I1", "I2"],
+            "TAET_YN": ["N", "N"],
+        }
+    )
+    _, info = drop_rows_missing_group_keys(df)
+    assert info["n_rows_dropped"] == 1
+    assert info["n_rows_after"] == 1
+
+
+def test_group_overlap_after_dropping_missing_keys() -> None:
+    entities = [("B001", "I1", 1, ["202401", "202402"]), ("B002", None, 0, ["202401"])]
+    df = _panel_df(entities)
+    df2, info = drop_rows_missing_group_keys(df)
+    assert info["n_rows_dropped"] == 1
+    train_m = pd.Series([True, False])
+    test_m = pd.Series([False, True])
+    stats = group_overlap_stats(
+        df2,
+        "PFM_BIZ_ID+INST_ID",
+        encode_target(df2["TAET_YN"], "Y"),
+        train_m.to_numpy(),
+        test_m.to_numpy(),
+    )
+    assert stats["n_rows"] == 2
+
+
+def test_align_labeled_to_split_masks() -> None:
+    """03에서 PK 제외 후 저장된 split_masks(짧은 길이)와 labeled(원본)를 맞춘다."""
+    df = pd.DataFrame(
+        {
+            "CRTR_YM": ["202401", None, "202403"],
+            "PFM_BIZ_ID": ["B1", "B2", "B3"],
+            "INST_ID": ["I1", "I2", "I3"],
+            "TAET_YN": ["N", "N", "Y"],
+        }
+    )
+    train_m = np.array([True, False])
+    test_m = np.array([False, True])
+    df2, tr, te, info = align_labeled_to_split_masks(df, train_m, test_m)
+    assert info["n_rows_dropped"] == 1
+    assert len(df2) == 2
+    assert tr.tolist() == [True, False]
+    assert te.tolist() == [False, True]
+
+
+def test_drop_rows_missing_group_keys_all_null_raises_empty() -> None:
+    df = pd.DataFrame(
+        {
+            "CRTR_YM": [None, None],
+            "PFM_BIZ_ID": ["B1", None],
+            "INST_ID": ["I1", "I2"],
+        }
+    )
+    df2, info = drop_rows_missing_group_keys(df)
+    assert info["n_rows_after"] == 0
+    assert len(df2) == 0
 
 
 def test_missing_group_column_raises() -> None:

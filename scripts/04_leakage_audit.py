@@ -30,7 +30,7 @@ from sklearn.preprocessing import LabelEncoder
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from src.features.group_audit import group_overlap_stats, group_verdict  # noqa: E402
+from src.features.group_audit import align_labeled_to_split_masks, group_overlap_stats, group_verdict  # noqa: E402
 from src.features.preprocess import encode_target, time_split_masks  # noqa: E402
 from src.io.banner import print_banner  # noqa: E402
 from src.io.config import load_config, resolve_data_path, resolve_repo_path  # noqa: E402
@@ -134,8 +134,16 @@ def main() -> None:
     print(f"[leakage] encoding={used}")
     bundle = joblib.load(bundle_path)
     masks = joblib.load(masks_path)
-    train_m = masks["train_mask"]
-    test_m = masks["test_mask"]
+    df, train_m, test_m, pk_drop = align_labeled_to_split_masks(
+        df, masks["train_mask"], masks["test_mask"]
+    )
+    if pk_drop["n_rows_dropped"]:
+        checked = ", ".join(pk_drop["key_columns_checked"])
+        print(
+            f"[leakage] PK 결측 행 정렬: {pk_drop['n_rows_dropped']:,} / "
+            f"{pk_drop['n_rows_before']:,} ({checked}) · "
+            f"감사 대상 {pk_drop['n_rows_after']:,}행"
+        )
 
     features: list[str] = list(bundle["features"])
     target_col = cfg.get("target_column", "TAET_YN")

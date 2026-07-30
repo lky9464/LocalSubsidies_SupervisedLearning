@@ -1,9 +1,10 @@
 # 지방보조금 부정수급 위험도 — 지도학습
 
-[![Release v0.6.1](https://img.shields.io/github/v/tag/lky9464/LocalSubsidies_SupervisedLearning?label=v0.6.1)](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases/tag/v0.6.1)
+[![Release v0.6.2](https://img.shields.io/github/v/tag/lky9464/LocalSubsidies_SupervisedLearning?label=v0.6.2)](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases/tag/v0.6.2)
 
 지방보조금 부정수급 **위험도 점수(0~1000)** 측정을 위한 지도학습 파이프라인 + **로컬 웹 UI**입니다.
 
+- **v0.6.2** — 행 PK 결측 제외(03·04~07·11) · labeled/mask 정렬 · ([`VERSION_HISTORY`](docs/VERSION_HISTORY.md))
 - **v0.6.1** — 사업·기관 무중복 분할(`group_random`) · 04 그룹 감사 · UI · ([`VERSION_HISTORY`](docs/VERSION_HISTORY.md))
 - **v0.6.0** — GBM·Stacked·EasyEnsemble v2 튜닝·등록 · ([`VERSION_HISTORY`](docs/VERSION_HISTORY.md))
 - **v0.5.2** — Run 격리·재실행 초기화 · 오프라인 full sync · ([`VERSION_HISTORY`](docs/VERSION_HISTORY.md))
@@ -19,12 +20,12 @@
 ## 일반 사용자 — 오프라인 PC 설치·사용 (권장)
 
 대상: Windows 10/11 x64 · 인터넷이 없는 업무 PC ·  
-온라인에서는 **[Release v0.6.1](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases/tag/v0.6.1) 한곳**에서 소스·wheels·UI·Python·VC++까지 받은 뒤 USB로 옮김.  
+온라인에서는 **[Release v0.6.2](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases/tag/v0.6.2) 한곳**에서 소스·wheels·UI·Python·VC++까지 받은 뒤 USB로 옮김.  
 (학습·추론 raw CSV는 사용자가 별도 준비. Node.js·개발 환경 불필요.)
 
 ### A. 온라인 PC에서 받을 것 (USB에 복사)
 
-모두 같은 [Release v0.6.1](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases/tag/v0.6.1) Assets / Source:
+모두 같은 [Release v0.6.2](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases/tag/v0.6.2) Assets / Source:
 
 | # | 파일 | 비고 |
 |---|------|------|
@@ -54,13 +55,13 @@
 최초 설치(§B)가 끝난 PC(**v0.3.0 이상**)는 **프로젝트 통째 교체 없이** 최신으로 동기화합니다.
 
 1. USB: Release **`update-to-vX.Y.Z.zip`** 을 프로젝트 루트에 복사 (**zip은 풀지 않음**)  
-   - **v0.6.1 기준**: deps 변경 없음 — **`wheels-win-amd64-py312.zip`** 은 최초 설치·v0.5.2 hop 시에만 필요
+   - **v0.6.2 기준**: deps 변경 없음 — **`wheels-win-amd64-py312.zip`** 은 최초 설치·v0.5.2 hop 시에만 필요
 2. **`UpdateOffline.bat`** 실행 (신버전: 더블클릭 · zip 자동 탐색)  
 3. 안내에 따라 **`SetupOffline.bat`** → **`RunWebNext.bat`**
 
 `configs\local.yaml` · raw · `{data_root}`는 **그대로** 둡니다.  
 구버전 UpdateOffline Usage만 뜨거나 · Setup `Fatal error in launcher` · UI(`web\out`) 비어 있음 → [`docs/offline_update.md`](docs/offline_update.md) **§5**.  
-Release 노트: [v0.6.1](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases/tag/v0.6.1)
+Release 노트: [v0.6.2](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases/tag/v0.6.2)
 
 ### C. 일상 사용 (웹 UI)
 

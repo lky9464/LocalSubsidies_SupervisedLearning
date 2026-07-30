@@ -18,6 +18,7 @@ import joblib
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+from src.features.group_audit import drop_rows_missing_group_keys  # noqa: E402
 from src.features.preprocess import (  # noqa: E402
     build_feature_lists,
     encode_target,
@@ -60,6 +61,15 @@ def main() -> None:
     print("[preprocess] labeled.csv 로드 중...")
     df, used = read_csv_auto(src, candidates=cfg.get("encoding_candidates"))
     print(f"[preprocess] encoding={used}")
+
+    df, pk_drop = drop_rows_missing_group_keys(df)
+    if pk_drop["n_rows_dropped"]:
+        checked = ", ".join(pk_drop["key_columns_checked"])
+        print(
+            f"[preprocess] PK 결측 행 제외: {pk_drop['n_rows_dropped']:,} / "
+            f"{pk_drop['n_rows_before']:,} ({checked}) · "
+            f"잔여 {pk_drop['n_rows_after']:,}행"
+        )
 
     split_cfg = run_cfg.get("split") or cfg.get("split", {})
     mode = str(split_cfg.get("mode", "random")).lower().strip()
@@ -161,6 +171,8 @@ def main() -> None:
         "sklearn_encoding": "ordinal",
         "split_mode": mode,
         "split_group_key": split_cfg.get("group_key") if mode == "group_random" else None,
+        "group_key_drop": pk_drop,
+        "pk_drop": pk_drop,
         "features": features,
         "categorical": categorical,
         "numeric": numeric,

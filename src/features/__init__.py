@@ -1,6 +1,6 @@
 """피처 선택·전처리."""
 
-from .group_audit import group_overlap_stats, group_verdict
+from .group_audit import group_overlap_stats, group_verdict, align_labeled_to_split_masks, drop_rows_missing_group_keys
 from .preprocess import (
     build_feature_lists,
     fit_preprocessor,

@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "target_version": "0.6.1",
+  "target_version": "0.6.2",
   "from_min": "0.3.0",
   "mode": "full_sync",
   "preserve_always": [
@@ -49,6 +49,13 @@
     }
   },
   "releases": [
+    {
+      "version": "0.6.2",
+      "from_min": "0.3.0",
+      "update_type": "full_sync",
+      "wheels_reinstall": false,
+      "notes": "Full sync. Row PK null drop (CRTR_YM/PFM_BIZ_ID/INST_ID) in 03/04-07/11 + align_labeled_to_split_masks. No deps change."
+    },
     {
       "version": "0.6.1",
       "from_min": "0.3.0",

@@ -16,6 +16,7 @@ import pandas as pd
 import yaml
 
 from src.evaluate.metrics import compute_classification_metrics, top_k_lift
+from src.features.group_audit import align_labeled_to_split_masks
 from src.features.preprocess import encode_target, transform_features
 from src.io.config import load_config, resolve_data_path, resolve_repo_path
 from src.io.encoding_util import read_csv_auto
@@ -276,7 +277,14 @@ def tune_one_algorithm(
     print(f"[tune] encoding={used}")
     bundle = joblib.load(bundle_path)
     masks = joblib.load(masks_path)
-    train_m = masks["train_mask"]
+    df, train_m, _, pk_drop = align_labeled_to_split_masks(
+        df, masks["train_mask"], masks["test_mask"]
+    )
+    if pk_drop["n_rows_dropped"]:
+        print(
+            f"[tune] PK 결측 행 정렬: {pk_drop['n_rows_dropped']:,} / "
+            f"{pk_drop['n_rows_before']:,}"
+        )
 
     fit_m, valid_m, split_desc = resolve_tune_fit_valid(df, train_m, cfg)
     n_fit, n_valid = int(fit_m.sum()), int(valid_m.sum())

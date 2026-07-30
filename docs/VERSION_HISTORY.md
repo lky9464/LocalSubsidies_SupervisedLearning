@@ -1,10 +1,22 @@
 # 버전 이력
 
-현재 버전: **v0.6.1**  
+현재 버전: **v0.6.2**  
 저장소: [LocalSubsidies_SupervisedLearning](https://github.com/lky9464/LocalSubsidies_SupervisedLearning)  
 릴리스: [Releases](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases)
 
 새 버전을 낼 때 이 문서 상단에 항목을 추가하고, GitHub Release/태그와 맞춥니다.
+
+---
+
+## v0.6.2 — 행 PK 결측 제외 (학습·평가·추론)
+
+- **03 전처리**: `CRTR_YM` · `PFM_BIZ_ID` · `INST_ID` 중 null인 행 집계 후 제외 · `preprocess_meta.json`에 `pk_drop` 기록
+- **04~07·train·tune**: `align_labeled_to_split_masks()` — `labeled.csv`(원본)와 `split_masks` 길이 정렬
+- **11 추론**: merge 직후 동일 PK 기준 제외 · 전량 제외 시 명확한 오류
+- **공통**: `drop_rows_missing_group_keys()` · `DEFAULT_ROW_PK_COLUMNS` (`group_audit.py`) · 단위 테스트 보강
+- **deps/UI 변경 없음** — `update-to-v0.6.2.zip` full sync만
+
+[Release v0.6.2](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases/tag/v0.6.2)
 
 ---
 

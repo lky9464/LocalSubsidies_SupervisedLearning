@@ -30,6 +30,7 @@ from src.evaluate.feature_importance import (  # noqa: E402
     load_column_comments,
     strip_transformer_prefix,
 )
+from src.features.group_audit import align_labeled_to_split_masks  # noqa: E402
 from src.features.preprocess import encode_target, transform_features  # noqa: E402
 from src.io.banner import print_banner  # noqa: E402
 from src.io.config import (  # noqa: E402
@@ -78,7 +79,14 @@ def main() -> None:
     print(f"[fi] encoding={used}")
     bundle = joblib.load(processed / "preprocess_bundle.joblib")
     masks = joblib.load(processed / "split_masks.joblib")
-    test_m = masks["test_mask"]
+    df, _, test_m, pk_drop = align_labeled_to_split_masks(
+        df, masks["train_mask"], masks["test_mask"]
+    )
+    if pk_drop["n_rows_dropped"]:
+        print(
+            f"[fi] PK 결측 행 정렬: {pk_drop['n_rows_dropped']:,} / "
+            f"{pk_drop['n_rows_before']:,}"
+        )
 
     features = bundle["features"]
     categorical = bundle["categorical"]

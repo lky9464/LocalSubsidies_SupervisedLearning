@@ -26,6 +26,7 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+from src.features.group_audit import drop_rows_missing_group_keys  # noqa: E402
 from src.features.preprocess import transform_features  # noqa: E402
 from src.io.banner import print_banner  # noqa: E402
 from src.io.config import (  # noqa: E402
@@ -111,6 +112,20 @@ def main() -> None:
         candidates=list(cfg.get("encoding_candidates") or []),
         files=files,
     )
+    df, pk_drop = drop_rows_missing_group_keys(df)
+    if pk_drop["n_rows_dropped"]:
+        checked = ", ".join(pk_drop["key_columns_checked"])
+        print(
+            f"[inference] PK 결측 행 제외: {pk_drop['n_rows_dropped']:,} / "
+            f"{pk_drop['n_rows_before']:,} ({checked}) · "
+            f"추론 대상 {pk_drop['n_rows_after']:,}행"
+        )
+    if pk_drop["n_rows_after"] == 0:
+        raise RuntimeError(
+            "추론 대상 행이 없습니다. "
+            f"PK({', '.join(pk_drop['key_columns_checked']) or 'CRTR_YM, PFM_BIZ_ID, INST_ID'}) "
+            "결측만 있는 입력인지 확인하세요."
+        )
     # 학습 raw와 동일 레이아웃이어도 타겟·타겟수정 컬럼은 추론에서 무시
     ignore_cols = list(
         (cfg.get("inference") or {}).get("ignore_columns")

@@ -82,7 +82,7 @@ UpdateOffline.bat D:\USB\update-to-v0.5.2.zip /autowheels
 
 - `api\`, `src\`, `scripts\`, `tests\`, `docs\`, `web\out\`
 - `requirements.txt` · 배치 파일 · 매니페스트
-- `configs\default.yaml` · `local.yaml.example`만 (local.yaml 제외)
+- `configs\default.yaml` · `local.yaml.example` · `tune.yaml` · `tune_*.yaml.example` (`local.yaml` · `tune_local.yaml` 제외)
 - baseline/deps 시 `vendor\wheels\` (wheels zip에서 재배치)
 
 ---

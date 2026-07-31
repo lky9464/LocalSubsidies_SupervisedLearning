@@ -64,7 +64,13 @@ try {
         }
         if ($rel -eq "configs") {
             # only examples / default — never local.yaml
-            foreach ($cf in @("configs/default.yaml", "configs/local.yaml.example")) {
+            foreach ($cf in @(
+                    "configs/default.yaml",
+                    "configs/local.yaml.example",
+                    "configs/tune.yaml",
+                    "configs/tune_local.yaml.example",
+                    "configs/tune_run.yaml.example"
+                )) {
                 $src = Join-Path $Root ($cf -replace '/', '\')
                 if (-not (Test-Path -LiteralPath $src)) { continue }
                 $dst = Join-Path $stage ($cf -replace '/', '\')

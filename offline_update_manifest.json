@@ -1,10 +1,11 @@
 {
   "schema_version": 2,
-  "target_version": "0.6.2",
+  "target_version": "0.7.0",
   "from_min": "0.3.0",
   "mode": "full_sync",
   "preserve_always": [
     "configs/local.yaml",
+    "configs/tune_local.yaml",
     ".venv",
     "vendor/wheels",
     "vendor/python"
@@ -26,7 +27,8 @@
         "TLS4902R_Layout.csv"
       ],
       "skip_relative_files": [
-        "configs/local.yaml"
+        "configs/local.yaml",
+        "configs/tune_local.yaml"
       ],
       "web_out_zip": true,
       "wheels_reinstall": false
@@ -49,6 +51,14 @@
     }
   },
   "releases": [
+    {
+      "version": "0.7.0",
+      "from_min": "0.3.0",
+      "update_type": "full_sync",
+      "extra_copy_paths": ["tune_batch", "outputs/reports/tuning"],
+      "wheels_reinstall": false,
+      "notes": "Full sync. nested_group_random Valid tuning, *_v3, configs/tune.yaml, tune_batch, tuning/vN reports. No deps change."
+    },
     {
       "version": "0.6.2",
       "from_min": "0.3.0",

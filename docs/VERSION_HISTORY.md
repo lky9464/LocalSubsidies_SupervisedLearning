@@ -16,6 +16,7 @@
 - **산출 이력:** `outputs/reports/tuning/vN/` (v2 git 복원 · v3 nested_group_random) · `comparison/`은 07·08 전용
 - **일괄 실행:** [`tune_batch/run_tune_batch.py`](../tune_batch/run_tune_batch.py) · 5종 · `data_run_id`
 - **문서:** README Owner CLI 튜닝(v4 예시) · [`model_tuning.md`](model_tuning.md) §3.1
+- **오프라인 full sync:** `update-to-v0.7.0.zip` · `web-out.zip` · deps 변경 없음 ([`offline_update.md`](offline_update.md))
 
 [Release v0.7.0](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases/tag/v0.7.0)
 

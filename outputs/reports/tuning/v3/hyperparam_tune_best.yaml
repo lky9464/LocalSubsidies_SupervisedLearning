@@ -1,0 +1,59 @@
+model_params:
+  random_forest_v2:
+    n_estimators: 200
+    max_depth: 24
+    min_samples_leaf: 8
+    class_weight: balanced
+  catboost_v2:
+    iterations: 500
+    depth: 7
+    learning_rate: 0.08
+    auto_class_weights: Balanced
+  gradient_boosting_v2:
+    max_iter: 400
+    max_depth: 8
+    learning_rate: 0.05
+    max_bins: 128
+    class_weight: balanced
+  easy_ensemble_v2:
+    n_estimators: 10
+  stacked_ensemble_v2:
+    cv: 3
+    rf_n_estimators: 100
+    rf_max_depth: 20
+    rf_min_samples_leaf: 5
+    hgb_max_depth: 7
+    hgb_learning_rate: 0.05
+    hgb_max_iter: 250
+    hgb_max_bins: 128
+    meta_max_iter: 500
+  random_forest_v1:
+    n_estimators: 300
+    max_depth: 24
+    min_samples_leaf: 3
+    class_weight: balanced
+  catboost_v1:
+    iterations: 500
+    depth: 6
+    learning_rate: 0.08
+    auto_class_weights: Balanced
+  gradient_boosting_v1:
+    max_iter: 300
+    max_depth: 8
+    learning_rate: 0.05
+    max_bins: 128
+    class_weight: balanced
+  easy_ensemble_v1:
+    n_estimators: 5
+  stacked_ensemble_v1:
+    cv: 3
+    rf_n_estimators: 100
+    rf_max_depth: 20
+    rf_min_samples_leaf: 5
+    hgb_max_depth: 7
+    hgb_learning_rate: 0.05
+    hgb_max_iter: 250
+    hgb_max_bins: 128
+    meta_max_iter: 500
+note: 'Validation 탐색 추천값. configs/default.yaml 의 model_params 에 새 버전 algo_id(예: {family}_v3)로
+  등록한 뒤 05→07→08→10 으로 Test 확정. 기존 버전 수치는 재현성을 위해 덮어쓰지 말 것.'

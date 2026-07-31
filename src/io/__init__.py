@@ -2,6 +2,10 @@
 
 from .config import (
     load_config,
+    load_tune_config,
+    resolve_tune_run_id,
+    apply_tune_run_id,
+    resolve_tune_output_dir,
     get_data_root,
     get_active_run_id,
     run_workspace,
@@ -20,6 +24,10 @@ from .quality import summarize_quality
 
 __all__ = [
     "load_config",
+    "load_tune_config",
+    "resolve_tune_run_id",
+    "apply_tune_run_id",
+    "resolve_tune_output_dir",
     "get_data_root",
     "get_active_run_id",
     "run_workspace",

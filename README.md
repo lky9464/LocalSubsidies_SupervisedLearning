@@ -1,9 +1,10 @@
 # 지방보조금 부정수급 위험도 — 지도학습
 
-[![Release v0.6.2](https://img.shields.io/github/v/tag/lky9464/LocalSubsidies_SupervisedLearning?label=v0.6.2)](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases/tag/v0.6.2)
+[![Release v0.7.0](https://img.shields.io/github/v/tag/lky9464/LocalSubsidies_SupervisedLearning?label=v0.7.0)](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases/tag/v0.7.0)
 
 지방보조금 부정수급 **위험도 점수(0~1000)** 측정을 위한 지도학습 파이프라인 + **로컬 웹 UI**입니다.
 
+- **v0.7.0** — 엔티티 무중복 Valid 튜닝 · `{family}_v3` · `configs/tune.yaml` · `tuning/vN/` · CLI `tune_batch` · ([`VERSION_HISTORY`](docs/VERSION_HISTORY.md))
 - **v0.6.2** — 행 PK 결측 제외(03·04~07·11) · labeled/mask 정렬 · ([`VERSION_HISTORY`](docs/VERSION_HISTORY.md))
 - **v0.6.1** — 사업·기관 무중복 분할(`group_random`) · 04 그룹 감사 · UI · ([`VERSION_HISTORY`](docs/VERSION_HISTORY.md))
 - **v0.6.0** — GBM·Stacked·EasyEnsemble v2 튜닝·등록 · ([`VERSION_HISTORY`](docs/VERSION_HISTORY.md))
@@ -139,8 +140,11 @@ Release 노트: [v0.6.2](https://github.com/lky9464/LocalSubsidies_SupervisedLea
 | `{data_root}/algorithms/{algo}/` | **알고리즘별** 모델·평가·행단위 점수 (5폴더) |
 | `{data_root}/algorithms/operations/` | 타겟 포착·점검 우선순위표 (`ops_queue_test.*`, `ops_queue_inference.*`) |
 | `{data_root}/ops/ops.sqlite` | Run 이력·운영 큐 메타 (raw 미포함, GitHub 금지) |
-| `outputs/reports/comparison/` | 5종 비교 집계 리포트 (공통) |
+| `outputs/reports/comparison/` | 04·07·08·06 **모델 비교** 집계 (누수·eval·순위·feature TOP10) |
+| `outputs/reports/tuning/vN/` | **튜닝 캠페인** N (`hyperparam_tune_*`, `tune_manifest.yaml`) |
 | `outputs/reports/{algo}/` | 알고리즘별 집계 리포트 |
+| `configs/tune.yaml` | 12·`tune_batch` 전용 (웹과 분리) |
+| `tune_batch/` | 5종 일괄 튜닝 스크립트·로그 |
 
 ```text
 LocalSubsidies_ML_Data/                 # 프로젝트 밖 ({data_root})
@@ -171,7 +175,9 @@ LocalSubsidies_SupervisedLearning/      # 이 repo
 ├── web/                                # Next.js 소스 + 정적 export(web/out, git 추적)
 ├── RunWebNext.bat                      # 웹 UI 실행 (더블클릭 → :8600)
 └── outputs/reports/
-    ├── comparison/                     # 5종 비교 Excel/PDF
+    ├── comparison/                     # 07·08·04·06 모델 비교
+    ├── tuning/                         # 튜닝 이력 (v2, v3, v4, …)
+    │   └── v3/
     ├── catboost_v1/
     ├── stacked_ensemble_v1/
     ├── easy_ensemble_v1/
@@ -215,13 +221,93 @@ python scripts/10_ops_queue.py          # 타겟 포착 분포 Test (주/보 A~D
 # 운영 추론 (라벨 미지 데이터, 예: 2026) — 주·보 모델 각각 (configs/default.yaml ops_queue 참고)
 python scripts/11_score_inference.py --algo random_forest_v1
 python scripts/11_score_inference.py --algo catboost_v1
-# (선택) Validation 하이퍼 탐색 — RF/CatBoost, Test 미사용
+# (선택) Validation 하이퍼 탐색 — Test 미사용 · configs/tune.yaml
 python scripts/12_tune_hyperparams.py
+# 5종 일괄
+python tune_batch/run_tune_batch.py
 ```
 
 > 의심 피처가 있으면 Feature 제외 후 `03`부터 다시 실행하고, `04` PASS 후 `05`로 진행합니다.  
 > 웹 UI에서는 누수 FAIL 시 **「제외 반영 후 03부터 재개」** 로 동일하게 처리합니다.  
 > 알고리즘 ID·튜닝: [`docs/algo_id_migration.md`](docs/algo_id_migration.md) · [`docs/model_tuning.md`](docs/model_tuning.md) · [`docs/hyperparam_methodology.md`](docs/hyperparam_methodology.md)
+
+## Owner — CLI 전용 하이퍼파라미터 튜닝 (웹 최소 · v4 예시)
+
+**대상:** Repo Owner · 웹 UI 없이 yaml + 터미널만으로 `12` 튜닝  
+**설정:** [`configs/tune.yaml`](configs/tune.yaml) (+ 선택 [`configs/tune_local.yaml`](configs/tune_local.yaml.example))  
+**산출:** `outputs/reports/tuning/{output_tag}/` (예: `v4/` — **덮어쓰지 않음**)
+
+| 구분 | 튜닝 (12) | 웹·05~11 |
+|------|-----------|----------|
+| 설정 파일 | `tune.yaml` | `default.yaml` + `run_config.yaml` |
+| API/Job | **사용 안 함** | FastAPI · 백그라운드 Job |
+| Run ID | `data_run_id` / `--run-id` | 웹 Run 발급 |
+
+### 경로 A — 03 산출물 재사용 (가장 간단 · 웹 불필요)
+
+v3와 **동일 raw·동일 group_random Run**(`run_20260730_172901` 등)에서 격자만 바꿀 때.
+
+1. **`configs/tune.yaml` 수정**
+   ```yaml
+   output_tag: v4
+   data_run_id: run_20260730_172901   # 기존 03 Run 유지
+
+   tune:
+     algorithms:                      # baseline = default.yaml model_params
+       - random_forest_v3             # v4 채택 시 *_v4 등록
+       - catboost_v3
+       - gradient_boosting_v3
+       - stacked_ensemble_v3
+       - easy_ensemble_v3
+     grids:
+       random_forest_v3:              # 키 = algorithms 와 동일 algo_id
+         n_estimators: [250, 300, 350]
+         max_depth: [20, 24, 28]
+         min_samples_leaf: [3, 5]
+       # … 5종
+   ```
+2. **일괄 튜닝** (웹·RunWebNext.bat 불필요)
+   ```powershell
+   cd C:\work\LocalSubsidies_SupervisedLearning
+   .\.venv\Scripts\activate
+   python tune_batch/run_tune_batch.py
+   ```
+3. **결과 확인** — `outputs/reports/tuning/v4/hyperparam_tune_*.xlsx` · `hyperparam_tune_best.yaml`
+4. **채택** — `default.yaml`에 `model_params.{family}_v4` + `algorithm_registry` v4 + `05_train_*_v4.py`
+5. **Test 1회** (CLI 또는 웹) — 동일 Run에서 `05`→`07`→`08`→`10` · v3와 **같은 Run**에서만 비교
+
+### 경로 B — 01~04도 CLI만 (신규 Run · 웹 최소)
+
+raw 경로만 알고 있을 때. 웹은 **Run ID 발급·Job 실행 없이** 터미널만 사용.
+
+1. **Run ID 결정** — 예: `run_tune_v4_20260801`
+2. **`run_config` 배치** — [`configs/tune_run.yaml.example`](configs/tune_run.yaml.example)를 복사:
+   ```text
+   {data_root}\runs\run_tune_v4_20260801\run_config.yaml
+   ```
+   - `split.mode: group_random` 유지  
+   - `raw_files:` 에 `{data_root}` 기준 CSV 상대경로 나열 (웹 데이터 등록 대신 직접 기입)
+3. **선행 파이프라인** (웹 없음)
+   ```powershell
+   $env:LSL_RUN_ID = "run_tune_v4_20260801"
+   python scripts/01_merge_raw.py
+   python scripts/02_fix_target.py
+   python scripts/03_preprocess.py
+   python scripts/04_leakage_audit.py
+   ```
+4. **`tune.yaml`** — `output_tag: v4`, `data_run_id: run_tune_v4_20260801`, `grids`·`algorithms` (경로 A와 동일)
+5. **`python tune_batch/run_tune_batch.py`**
+6. 채택·Test — 경로 A 4~5단계와 동일
+
+### v4 체크리스트
+
+- [ ] `require_preprocess_split_mode: group_random` — 03이 `random`이면 12가 거부
+- [ ] `tune.grids` 키 = `tune.algorithms` algo_id (v4부터 **`*_v3` baseline** 권장)
+- [ ] 산출은 `tuning/v4/` — `comparison/`에는 07·08만
+- [ ] Test로 반복 튜닝 금지 — Valid에서 best → Test **1회**
+- [ ] v2·v3 튜닝 Run과 Test 수치 **직접 비교 금지** (분할·Valid 방식 상이)
+
+상세: [`docs/model_tuning.md`](docs/model_tuning.md) §3.1 · §4
 
 ### 학습(05) — 일괄 / 개별
 
@@ -279,7 +365,7 @@ python scripts/05_train_random_forest_v1.py
 | [`docs/operations_criteria.md`](docs/operations_criteria.md) | 주·보 선정 원칙·4×4·평가 스냅샷 |
 | [`docs/metrics_guide.md`](docs/metrics_guide.md) | 평가 지표 해설 |
 | [`docs/offline_setup.md`](docs/offline_setup.md) | **오프라인 사용법** (GitHub 다운로드 → 설치 → 실행) |
-| [`docs/model_tuning.md`](docs/model_tuning.md) | 하이퍼파라미터 튜닝·기준선·피처 다음 단계 |
+| [`docs/model_tuning.md`](docs/model_tuning.md) | 하이퍼파라미터 튜닝·**CLI 독립 실행(v4)** · v3/v4 반영 |
 | [`docs/hyperparam_methodology.md`](docs/hyperparam_methodology.md) | 5종 하이퍼 수정 **방법론** (수치 미적용) |
 | [`docs/algo_id_migration.md`](docs/algo_id_migration.md) | algo_id `*_v1` 로컬 마이그레이션 |
 | [`docs/VERSION_HISTORY.md`](docs/VERSION_HISTORY.md) | 버전 이력 (v0.1~) |

@@ -1,0 +1,27 @@
+# 03_preprocess 선행용 run_config 예시 (웹 없이 CLI만)
+# 복사: {data_root}/runs/{run_id}/run_config.yaml
+#
+#   set LSL_RUN_ID=run_tune_20260731
+#   python scripts/01_merge_raw.py
+#   python scripts/02_fix_target.py
+#   python scripts/03_preprocess.py
+#   python scripts/04_leakage_audit.py
+#   python scripts/12_tune_hyperparams.py
+
+split:
+  mode: group_random
+  group_key: PFM_BIZ_ID+INST_ID
+  train_start: "202401"
+  train_end: "202512"
+  test_size: 0.3
+  random_state: 42
+
+algorithms:
+  - random_forest_v1
+  - catboost_v1
+
+raw_files: []
+split_committed: true
+algorithms_committed: true
+
+# raw_files 는 01 전 웹·CLI 데이터 등록으로 채우거나, 사용 CSV 상대경로를 직접 기입

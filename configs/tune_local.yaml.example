@@ -1,0 +1,9 @@
+# Owner 로컬 전용 (Git 제외). configs/tune.yaml 위에 merge.
+# cp configs/tune_local.yaml.example configs/tune_local.yaml
+
+# data_run_id: run_20260730_172901
+# output_tag: v4
+
+# tune:
+#   algorithms:
+#     - random_forest_v1

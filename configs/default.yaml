@@ -15,6 +15,7 @@ paths:
   # 워크스페이스 상대 (repo 내부)
   reports: outputs/reports
   reports_comparison: outputs/reports/comparison
+  reports_tuning: outputs/reports/tuning
 
 # raw 읽기 시 우선 시도 인코딩 (실패하면 encoding_candidates로 자동 폴백)
 encoding: EUC-KR
@@ -176,6 +177,10 @@ algorithm_registry:
         algo_id: catboost_v2
         label: CatBoost (v2)
         script: scripts/05_train_catboost_v2.py
+      v3:
+        algo_id: catboost_v3
+        label: CatBoost (v3 · group Valid)
+        script: scripts/05_train_catboost_v3.py
   stacked_ensemble:
     label: Stacked Ensemble
     versions:
@@ -186,6 +191,10 @@ algorithm_registry:
         algo_id: stacked_ensemble_v2
         label: Stacked Ensemble (v2)
         script: scripts/05_train_stacked_ensemble_v2.py
+      v3:
+        algo_id: stacked_ensemble_v3
+        label: Stacked Ensemble (v3 · group Valid)
+        script: scripts/05_train_stacked_ensemble_v3.py
   easy_ensemble:
     label: EasyEnsemble
     versions:
@@ -196,6 +205,10 @@ algorithm_registry:
         algo_id: easy_ensemble_v2
         label: EasyEnsemble (v2)
         script: scripts/05_train_easy_ensemble_v2.py
+      v3:
+        algo_id: easy_ensemble_v3
+        label: EasyEnsemble (v3 · group Valid)
+        script: scripts/05_train_easy_ensemble_v3.py
   gradient_boosting:
     label: Gradient Boosting
     versions:
@@ -206,6 +219,10 @@ algorithm_registry:
         algo_id: gradient_boosting_v2
         label: Gradient Boosting (v2)
         script: scripts/05_train_gradient_boosting_v2.py
+      v3:
+        algo_id: gradient_boosting_v3
+        label: Gradient Boosting (v3 · group Valid)
+        script: scripts/05_train_gradient_boosting_v3.py
   random_forest:
     label: RandomForest
     versions:
@@ -216,8 +233,12 @@ algorithm_registry:
         algo_id: random_forest_v2
         label: RandomForest (v2)
         script: scripts/05_train_random_forest_v2.py
+      v3:
+        algo_id: random_forest_v3
+        label: RandomForest (v3 · group Valid)
+        script: scripts/05_train_random_forest_v3.py
 
-# 알고리즘별 하이퍼파라미터 (키 = algo_id). v1 = v0.3.0 기준선, v2 = Validation 튜닝 채택
+# 알고리즘별 하이퍼파라미터 (키 = algo_id). v1 = v0.3.0 기준선, v2 = 행단위 Valid, v3 = 엔티티 Valid
 model_params:
   catboost_v1:
     iterations: 400
@@ -275,48 +296,36 @@ model_params:
     n_estimators: 8
   easy_ensemble_v2:
     n_estimators: 10
+  catboost_v3:
+    iterations: 500
+    depth: 6
+    learning_rate: 0.08
+    auto_class_weights: Balanced
+  random_forest_v3:
+    n_estimators: 300
+    max_depth: 24
+    min_samples_leaf: 3
+    class_weight: balanced
+  gradient_boosting_v3:
+    max_iter: 300
+    max_depth: 8
+    learning_rate: 0.05
+    max_bins: 128
+    class_weight: balanced
+  stacked_ensemble_v3:
+    cv: 3
+    rf_n_estimators: 100
+    rf_max_depth: 20
+    rf_min_samples_leaf: 5
+    hgb_max_depth: 7
+    hgb_learning_rate: 0.05
+    hgb_max_iter: 250
+    hgb_max_bins: 128
+    meta_max_iter: 500
+  easy_ensemble_v3:
+    n_estimators: 5
 
-# Validation 소규모 격자 탐색 (scripts/12_tune_hyperparams.py)
-# nested_random|random: 03의 train_mask 안에서만 fit/valid (Test 미사용, 권장)
-# pool_random: 기간 풀 전체 분할 (레거시·Test와 겹칠 수 있음)
-# time: split.valid_* 기간을 Train 안에서 Valid로 사용
-tune:
-  split_mode: nested_random
-  valid_size: 0.2
-  random_state: 42
-  # 인자 없이 12를 실행할 때의 기본 대상. 나머지 family는 --algo 로 개별 실행
-  algorithms:
-    - random_forest_v1
-    - catboost_v1
-  primary_metric: top1_lift
-  min_precision_ratio: 0.85
-  # --- 탐색 엔진 (현재: grid만 구현 · optuna는 § hyperparam_methodology.md §9 설계) ---
-  # method: grid              # grid | optuna
-  # n_trials: 25              # method=optuna
-  # optuna_sampler: tpe       # tpe | random
-  # catboost_pruning: true
-  # trial 수 = 격자 전수 조합 + 기준선(현재 model_params) 1회
-  grids:
-    random_forest_v1:
-      n_estimators: [150, 200, 300]
-      max_depth: [16, 20, 24]
-      min_samples_leaf: [3, 5, 8]
-    catboost_v1:
-      iterations: [300, 400, 500]
-      depth: [5, 6, 7]
-      learning_rate: [0.03, 0.05, 0.08]
-    # max_bins는 RAM 부담이 커 1차 탐색에서 고정
-    gradient_boosting_v1:
-      max_iter: [200, 300, 400]
-      max_depth: [4, 6, 8]
-      learning_rate: [0.03, 0.05, 0.08]
-    # trial마다 CV 3-fold × (RF + HGB) + 메타 학습 → 축소 격자만 사용
-    stacked_ensemble_v1:
-      rf_max_depth: [16, 20]
-      hgb_max_depth: [5, 7]
-      hgb_max_iter: [150, 250]
-    easy_ensemble_v1:
-      n_estimators: [5, 10, 12, 15]
+# 하이퍼파라미터 튜닝: configs/tune.yaml (12_tune_hyperparams · tune_batch 전용)
 
 # 기본 학습 대상 algo_id 목록
 algorithms:

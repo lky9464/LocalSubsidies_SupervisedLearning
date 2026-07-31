@@ -1,5 +1,6 @@
 # 로컬 절대경로·민감 설정
 configs/local.yaml
+configs/tune_local.yaml
 
 # Python
 __pycache__/

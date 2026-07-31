@@ -193,6 +193,173 @@ def group_random_split_masks(
     return train, test
 
 
+def _parent_entity_context(
+    df: pd.DataFrame,
+    parent_mask: np.ndarray | pd.Series,
+    *,
+    group_key: str,
+    target_col: str,
+    positive_label: str,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """부모 마스크 안의 (행 위치, 엔티티 코드, 고유 코드, 엔티티 any-positive 라벨)."""
+    from src.features.group_audit import entity_codes
+
+    parent = np.asarray(parent_mask, dtype=bool)
+    if parent.shape[0] != len(df):
+        raise RuntimeError(f"마스크 길이 불일치: mask={parent.shape[0]} df={len(df)}")
+    row_pos = np.flatnonzero(parent)
+    if len(row_pos) < 150:
+        raise RuntimeError(
+            f"튜닝용 Train 행 수 부족: {len(row_pos)}. 03_preprocess 분할을 확인하세요."
+        )
+
+    df_parent = df.iloc[row_pos]
+    codes = entity_codes(df_parent, group_key)
+    y_parent = encode_target(df_parent[target_col], positive_label)
+    unique_codes = np.unique(codes)
+    if len(unique_codes) < 2:
+        raise RuntimeError(
+            f"group 분할 엔티티 수 부족: {len(unique_codes)} (key={group_key})"
+        )
+
+    n_codes = int(codes.max()) + 1
+    pos_per_entity = np.bincount(
+        codes, weights=(np.asarray(y_parent) == 1).astype(float), minlength=n_codes
+    )
+    ent_labels = (pos_per_entity[unique_codes] > 0).astype(np.int8)
+    return row_pos, codes, unique_codes, ent_labels
+
+
+def _entity_masks_to_full(
+    n_rows: int,
+    row_pos: np.ndarray,
+    codes: np.ndarray,
+    valid_entities: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray]:
+    """부모 내 엔티티 목록 → df 전체 길이의 fit/valid 마스크."""
+    valid_local = np.isin(codes, valid_entities)
+    fit_m = np.zeros(n_rows, dtype=bool)
+    valid_m = np.zeros(n_rows, dtype=bool)
+    fit_m[row_pos[~valid_local]] = True
+    valid_m[row_pos[valid_local]] = True
+    if bool((fit_m & valid_m).any()):
+        raise RuntimeError("group 분할: fit/valid 행 교집합 발생")
+    return fit_m, valid_m
+
+
+def group_fold_masks_within_mask(
+    df: pd.DataFrame,
+    parent_mask: np.ndarray | pd.Series,
+    *,
+    group_key: str = "PFM_BIZ_ID+INST_ID",
+    target_col: str = "TAET_YN",
+    positive_label: str = "Y",
+    n_folds: int = 3,
+    random_state: int = 42,
+) -> list[tuple[np.ndarray, np.ndarray]]:
+    """부모 마스크(Train) 안에서 엔티티 단위 K-fold fit/valid 마스크 목록.
+
+    동일 group_key 엔티티의 모든 행은 한 fold에만 valid로 들어간다. 엔티티가
+    fit과 valid에 동시에 나타나면 RuntimeError.
+    """
+    import warnings
+
+    from sklearn.model_selection import KFold, StratifiedKFold
+
+    n_folds = int(n_folds)
+    if n_folds < 2:
+        raise ValueError(f"n_folds는 2 이상이어야 합니다: {n_folds}")
+
+    row_pos, codes, unique_codes, ent_labels = _parent_entity_context(
+        df,
+        parent_mask,
+        group_key=group_key,
+        target_col=target_col,
+        positive_label=positive_label,
+    )
+    if len(unique_codes) < n_folds:
+        raise RuntimeError(
+            f"엔티티 수({len(unique_codes)})가 n_folds({n_folds})보다 적습니다."
+        )
+
+    n_pos_ent = int(ent_labels.sum())
+    n_neg_ent = len(unique_codes) - n_pos_ent
+    if n_pos_ent >= n_folds and n_neg_ent >= n_folds:
+        splitter = StratifiedKFold(
+            n_splits=n_folds, shuffle=True, random_state=int(random_state)
+        )
+        split_iter = splitter.split(unique_codes.reshape(-1, 1), ent_labels)
+    else:
+        warnings.warn(
+            f"group_fold: 양성/음성 엔티티 수 부족(pos={n_pos_ent}, neg={n_neg_ent}) — "
+            "층화 없이 분할합니다.",
+            stacklevel=2,
+        )
+        splitter = KFold(n_splits=n_folds, shuffle=True, random_state=int(random_state))
+        split_iter = splitter.split(unique_codes.reshape(-1, 1))
+
+    folds: list[tuple[np.ndarray, np.ndarray]] = []
+    for _, valid_ent_pos in split_iter:
+        folds.append(
+            _entity_masks_to_full(
+                len(df), row_pos, codes, unique_codes[valid_ent_pos]
+            )
+        )
+    return folds
+
+
+def group_split_masks_within_mask(
+    df: pd.DataFrame,
+    parent_mask: np.ndarray | pd.Series,
+    *,
+    group_key: str = "PFM_BIZ_ID+INST_ID",
+    target_col: str = "TAET_YN",
+    positive_label: str = "Y",
+    valid_size: float = 0.2,
+    random_state: int = 42,
+) -> tuple[np.ndarray, np.ndarray]:
+    """부모 마스크(Train) 안에서 엔티티 단위 단일 fit/valid 분할."""
+    import warnings
+
+    from sklearn.model_selection import train_test_split
+
+    row_pos, codes, unique_codes, ent_labels = _parent_entity_context(
+        df,
+        parent_mask,
+        group_key=group_key,
+        target_col=target_col,
+        positive_label=positive_label,
+    )
+
+    stratify: np.ndarray | None = ent_labels
+    n_pos_ent = int(ent_labels.sum())
+    n_neg_ent = len(unique_codes) - n_pos_ent
+    if n_pos_ent < 2 or n_neg_ent < 2:
+        stratify = None
+        warnings.warn(
+            f"group_split: 양성/음성 엔티티 수 부족(pos={n_pos_ent}, neg={n_neg_ent}) — "
+            "층화 없이 분할합니다.",
+            stacklevel=2,
+        )
+    try:
+        _, valid_ent = train_test_split(
+            unique_codes,
+            test_size=float(valid_size),
+            random_state=int(random_state),
+            shuffle=True,
+            stratify=stratify,
+        )
+    except ValueError:
+        warnings.warn("group_split: stratify 실패 — 층화 없이 재시도합니다.", stacklevel=2)
+        _, valid_ent = train_test_split(
+            unique_codes,
+            test_size=float(valid_size),
+            random_state=int(random_state),
+            shuffle=True,
+        )
+    return _entity_masks_to_full(len(df), row_pos, codes, valid_ent)
+
+
 def _to_numeric_frame(df: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
     out = pd.DataFrame(index=df.index)
     for c in cols:

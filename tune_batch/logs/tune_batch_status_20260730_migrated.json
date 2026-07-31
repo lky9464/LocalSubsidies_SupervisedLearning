@@ -1,0 +1,42 @@
+﻿{
+    "run_id":  "run_20260730_172901",
+    "started_at":  "2026-07-30 21:02:59",
+    "finished_at":  "2026-07-31 09:10:57",
+    "overall":  "completed",
+    "log_file":  "tmp\\tune_batch_20260730_210259.log",
+    "algos":  [
+                  {
+                      "algo":  "catboost_v1",
+                      "status":  "ok",
+                      "exit_code":  0,
+                      "error":  null,
+                      "ended_at":  "2026-07-31 06:33:37",
+                      "started_at":  "2026-07-30 21:02:59"
+                  },
+                  {
+                      "algo":  "gradient_boosting_v1",
+                      "status":  "ok",
+                      "exit_code":  0,
+                      "error":  null,
+                      "ended_at":  "2026-07-31 07:22:56",
+                      "started_at":  "2026-07-31 06:33:37"
+                  },
+                  {
+                      "algo":  "easy_ensemble_v1",
+                      "status":  "ok",
+                      "exit_code":  0,
+                      "error":  null,
+                      "ended_at":  "2026-07-31 07:29:55",
+                      "started_at":  "2026-07-31 07:22:56"
+                  },
+                  {
+                      "algo":  "stacked_ensemble_v1",
+                      "status":  "ok",
+                      "exit_code":  0,
+                      "error":  null,
+                      "ended_at":  "2026-07-31 09:10:57",
+                      "started_at":  "2026-07-31 07:29:55"
+                  }
+              ],
+    "migrated_from":  "tmp/"
+}

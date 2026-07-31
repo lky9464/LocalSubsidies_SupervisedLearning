@@ -1,0 +1,49 @@
+# 하이퍼파라미터 튜닝 전용 (scripts/12, tune_batch/)
+# 웹·학습·평가·추론 설정은 configs/default.yaml — load_tune_config() 로 default + 본 파일 merge
+
+# 산출물 버전 폴더: outputs/reports/tuning/{output_tag}/
+output_tag: v3
+
+# 03 산출물 Run ID (선택). 우선순위: CLI --run-id > LSL_RUN_ID > 본 값
+data_run_id: run_20260730_172901
+
+# 03 split.mode 검증 (null 이면 스킵). 웹 run_config 와 무관하게 산출물만 검사
+require_preprocess_split_mode: group_random
+
+tune:
+  split_mode: nested_group_random
+  group_key: PFM_BIZ_ID+INST_ID
+  n_folds: 3
+  valid_size: 0.2
+  random_state: 42
+  # 격자 탐색 대상 algo_id (model_params baseline + tune.grids delta)
+  algorithms:
+    - random_forest_v1
+    - catboost_v1
+    - gradient_boosting_v1
+    - stacked_ensemble_v1
+    - easy_ensemble_v1
+  primary_metric: top1_lift
+  min_precision_ratio: 0.85
+  # method: grid
+  # n_trials: 25
+  # optuna_sampler: tpe
+  grids:
+    random_forest_v1:
+      n_estimators: [150, 200, 300]
+      max_depth: [16, 20, 24]
+      min_samples_leaf: [3, 5, 8]
+    catboost_v1:
+      iterations: [300, 400, 500]
+      depth: [5, 6, 7]
+      learning_rate: [0.03, 0.05, 0.08]
+    gradient_boosting_v1:
+      max_iter: [200, 300, 400]
+      max_depth: [4, 6, 8]
+      learning_rate: [0.03, 0.05, 0.08]
+    stacked_ensemble_v1:
+      rf_max_depth: [16, 20]
+      hgb_max_depth: [5, 7]
+      hgb_max_iter: [150, 250]
+    easy_ensemble_v1:
+      n_estimators: [5, 10, 12, 15]

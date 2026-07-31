@@ -14,9 +14,9 @@ UI(v0.3.0) 이후 **하이퍼파라미터·주·보 재선정·피처** 실험�
 | 항목 | 고정값 (기준선) |
 |------|-----------------|
 | 버전·하이퍼 기본 | v0.3.0 기본값 → `configs/default.yaml` `model_params` (동일 수치로 이전) |
-| Train | 풀 `202401`~`202512` 중 random **~70%** (`split.mode=random`, `test_size=0.3`) |
-| Test | 동일 풀 random **~30%** (최종 평가만, 튜닝 금지) |
-| Validation (튜닝) | **Train 안** random ~20% (`tune.split_mode=nested_random`) |
+| Train | 풀 `202401`~`202512` 중 **사업·기관 무중복 ~70%** (`split.mode=group_random`, `test_size=0.3`) |
+| Test | 동일 풀 **~30%** — Train과 `PFM_BIZ_ID+INST_ID` 교집합 0 (최종 평가만, 튜닝 금지) |
+| Validation (튜닝) | **Train 안** 엔티티 단위 K-fold (`tune.split_mode=nested_group_random`, `n_folds=3`) |
 | 타겟 | `TAET_YN` ([`label_definition.md`](label_definition.md)) |
 | 누수 제외 | `exclude_features` + `04_leakage_audit` PASS 필수 |
 | 주·보 스냅샷 | RF / CatBoost ([`operations_criteria.md`](operations_criteria.md) §2.1) |
@@ -52,48 +52,99 @@ Run 오버라이드: `{data_root}/runs/{run_id}/run_config.yaml` 의 `model_para
 
 ---
 
-## 4. RF·CatBoost 소규모 탐색 (로컬)
+## 3.1 튜닝 vs 웹 서비스 (독립 실행)
+
+**`12` / `tune_batch`는 웹 API·FastAPI·Streamlit과 연결되지 않습니다.** 설정·산출물만 아래 파일을 사용합니다.
+
+| 구분 | 튜닝 (Owner CLI) | 웹·05~11 |
+|------|------------------|----------|
+| 설정 | `configs/tune.yaml` (+ `tune_local.yaml`) | `default.yaml` + `run_config.yaml` |
+| 로드 | `load_tune_config()` | `load_config()` + `load_run_config()` |
+| 산출 | `outputs/reports/tuning/{output_tag}/` | `comparison/` · Run `algorithms/` |
+| Run ID | `data_run_id` / `--run-id` / `LSL_RUN_ID` | 웹 Job · run_config |
+
+**공유(의도적):** `configs/local.yaml`의 `data_root`, `default.yaml`의 `model_params`(baseline)·`exclude_features`·타겟 정의.
+
+**선행 01~04:** 웹 없이 CLI만 가능. `{data_root}/runs/{run_id}/run_config.yaml` 예시는 [`configs/tune_run.yaml.example`](../configs/tune_run.yaml.example).  
+`12` 시작 시 `require_preprocess_split_mode`(기본 `group_random`)로 **03 산출물**만 검증 — 웹 `run_config`는 읽지 않음.
 
 ```text
+# tune.yaml data_run_id 만 맞추면 12 단독 실행 가능
 python scripts/12_tune_hyperparams.py
-python scripts/12_tune_hyperparams.py --algo random_forest_v1
-python scripts/12_tune_hyperparams.py --algo catboost_v1
+python tune_batch/run_tune_batch.py
 ```
 
-- 탐색 격자: `configs/default.yaml` → `tune.grids`
-- 대상 알고리즘 기본: `tune.algorithms` = `random_forest_v1`, `catboost_v1`
-- 분할: **03의 Train 마스크 안에서만** Valid (`nested_random`). Test와 겹치지 않음
-- 산출(집계만): `outputs/reports/comparison/hyperparam_tune_*.json` / `.xlsx`  
-  및 추천값 `hyperparam_tune_best.yaml`
+---
+
+## 4. 5종 격자 탐색 (로컬)
+
+```text
+python scripts/12_tune_hyperparams.py --run-id {group_random Run ID}
+python scripts/12_tune_hyperparams.py --run-id {run} --algo random_forest_v1
+python scripts/12_tune_hyperparams.py --run-id {run} --algo stacked_ensemble_v1
+```
+
+- 탐색 격자: `configs/tune.yaml` → `tune.grids`
+- 대상 알고리즘 기본: `tune.algorithms` = v1 **5종**
+- 분할: **03의 Train 마스크 안에서** 엔티티 단위 K-fold (`nested_group_random`, `n_folds=3`)  
+  같은 `PFM_BIZ_ID+INST_ID`가 fit과 Valid에 동시에 들어가지 않음
+- 산출(집계만): `outputs/reports/tuning/{output_tag}/hyperparam_tune_*.{json,xlsx}`  
+  (`분할무결성(folds)` 시트) 및 `hyperparam_tune_best.yaml` · `tune_manifest.yaml`
+- 일괄 실행: `python tune_batch/run_tune_batch.py --run-id {run}`
+
+> **전제:** `12`는 반드시 **`split.mode=group_random`으로 돌린 Run**에서 실행하세요.  
+> 03이 `random`이면 `train_mask` 자체가 Test와 엔티티를 공유해, Valid만 그룹 분할해도 지표가 왜곡됩니다.
 
 > `split.mode`/`tune` 변경 후 **`03_preprocess`를 다시 실행**해야 `split_masks`가 맞습니다.  
-> 이어서 `12`를 RF·CatBoost 각각(또는 일괄) 재실행하세요. 이전 pool_random 결과는 비교용으로 이름을 바꿔 보관하는 것을 권장합니다.
+> 이전 `nested_random` 결과는 비교용으로 이름을 바꿔 보관하는 것을 권장합니다.
+
+**실행 시간:** 후보 수 × `n_folds` 만큼 학습합니다(기본 3배). Stacked는 trial마다 내부 CV까지 돌아
+가장 오래 걸리므로 `--algo`로 분리 실행하는 편이 안전합니다.
 
 ### 4.1 반영 절차
 
-1. `12` 실행 → best 후보 확인 (Validation 지표)
-2. 채택 시 `model_params.{algo}_v2` + `algorithm_registry` + `05_train_*_v2.py` (v1 유지)
-3. 학습 옵션에서 **v2** 선택 → `05` → `06` → `07` → `08` → `10` (Test 1회)
-4. 기준선(v1)과 PR-AUC·상위 1%/5% 리프트·4×4 주A/주B 비교
+1. `12` 실행 → best 후보 확인 (Validation 지표 · fold 평균)
+2. 채택 시 `model_params.{algo}_v3` + `algorithm_registry` + `05_train_*_v3.py`  
+   **기존 v1·v2 수치는 덮어쓰지 않는다** (과거 Run 재현성)
+3. 학습 옵션에서 **v3** 선택 → `05` → `06` → `07` → `08` → `10` (Test 1회)
+4. 동일 Run 안에서 v1 / v2 / v3의 PR-AUC·상위 1%/5% 리프트·4×4 주A/주B 비교
 5. 주·보 변경 시 `ops_queue` + `operations_criteria.md` §2.1 갱신
 6. [`VERSION_HISTORY.md`](VERSION_HISTORY.md) 기록
 
-**현재 (v0.6.0):** 5 family 모두 v2 등록·Test 채택 완료. 주·보 4×4 조합 비교·`ops_queue` 갱신은 다음 세션.
+**현재 (v0.7.0):** 5 family를 `nested_group_random`으로 재튜닝해 **v3** 등록 예정.  
+v2는 `nested_random`(엔티티 공유 Valid) + `random` Test에서 선정된 값이라 **이력용으로만 보존**합니다.
 
-EasyEnsemble은 절대 리프트가 낮아 참고용. Stacked·HGB v2는 Validation `12` + Test 확정 완료.
+> **v2 숫자와 직접 비교 금지:** v2의 Test 리프트는 Train/Test가 엔티티를 공유하던 Run
+> (`run_20260728_200201`)에서 측정됐습니다. v3가 낮게 나오는 것은 성능 저하가 아니라
+> 이전 값이 낙관적이었다는 뜻입니다. 비교는 **동일 group_random Run 안에서만** 하세요.
 
 > **단계별 로드맵**(RF/CB v2 STOP → HistGB → Optuna) 및 **`tune.method` 설계**는  
 > [`hyperparam_methodology.md`](hyperparam_methodology.md) **§8·§9** 참고.
 
-### 4.2 Phase 2 — HistGB·Stacked·EasyEnsemble (요약)
+### 4.2 알려진 한계 — Stacked 내부 CV
 
-| algo_id | 권장 |
-|---------|------|
-| `gradient_boosting_v1` | `12` grid 확장 · 15~27 trial |
-| `stacked_ensemble_v1` | grid 전수 금지 · Phase 3 Optuna 또는 1축씩 |
-| `easy_ensemble_v1` | `n_estimators` 짧은 grid 또는 07·08만 |
+`stacked_ensemble`은 `StackingClassifier(cv=3)`을 쓰며, 이 CV는 **행 단위**입니다.
+메타 학습기가 보는 out-of-fold 예측이 같은 엔티티의 다른 달에서 나오므로,
+**모델 내부에 별도의 엔티티 누수**가 남아 있습니다. `tune.split_mode`를 바꿔도 해소되지 않으며,
+`GroupKFold` 주입이 필요합니다 (v0.7.1 검토 항목).
 
-상세: [`hyperparam_methodology.md`](hyperparam_methodology.md) §8.2.
+Stacked의 Test 지표는 이 한계를 감안해 해석하세요.
+
+상세 로드맵: [`hyperparam_methodology.md`](hyperparam_methodology.md) §8.2.
+
+### 4.3 v4 튜닝 예시 (웹 최소 · CLI)
+
+README **「Owner — CLI 전용 하이퍼파라미터 튜닝」** 과 동일합니다. 요약:
+
+| 단계 | 경로 A (03 재사용) | 경로 B (01~04 CLI) |
+|------|-------------------|-------------------|
+| Run | `data_run_id` 기존 유지 | `tune_run.yaml.example` → `run_config.yaml` |
+| yaml | `output_tag: v4`, `algorithms`/`grids` → `*_v3` | 동일 + `data_run_id` 신규 |
+| 실행 | `python tune_batch/run_tune_batch.py` | 01~04 후 배치 |
+| 산출 | `tuning/v4/` | `tuning/v4/` |
+| 채택 | `{family}_v4` 등록 → 05~10 Test 1회 | 동일 |
+
+v4부터 `tune.grids` 키와 `tune.algorithms`는 **v3 algo_id**(`random_forest_v3` 등)를 baseline으로 두는 것을 권장합니다 (`default.yaml` `model_params.*_v3`).
 
 ---
 
@@ -130,5 +181,6 @@ Test **08** 순위 규칙: [`ranking_methodology.md`](ranking_methodology.md)
 | 상황 | 버전 |
 |------|------|
 | 튜닝 도구·`model_params` 분리·RF/CB v2 채택 | **v0.4.0** ([`VERSION_HISTORY.md`](VERSION_HISTORY.md)) |
+| 엔티티 무중복 Valid(`nested_group_random`)·5종 v3 재튜닝 | **v0.7.0** |
 | 탐색 결과로 기본 하이퍼·주보·품질이 바뀐 배포 | 다음 MINOR 또는 PATCH (변경 폭에 따름) |
 | 기본값 버그성 수정만 | PATCH |

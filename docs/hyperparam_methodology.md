@@ -5,7 +5,8 @@
 
 전제: 알고리즘 ID = `{family}_v{N}` ([`algo_id_migration.md`](algo_id_migration.md)). 채택 결과는 해당 family의 **새 버전(v2+)** 으로 추가하고 v1은 유지합니다.
 
-> **수치 반영:** RF·CatBoost Validation best는 `random_forest_v2` / `catboost_v2`로 **등록됨** (§5.1).  
+> **v0.7.0:** 튜닝 Validation이 **엔티티(사업·기관) 무중복 K-fold**로 바뀌었습니다 (§1.3.1).  
+> 기존 `*_v2`는 엔티티가 섞인 Valid에서 선정된 값이라 **이력용으로만 보존**하고, 5종을 재튜닝해 **`*_v3`** 로 등록합니다 (§5.1).  
 > Test 확정(`05`~`10`)·주·보 갱신은 사용자 로컬에서 진행합니다.
 
 ---
@@ -16,6 +17,7 @@
 |------|------|
 | 하이퍼파라미터가 무엇인지 | §1 |
 | Train / Valid / Test를 왜 나누는지 | §1.3 |
+| **엔티티(사업·기관) 단위로 나누는 이유** | **§1.3.1** |
 | `12_tune_hyperparams.py`가 28회 돌리는 방식 | §2 |
 | best 선정·엑셀 행 순서 | §2.4 |
 | 5종 알고리즘·파라미터 뜻 | §3 |
@@ -50,21 +52,42 @@
 ### 1.3 Train · Validation · Test — 역할 구분
 
 ```text
-풀 202401~202512
-├─ ~70% Train ──┬─ ~80% fit   (튜닝 시 “학습”에 사용)
-│               └─ ~20% Valid (튜닝 시 “모의고사” — best 선택)
+풀 202401~202512  (사업·기관 = PFM_BIZ_ID+INST_ID 단위로 분할)
+├─ ~70% Train ──┬─ fold1 Valid / fold2·3 fit
+│               ├─ fold2 Valid / fold1·3 fit     ← 엔티티 무중복 3-fold
+│               └─ fold3 Valid / fold1·2 fit
 └─ ~30% Test    (최종 1회만 — 07→08→10)
 ```
 
 | 구간 | 이 프로젝트에서 하는 일 |
 |------|-------------------------|
 | **fit** | 후보별 모델 **학습** |
-| **Valid** | 후보별 **점수·리프트 계산** → best 선정 (`scripts/12`) |
+| **Valid** | 후보별 **점수·리프트 계산** → fold 평균으로 best 선정 (`scripts/12`) |
 | **Test** | 채택 후 **최종 성능·4×4·주·보** 확정 (`07`~`10`) |
 
 **Valid로 best를 고르고, Test로 “정말 괜찮은지” 1번만 확인**합니다. Test로 반복 튜닝하면 Test에 맞춰져 **과적합(낙관적 평가)** 이 됩니다.
 
-튜닝 분할 설정: `tune.split_mode=nested_random` — 03의 `train_mask` **안에서만** fit/valid를 80/20으로 나눕니다.
+튜닝 분할 설정: `tune.split_mode=nested_group_random` — 03의 `train_mask` **안에서** 엔티티 단위 K-fold(`n_folds=3`)로 나눕니다.
+
+### 1.3.1 왜 엔티티 단위로 나누나 (v0.7.0)
+
+한 행은 `CRTR_YM × PFM_BIZ_ID × INST_ID` 조합이라, 같은 사업이 여러 달에 걸쳐 여러 행으로 존재합니다.
+행 단위로 fit/Valid를 나누면 **같은 사업의 1·3월이 fit에, 2·5월이 Valid에** 들어갑니다.
+라벨이 사업 상태에 가까워 여러 달 유지되면, Valid 점수는 판별력이 아니라 **엔티티 암기력**을 재게 됩니다.
+
+암기가 보상받으면 탐색은 **용량이 큰 후보**(깊은 트리·많은 반복)를 고릅니다.
+실제로 v0.6.0에서 채택된 v2는 5종 중 4종에서 깊이 축이 올라갔는데, 이는 누수된 Valid의 전형적 신호입니다.
+
+| 층 | 설정 | 도입 |
+|---|---|---|
+| Train ↔ Test 무중복 | `split.mode: group_random` | v0.6.1 |
+| fit ↔ Valid 무중복 | `tune.split_mode: nested_group_random` | **v0.7.0** |
+
+두 층을 **모두** 적용해야 의미가 있습니다. 03이 `random`이면 `train_mask` 자체가 Test와 엔티티를 공유합니다.
+
+**대가:** Valid 양성이 엔티티 블록 단위로 들어와 유효 표본이 줄고, 지표 분산이 커집니다.
+그래서 단일 분할 대신 **3-fold 평균**을 기본으로 쓰고, `top1_lift_std`(fold 간 표준편차)를 함께 기록합니다.
+표준편차가 후보 간 차이보다 크면 그 격자는 결론을 내기에 부족하다는 뜻입니다.
 
 ### 1.4 과적합·과소적합 (직관)
 
@@ -90,22 +113,23 @@ RAM·시간(약 16GB, `n_jobs=2`)을 고려해 **축 3개 × 값 3개 = 27조합
 
 ## 2. `scripts/12_tune_hyperparams.py` 동작 원리
 
-코드: [`src/models/tune.py`](../src/models/tune.py) · 설정: [`configs/default.yaml`](../configs/default.yaml) → `tune`
+코드: [`src/models/tune.py`](../src/models/tune.py) · 설정: [`configs/tune.yaml`](../configs/tune.yaml) (`load_tune_config()`)
 
 ### 2.1 전체 흐름
 
 ```text
-1) labeled.csv + preprocess_bundle + split_masks 로드
-2) Train 마스크 안에서 fit / valid 분리 (nested_random)
-3) model_params = 기준선(base_params) 확정
-4) tune.grids 로 후보 조합(delta) 생성
-5) 각 trial: params = base_params + delta → 학습(fit) → Valid 예측 → 지표 계산
-6) rank_candidates: 정밀도 가드 → top1_lift → top5_lift → PR-AUC 순 정렬
-7) hyperparam_tune_{algo}.json / .xlsx / hyperparam_tune_best.yaml 저장
+1) labeled.csv + preprocess_bundle + split_masks 로드 (PK 결측 행 정렬)
+2) Train 마스크 안에서 엔티티 단위 K-fold 생성 (nested_group_random)
+3) fold 무결성 감사 — fit/Valid 엔티티 교집합이 0이 아니면 즉시 중단
+4) model_params = 기준선(base_params) 확정
+5) tune.grids 로 후보 조합(delta) 생성
+6) 각 trial: fold마다 학습→Valid 예측→지표 계산 후 fold 평균
+7) rank_candidates: 정밀도 가드 → top1_lift → top5_lift → PR-AUC 순 정렬
+8) hyperparam_tune_{algo}.json / .xlsx / hyperparam_tune_best.yaml 저장
 ```
 
-대상 알고리즘(기본): `random_forest_v1`, `catboost_v1` (`tune.algorithms`).  
-EasyEnsemble / Stacked / HistGB는 `12` **자동 격자 대상 아님** (§3·§4 참고).
+대상 알고리즘(기본): v1 **5종** (`tune.algorithms`).  
+Stacked는 trial당 비용이 커 `--algo`로 분리 실행을 권장합니다 (§4.4·§8.2).
 
 ### 2.2 28회(trial)는 어떻게 만들어지나
 
@@ -115,8 +139,10 @@ RF·CatBoost 모두 `tune.grids`에 **파라미터 3개 × 각 3값** 이 있으
 1회 (trial 1)  : delta = {}  → 변경 없음, 현재 model_params = 기준선(baseline)
 2~28회         : 3 × 3 × 3 = 27가지 조합 (itertools.product 전수 조합)
 ────────────────
-합계 28회
+합계 28 후보 × n_folds(3) = 학습 84회
 ```
+
+**v0.7.0부터 trial 수 ≠ 학습 횟수**입니다. 후보 1개당 fold 수만큼 학습하고 지표를 평균합니다.
 
 격자 전개 코드:
 
@@ -164,7 +190,11 @@ for delta in [{}] + all_combinations(tune.grids):
 엑셀 **위→아래**: 가드 통과(T) 후보를 위 지표 순으로 정렬 → **1행 = best** → 가드 탈락(F)은 맨 아래.  
 **trial 번호 ≠ 행 순서** (1행이 trial 1 baseline일 필요 없음).
 
-산출물: `outputs/reports/comparison/hyperparam_tune_*.json` / `.xlsx`, 추천값 `hyperparam_tune_best.yaml`  
+모든 지표는 **fold 평균**이며, `top1_lift_std` 열이 fold 간 편차를 보여 줍니다.
+1·2위 후보의 차이가 `top1_lift_std`보다 작으면 **사실상 동률**로 보고, 더 단순한(용량이 작은) 쪽을 택하는 편이 안전합니다.
+
+산출물: `outputs/reports/tuning/{output_tag}/hyperparam_tune_*.json` / `.xlsx`, 추천값 `hyperparam_tune_best.yaml`  
+xlsx 시트: `후보(trials)` · `분할무결성(folds)` (fold별 행·Valid 양성 엔티티·엔티티 교집합)  
 지표 해설: [`metrics_guide.md`](metrics_guide.md)
 
 ---
@@ -253,7 +283,12 @@ for delta in [{}] + all_combinations(tune.grids):
 | **`meta_max_iter`** | 최종 로지스틱 반복 상한 |
 | **`cv`** | meta 학습용 **내부 CV fold 수** (기본 3). ↑면 시간↑ |
 
-**튜닝 직관:** 베이스 2개 + meta + CV라 **한 trial 비용이 큼**. `12` 일괄 격자 대상 아님. 순위·4×4는 **참고 모델**로 두고, 시간 여유 있을 때 RF/HGB 축을 **각각 소규모**로 조정하는 방식이 현실적 (§4.4).
+**튜닝 직관:** 베이스 2개 + meta + CV라 **한 trial 비용이 큼**. fold까지 곱해지므로 `--algo`로 분리 실행을 권장합니다. 순위·4×4는 **참고 모델**로 두고, 시간 여유 있을 때 RF/HGB 축을 **각각 소규모**로 조정하는 방식이 현실적 (§4.4).
+
+> **알려진 한계 (v0.7.0 미해결):** `cv=3`은 **행 단위** StratifiedKFold입니다.
+> 메타 학습기의 out-of-fold 예측이 같은 엔티티의 다른 달에서 나오므로,
+> **모델 내부에 엔티티 누수**가 남습니다. `tune.split_mode` 변경으로는 해소되지 않으며
+> `GroupKFold` 주입이 필요합니다 (v0.7.1 검토). Stacked 지표는 이를 감안해 해석하세요.
 
 ---
 
@@ -271,13 +306,15 @@ for delta in [{}] + all_combinations(tune.grids):
 
 ### 3.6 알고리즘·튜닝 지원 요약
 
-| algo_id | 학습 방식 | `12` 자동 격자 | 주요 튜닝 축 |
-|---------|-----------|----------------|--------------|
-| `random_forest_v1` | Bagging (다수 트리) | **예** (28 trial) | n_estimators, max_depth, min_samples_leaf |
-| `catboost_v1` | Boosting | **예** (28 trial) | iterations, depth, learning_rate |
-| `gradient_boosting_v1` | Hist Boosting | **예** (28 trial) | max_iter, max_depth, learning_rate, max_bins |
-| `stacked_ensemble_v1` | Stacking (RF+HGB→LR) | **예** (9 trial) | rf_*, hgb_*, cv, meta_max_iter |
-| `easy_ensemble_v1` | 불균형 앙상블 | **예** (5 trial) | n_estimators |
+`n_folds=3` 기준 학습 횟수 = 후보 수 × 3.
+
+| algo_id | 학습 방식 | 후보 수 | 학습 횟수 | 주요 튜닝 축 |
+|---------|-----------|--------:|---------:|--------------|
+| `random_forest_v1` | Bagging (다수 트리) | 28 | 84 | n_estimators, max_depth, min_samples_leaf |
+| `catboost_v1` | Boosting | 28 | 84 | iterations, depth, learning_rate |
+| `gradient_boosting_v1` | Hist Boosting | 28 | 84 | max_iter, max_depth, learning_rate, max_bins |
+| `stacked_ensemble_v1` | Stacking (RF+HGB→LR) | 9 | 27 | rf_*, hgb_*, cv, meta_max_iter |
+| `easy_ensemble_v1` | 불균형 앙상블 | 5 | 15 | n_estimators |
 
 ---
 
@@ -343,17 +380,25 @@ for delta in [{}] + all_combinations(tune.grids):
 4. `05`~`10`으로 Test 확정 · 주·보·`operations_criteria` 갱신
 5. [`VERSION_HISTORY.md`](VERSION_HISTORY.md) 기록
 
-### 5.1 적용 현황 (Validation 채택 · Test v2 채택)
+### 5.1 적용 현황
 
-| algo_id | 채택 하이퍼 (요약) | 상태 |
-|---------|-------------------|------|
-| `random_forest_v2` | `n_estimators=200`, `max_depth=24`, `min_samples_leaf=8` | **Test v2 채택** (run_20260728_200201) |
-| `catboost_v2` | `iterations=500`, `depth=7`, `learning_rate=0.08` | **Test v2 채택** (run_20260728_200201) |
-| `gradient_boosting_v2` | `max_iter=400`, `max_depth=8`, `learning_rate=0.05` | **Test v2 채택** (run_20260728_200201) |
-| `stacked_ensemble_v2` | `rf_max_depth=20`, `hgb_max_depth=7`, `hgb_max_iter=250` | **Test v2 채택** (run_20260728_200201) |
-| `easy_ensemble_v2` | `n_estimators=10` | **Test v2 채택** (run_20260728_200201 · 절대 리프트仍 낮음) |
+**v2 (v0.6.0 · 이력용 보존)** — `nested_random` Valid + `random` Test에서 선정. 엔티티 누수가 있던 조건입니다.
 
-v1은 기준선으로 유지. **`ops_queue` 주·보·4×4 조합 확정**은 다음 세션(현재 `random_forest_v1` · `catboost_v1` 유지).
+| algo_id | 채택 하이퍼 (요약) | v1 대비 |
+|---------|-------------------|---------|
+| `random_forest_v2` | `n_estimators=200`, `max_depth=24`, `min_samples_leaf=8` | 깊이 ↑ |
+| `catboost_v2` | `iterations=500`, `depth=7`, `learning_rate=0.08` | 깊이·반복 ↑ |
+| `gradient_boosting_v2` | `max_iter=400`, `max_depth=8`, `learning_rate=0.05` | 깊이·반복 ↑ |
+| `stacked_ensemble_v2` | `rf_max_depth=20`, `hgb_max_depth=7`, `hgb_max_iter=250` | 깊이·반복 ↑ |
+| `easy_ensemble_v2` | `n_estimators=10` | — |
+
+5종 중 4종이 **용량이 큰 쪽**으로 이동했습니다 (§1.3.1). v2 수치는 재현성을 위해 **덮어쓰지 않고 보존**하되,
+새 Run의 주·보 후보로는 쓰지 않습니다.
+
+**v3 (v0.7.0 · 진행 중)** — `nested_group_random` 3-fold + `group_random` Test에서 재선정.
+`12` 실행 후 `hyperparam_tune_best.yaml`을 보고 `model_params.{family}_v3`로 등록합니다.
+
+v1은 기준선으로 계속 유지합니다.
 
 ---
 
@@ -430,7 +475,8 @@ gradient_boosting_v1:
 
 - **`grid`** (현행): `tune.grids` 전수 조합 + baseline 1회
 - **`optuna`**: TPE sampler + (CatBoost) trial pruning
-- **공통 유지:** `nested_random` Valid · `score_candidate` · `rank_candidates` · JSON/XLSX 산출 형식
+- **공통 유지:** `nested_group_random` Valid(엔티티 K-fold) · `score_candidate` · `rank_candidates` · JSON/XLSX 산출 형식  
+  Optuna objective도 **fold 평균 `top1_lift`** 를 반환해야 grid 결과와 비교 가능합니다.
 
 ### 9.2 설정 (`configs/default.yaml` 예시)
 
@@ -541,11 +587,13 @@ model.fit(
 | 1순위 지표 | Validation 상위 **1%·5% 리프트** (및 양성 포착비율) |
 | 2순위 | **PR-AUC** |
 | 가드 | 기준선 대비 정밀도 비율 (`tune.min_precision_ratio`, 기본 0.85) 미달 시 탈락 |
-| 탐색 구간 | **Train 내부 Validation만** (`tune.split_mode=nested_random`) — Test 미사용 |
+| 탐색 구간 | **Train 내부 Validation만** (`tune.split_mode=nested_group_random`) — Test 미사용 |
+| 엔티티 무결성 | fit ∩ Valid = **0** (`PFM_BIZ_ID+INST_ID`) · 위반 시 `12`가 즉시 중단 |
 | 확정 | 기존 Test 구간으로 **07→08→10 1회** (Test로 반복 튜닝 금지) |
 | 환경 | `memory.n_jobs: 2`, 16GB RAM 친화 — 깊이·트리 수 과도한 확대 지양 |
-| 도구 | `python scripts/12_tune_hyperparams.py --algo {algo_id}` |
-| 튜닝 분할 | `nested_random`(권장): 03 `train_mask` 안 80/20 · `time`: Train 내 valid 월 · `pool_random`: 레거시 |
+| 도구 | `python scripts/12_tune_hyperparams.py --run-id {run} --algo {algo_id}` |
+| 튜닝 분할 | `nested_group_random`(권장): Train 안 엔티티 K-fold · `nested_random`: 행 단위(누수) · `time`: Train 내 valid 월 · `pool_random`: 레거시 |
+| 버전 정책 | 채택 시 **새 algo_id**(`_v3`)로 등록 · 기존 버전 수치 덮어쓰기 금지 |
 
 ---
 

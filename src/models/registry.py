@@ -18,14 +18,19 @@ FAMILY_LABELS: dict[str, str] = {
 DEFAULT_ALGO_IDS: list[str] = [
     "catboost_v1",
     "catboost_v2",
+    "catboost_v3",
     "stacked_ensemble_v1",
     "stacked_ensemble_v2",
+    "stacked_ensemble_v3",
     "easy_ensemble_v1",
     "easy_ensemble_v2",
+    "easy_ensemble_v3",
     "gradient_boosting_v1",
     "gradient_boosting_v2",
+    "gradient_boosting_v3",
     "random_forest_v1",
     "random_forest_v2",
+    "random_forest_v3",
 ]
 
 _ALGO_ID_RE = re.compile(r"^([a-z][a-z0-9_]*)_v(\d+)$", re.IGNORECASE)

@@ -1,0 +1,4 @@
+output_tag: v2
+source: git tag v0.6.2 (Release v0.6.0 튜닝 산출물 복원)
+split_mode: nested_random
+note: 행 단위 Valid · v2 model_params 채택 캠페인. comparison/ 에서 tuning/v2/ 로 이관.

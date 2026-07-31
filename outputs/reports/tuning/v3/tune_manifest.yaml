@@ -1,0 +1,12 @@
+output_tag: v3
+run_id: run_20260730_172901
+split_mode: nested_group_random
+n_folds: 3
+group_key: PFM_BIZ_ID+INST_ID
+algorithms_completed:
+  - random_forest_v1
+  - catboost_v1
+  - gradient_boosting_v1
+  - easy_ensemble_v1
+  - stacked_ensemble_v1
+note: v0.7.0 엔티티 무중복 Valid 튜닝 · comparison/ 에서 tuning/v3/ 로 이관.

@@ -60,6 +60,61 @@ def load_config(
     return cfg
 
 
+def load_tune_config(
+    *,
+    default_path: Path | None = None,
+    tune_path: Path | None = None,
+    tune_local_path: Path | None = None,
+    local_path: Path | None = None,
+) -> dict[str, Any]:
+    """default.yaml + tune.yaml + tune_local.yaml(선택) + local.yaml — 12·tune_batch 전용.
+
+    웹 API·run_config 는 읽지 않는다. data_root 만 local.yaml 과 공유.
+    """
+    cfg = load_config(default_path=default_path, local_path=local_path)
+    tune_path = tune_path or PROJECT_ROOT / "configs" / "tune.yaml"
+    if tune_path.exists():
+        with open(tune_path, encoding="utf-8") as f:
+            tune_cfg = yaml.safe_load(f) or {}
+        cfg = _deep_merge(cfg, tune_cfg)
+    tune_local_path = tune_local_path or PROJECT_ROOT / "configs" / "tune_local.yaml"
+    if tune_local_path.exists():
+        with open(tune_local_path, encoding="utf-8") as f:
+            tune_local = yaml.safe_load(f) or {}
+        cfg = _deep_merge(cfg, tune_local)
+    return cfg
+
+
+def resolve_tune_run_id(cfg: dict[str, Any], cli_run_id: str | None = None) -> str | None:
+    """튜닝용 Run ID: CLI > LSL_RUN_ID > tune.yaml data_run_id."""
+    if cli_run_id and str(cli_run_id).strip():
+        return str(cli_run_id).strip()
+    env = get_active_run_id()
+    if env:
+        return env
+    data_rid = cfg.get("data_run_id")
+    if data_rid and str(data_rid).strip():
+        return str(data_rid).strip()
+    return None
+
+
+def apply_tune_run_id(cfg: dict[str, Any], cli_run_id: str | None = None) -> str | None:
+    """resolve_tune_run_id 결과를 LSL_RUN_ID 에 반영."""
+    rid = resolve_tune_run_id(cfg, cli_run_id)
+    if rid:
+        os.environ["LSL_RUN_ID"] = rid
+    return rid
+
+
+def resolve_tune_output_dir(cfg: dict[str, Any]) -> Path:
+    """outputs/reports/tuning/{output_tag}/ — 튜닝 산출물 버전 폴더."""
+    tag = str(cfg.get("output_tag") or "v1").strip() or "v1"
+    base = resolve_repo_path(cfg, "reports_tuning")
+    out = base / tag
+    out.mkdir(parents=True, exist_ok=True)
+    return out
+
+
 def get_data_root(cfg: dict[str, Any]) -> Path:
     """프로젝트 밖 데이터 루트를 반환한다. 미설정 시 명확히 오류."""
     root = cfg.get("data_root")

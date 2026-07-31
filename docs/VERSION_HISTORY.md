@@ -1,10 +1,23 @@
 # 버전 이력
 
-현재 버전: **v0.6.2**  
+현재 버전: **v0.7.0**  
 저장소: [LocalSubsidies_SupervisedLearning](https://github.com/lky9464/LocalSubsidies_SupervisedLearning)  
 릴리스: [Releases](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases)
 
 새 버전을 낼 때 이 문서 상단에 항목을 추가하고, GitHub Release/태그와 맞춥니다.
+
+---
+
+## v0.7.0 — 엔티티 무중복 Valid 튜닝 · v3 · CLI 튜닝 독립
+
+- **Valid 분할:** `nested_group_random` · Train 안 엔티티 K-fold · `top1_lift_std` · fold 무결성 감사
+- **`*_v3` 등록:** 5 family · `model_params` · `algorithm_registry` · `05_train_*_v3.py` (v2 이력 보존)
+- **튜닝 설정 분리:** [`configs/tune.yaml`](../configs/tune.yaml) · `load_tune_config()` · 웹 `default.yaml`과 `tune` 블록 분리
+- **산출 이력:** `outputs/reports/tuning/vN/` (v2 git 복원 · v3 nested_group_random) · `comparison/`은 07·08 전용
+- **일괄 실행:** [`tune_batch/run_tune_batch.py`](../tune_batch/run_tune_batch.py) · 5종 · `data_run_id`
+- **문서:** README Owner CLI 튜닝(v4 예시) · [`model_tuning.md`](model_tuning.md) §3.1
+
+[Release v0.7.0](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases/tag/v0.7.0)
 
 ---
 

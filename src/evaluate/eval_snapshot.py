@@ -70,16 +70,31 @@ def load_per_algo_eval(
     *,
     run_id: str | None = None,
 ) -> tuple[dict, dict]:
+    """Run 격리 경로 우선, 없으면 전역 algorithms/{algo}/eval_metrics.json."""
+    lookup_runs: list[str | None] = []
+    if run_id:
+        lookup_runs.append(run_id)
+    lookup_runs.append(None)
+
+    seen: set[Path] = set()
     for key in algo_lookup_ids(algo):
-        path = resolve_algo_dir(cfg, key, run_id=run_id) / "eval_metrics.json"
-        if not path.exists():
-            continue
-        try:
-            with open(path, encoding="utf-8") as f:
-                payload = json.load(f)
-        except (OSError, json.JSONDecodeError):
-            continue
-        return payload.get("metrics") or {}, payload.get("lift") or {}
+        for rid in lookup_runs:
+            path = resolve_algo_dir(cfg, key, run_id=rid) / "eval_metrics.json"
+            try:
+                resolved = path.resolve()
+            except OSError:
+                continue
+            if resolved in seen:
+                continue
+            seen.add(resolved)
+            if not path.exists():
+                continue
+            try:
+                with open(path, encoding="utf-8") as f:
+                    payload = json.load(f)
+            except (OSError, json.JSONDecodeError):
+                continue
+            return payload.get("metrics") or {}, payload.get("lift") or {}
     return {}, {}
 
 
@@ -117,8 +132,9 @@ def load_eval_maps_for_run(
     """
     lift/metrics 맵 (우선순위).
     1) runs/{run_id}/eval_summary.json
-    2) algorithms/eval_summary.json
-    3) algorithms/{algo}/eval_metrics.json (alias·legacy 폴더 포함)
+    2) runs/{run_id}/algorithms/eval_summary.json (Run 격리 시)
+    3) {data_root}/algorithms/eval_summary.json (전역 · Run에 없는 algo 보충)
+    4) algorithms/{algo}/eval_metrics.json (Run 우선 → 전역 fallback)
     """
     lift_map: dict[str, dict] = {}
     metrics_map: dict[str, dict] = {}
@@ -129,10 +145,24 @@ def load_eval_maps_for_run(
             lift, metrics = read_eval_summary_file(run_path)
             merge_eval_maps(lift_map, metrics_map, lift, metrics)
 
-    summary_path = resolve_data_path(cfg, "algorithms", run_id=run_id) / "eval_summary.json"
-    if summary_path.exists():
-        lift, metrics = read_eval_summary_file(summary_path)
+    scoped_summary = (
+        resolve_data_path(cfg, "algorithms", run_id=run_id) / "eval_summary.json"
+    )
+    if scoped_summary.exists():
+        lift, metrics = read_eval_summary_file(scoped_summary)
         merge_eval_maps(lift_map, metrics_map, lift, metrics)
+
+    global_summary = (
+        get_data_root(cfg)
+        / cfg.get("paths", {}).get("algorithms", "algorithms")
+        / "eval_summary.json"
+    )
+    try:
+        if global_summary.exists() and global_summary.resolve() != scoped_summary.resolve():
+            lift, metrics = read_eval_summary_file(global_summary)
+            merge_eval_maps(lift_map, metrics_map, lift, metrics)
+    except OSError:
+        pass
 
     seen: set[str] = set()
     for algo in algos or []:

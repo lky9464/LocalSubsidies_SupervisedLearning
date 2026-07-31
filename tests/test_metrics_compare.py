@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from api.services.metrics import build_compare_frame, radar_chart_data, radar_chart_data
+from api.services.metrics import build_compare_frame, radar_chart_data
 from src.evaluate.eval_snapshot import load_eval_maps_for_run, save_run_eval_summary
 
 

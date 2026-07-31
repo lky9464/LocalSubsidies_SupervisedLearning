@@ -15,7 +15,7 @@
 | 09 | `09_report.py` | 집계 리포트 | `outputs/reports/` |
 | 10 | `10_ops_queue.py` | 타겟 포착 분포 (Test 주/보 A~D · 4×4) | `algorithms/operations/ops_queue_test.*` |
 | 11 | `11_score_inference.py` | 라벨 미지 추론 · 점검 우선순위표 | `scores/inference/{algo}_inference_scores*` · `ops_queue_inference.*` |
-| 12 | `12_tune_hyperparams.py` | Validation 하이퍼 탐색 (RF·CatBoost, Test 미사용) | `outputs/reports/comparison/hyperparam_tune_*` |
+| 12 | `12_tune_hyperparams.py` | Validation 하이퍼 탐색 (Test 미사용) | `outputs/reports/tuning/{output_tag}/hyperparam_tune_*` |
 
 웹 UI **학습 파이프라인**은 01~10만 포함합니다. 추론(11)은 **추론** 메뉴입니다.  
 튜닝(12)은 CLI 전용이며, 반영 후 다시 `05`~`10`으로 Test 확정합니다. 상세: [`model_tuning.md`](model_tuning.md).

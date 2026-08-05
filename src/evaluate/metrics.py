@@ -10,6 +10,7 @@ from sklearn.metrics import (
     average_precision_score,
     confusion_matrix,
     f1_score,
+    precision_recall_curve,
     precision_score,
     recall_score,
     roc_auc_score,
@@ -44,6 +45,35 @@ def compute_classification_metrics(
         out["ROC_AUC(ROC_AUC)"] = None
         out["PR_AUC(AveragePrecision)"] = None
     return out
+
+
+def compute_pr_curve_points(
+    y_true: np.ndarray,
+    y_proba: np.ndarray,
+    *,
+    max_points: int = 80,
+) -> dict[str, Any] | None:
+    """PR curve 좌표 + PR-AUC·baseline (웹 차트·eval_metrics 저장용)."""
+    y_true = np.asarray(y_true)
+    y_proba = np.asarray(y_proba, dtype=float)
+    if len(y_true) == 0 or len(np.unique(y_true)) < 2:
+        return None
+
+    precision, recall, _ = precision_recall_curve(y_true, y_proba)
+    pr_auc = float(average_precision_score(y_true, y_proba))
+    baseline = float(y_true.mean())
+
+    if len(recall) > max_points:
+        idx = np.linspace(0, len(recall) - 1, max_points, dtype=int)
+        precision = precision[idx]
+        recall = recall[idx]
+
+    return {
+        "recall": [round(float(x), 6) for x in recall],
+        "precision": [round(float(x), 6) for x in precision],
+        "pr_auc": round(pr_auc, 6),
+        "baseline": round(baseline, 6),
+    }
 
 
 def top_k_lift(

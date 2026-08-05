@@ -198,7 +198,7 @@ def _parse_metric_value(v: Any) -> float | None:
 def radar_chart_data(compare_df: pd.DataFrame, metrics: list[str] | None = None) -> dict:
     """Min-max normalized radar series for Recharts (모델별 algo_key 고유)."""
     if compare_df.empty:
-        return {"metrics": [], "series": []}
+        return {"metrics": [], "series": [], "axis_scales": {}}
 
     numeric_cols = [
         "PR-AUC",
@@ -215,7 +215,7 @@ def radar_chart_data(compare_df: pd.DataFrame, metrics: list[str] | None = None)
     selected = metrics or list(DEFAULT_RADAR_METRICS)
     selected = [m for m in selected if m in available]
     if len(selected) < 3:
-        return {"metrics": selected, "series": []}
+        return {"metrics": selected, "series": [], "axis_scales": {}}
 
     mins = {m: float("inf") for m in selected}
     maxs = {m: float("-inf") for m in selected}
@@ -232,20 +232,26 @@ def radar_chart_data(compare_df: pd.DataFrame, metrics: list[str] | None = None)
             mins[m] = 0.0
             maxs[m] = 1.0
 
+    axis_scales = {
+        m: {"min": round(mins[m], 6), "max": round(maxs[m], 6)} for m in selected
+    }
+
     series = []
     seen_ids: set[str] = set()
     for idx, row in compare_df.iterrows():
         display = str(row.get("알고리즘") or "")
         algo_key = str(row.get("algo_key") or display or f"model_{idx}")
+        role = str(row.get("역할") or "")
         series_id = algo_key
         if series_id in seen_ids:
             series_id = f"{algo_key}__{idx}"
         seen_ids.add(series_id)
         values: dict[str, float] = {}
+        raw: dict[str, float | None] = {}
         for m in selected:
             fv = _parse_metric_value(row.get(m))
+            raw[m] = fv
             if fv is None:
-                # 결측은 축 최솟값(0) — 다른 모델과 겹치지 않도록 id는 algo_key 유지
                 values[m] = 0.0
                 continue
             lo, hi = mins[m], maxs[m]
@@ -253,6 +259,16 @@ def radar_chart_data(compare_df: pd.DataFrame, metrics: list[str] | None = None)
                 values[m] = (fv - lo) / (hi - lo)
             else:
                 values[m] = 0.5
-        series.append({"id": series_id, "name": display or algo_key, "values": values})
+        default_visible = role in ("primary", "aux", "reference")
+        series.append(
+            {
+                "id": series_id,
+                "name": display or algo_key,
+                "role": role,
+                "default_visible": default_visible,
+                "values": values,
+                "raw": raw,
+            }
+        )
 
-    return {"metrics": selected, "series": series}
+    return {"metrics": selected, "series": series, "axis_scales": axis_scales}

@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "target_version": "0.7.0",
+  "target_version": "0.7.1",
   "from_min": "0.3.0",
   "mode": "full_sync",
   "preserve_always": [
@@ -51,6 +51,13 @@
     }
   },
   "releases": [
+    {
+      "version": "0.7.1",
+      "from_min": "0.3.0",
+      "update_type": "full_sync",
+      "wheels_reinstall": true,
+      "notes": "Full sync. Model comparison SHAP/PR-AUC UI, 06 SHAP_total, 07 PR curve, CleanupLegacy tuning preserve. shap dep — reinstall wheels on offline PCs."
+    },
     {
       "version": "0.7.0",
       "from_min": "0.3.0",

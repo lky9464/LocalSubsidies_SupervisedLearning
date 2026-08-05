@@ -1,5 +1,5 @@
 """
-[로컬 전용] 알고리즘별 Feature 중요도 TOP10 + 기여도 + 사유
+[로컬 전용] 알고리즘별 Feature 중요도 TOP10 + SHAP 전역 + 기여도 + 사유
 
 선행: 05_train.py (모델 학습 완료 후)
 후행: 07_evaluate.py (test_scores TOP10 열에 사용)
@@ -7,6 +7,7 @@
 출력:
 - {data_root}/algorithms/{algo}/feature_top10.json  (evaluate/inference용)
 - outputs/reports/{algo}/feature_importance_top10.xlsx
+- outputs/reports/{algo}/SHAP_total.xlsx
 - outputs/reports/comparison/feature_importance_top10_all.xlsx
 
 Cursor Agent는 이 스크립트를 실행하지 마세요.
@@ -30,17 +31,20 @@ from src.evaluate.feature_importance import (  # noqa: E402
     load_column_comments,
     strip_transformer_prefix,
 )
+from src.evaluate.shap_importance import compute_shap_total, write_shap_total_xlsx  # noqa: E402
 from src.features.group_audit import align_labeled_to_split_masks  # noqa: E402
 from src.features.preprocess import encode_target, transform_features  # noqa: E402
 from src.io.banner import print_banner  # noqa: E402
 from src.io.config import (  # noqa: E402
     PROJECT_ROOT,
     ensure_algo_dirs,
+    get_active_run_id,
     load_config,
     resolve_algo_dir,
     resolve_algo_report_dir,
     resolve_data_path,
     resolve_repo_path,
+    resolve_run_algo_report_dir,
 )
 from src.pipeline.run_config import resolve_pipeline_algorithms  # noqa: E402
 from src.scoring.score_table import save_top_features_json  # noqa: E402
@@ -61,6 +65,9 @@ def main() -> None:
     algorithms = resolve_pipeline_algorithms(cfg)
     ensure_algo_dirs(cfg, algorithms)
     top_n = int(cfg.get("feature_importance", {}).get("top_n", 10))
+    fi_cfg = cfg.get("feature_importance", {})
+    shap_enabled = bool(fi_cfg.get("shap_enabled", True))
+    shap_sample_size = int(fi_cfg.get("shap_sample_size", 8000))
 
     interim = resolve_data_path(cfg, "interim")
     processed = resolve_data_path(cfg, "processed")
@@ -172,6 +179,34 @@ def main() -> None:
                 f"({r['피처명한글(feature_ko)']}) "
                 f"비중={r['기여도비중(importance_share)']:.2%}"
             )
+
+        if shap_enabled:
+            print(f"[shap] === {algo} SHAP 전역 중요도 산출 ===")
+            shap_df = compute_shap_total(
+                algo,
+                model,
+                feat_names,
+                X_te,
+                y_test,
+                comments,
+                sample_size=shap_sample_size,
+            )
+            shap_path = out_dir / "SHAP_total.xlsx"
+            write_shap_total_xlsx(shap_path, shap_df)
+            print(f"[shap] 저장: {shap_path}")
+            run_id = get_active_run_id()
+            run_report = resolve_run_algo_report_dir(cfg, algo, run_id=run_id)
+            if run_report is not None:
+                run_report.mkdir(parents=True, exist_ok=True)
+                run_shap_path = run_report / "SHAP_total.xlsx"
+                write_shap_total_xlsx(run_shap_path, shap_df)
+                print(f"[shap] Run 저장: {run_shap_path}")
+            for _, r in shap_df.head(top_n).iterrows():
+                print(
+                    f"  #{int(r['순위(rank)'])} {r['피처명(feature)']} "
+                    f"비중={r['기여도비중(importance_share)']:.2%} "
+                    f"방향={r['기여방향표시(direction_label)']}"
+                )
 
     if not all_rows:
         print("[fi] 결과 없음")

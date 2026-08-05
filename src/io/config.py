@@ -159,11 +159,24 @@ def resolve_repo_path(cfg: dict[str, Any], key: str) -> Path:
 
 
 def resolve_run_reports_dir(cfg: dict[str, Any], run_id: str | None = None) -> Path | None:
-    """Run별 리포트(누수점검 JSON 등). run_id 없으면 None."""
+    """Run별 리포트(SHAP·누수점검 JSON 등). run_id 없으면 None."""
     ws = run_workspace(cfg, run_id)
     if ws is None:
         return None
     return ws / "reports"
+
+
+def resolve_run_algo_report_dir(
+    cfg: dict[str, Any],
+    algo: str,
+    *,
+    run_id: str | None = None,
+) -> Path | None:
+    """Run별 알고리즘 리포트: {data_root}/runs/{run_id}/reports/{algo}/"""
+    base = resolve_run_reports_dir(cfg, run_id)
+    if base is None:
+        return None
+    return base / algo
 
 
 def resolve_algo_dir(

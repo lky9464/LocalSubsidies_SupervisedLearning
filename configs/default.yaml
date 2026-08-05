@@ -135,11 +135,13 @@ evaluation:
   score_bins: 10
   min_cell_count: 5  # 리포트 셀 n<5 마스킹
 
-# Feature 중요도 TOP-N
+# Feature 중요도 TOP-N · SHAP 전역(06)
 feature_importance:
   top_n: 10
   permutation_sample_size: 8000
   permutation_repeats: 2
+  shap_enabled: true
+  shap_sample_size: 8000
 
 # 주·보 상위% 구간 A~D (4×4). Test=타겟 포착 분포(10), 추론=점검 우선순위표
 # primary_algo / aux_algo: 평가·순위(08) 후 설정. 데이터 변경 시 갱신 (고정 아님)

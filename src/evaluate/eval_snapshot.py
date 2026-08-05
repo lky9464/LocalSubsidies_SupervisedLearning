@@ -64,13 +64,21 @@ def register_eval_entry(
             metrics_map[alias] = m
 
 
-def load_per_algo_eval(
+def _read_eval_metrics_file(path: Path) -> dict[str, Any]:
+    try:
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def load_per_algo_eval_payload(
     cfg: dict[str, Any],
     algo: str,
     *,
     run_id: str | None = None,
-) -> tuple[dict, dict]:
-    """Run 격리 경로 우선, 없으면 전역 algorithms/{algo}/eval_metrics.json."""
+) -> dict[str, Any]:
+    """Run 격리 경로 우선 eval_metrics.json 전체 payload."""
     lookup_runs: list[str | None] = []
     if run_id:
         lookup_runs.append(run_id)
@@ -89,13 +97,33 @@ def load_per_algo_eval(
             seen.add(resolved)
             if not path.exists():
                 continue
-            try:
-                with open(path, encoding="utf-8") as f:
-                    payload = json.load(f)
-            except (OSError, json.JSONDecodeError):
-                continue
-            return payload.get("metrics") or {}, payload.get("lift") or {}
-    return {}, {}
+            payload = _read_eval_metrics_file(path)
+            if payload:
+                return payload
+    return {}
+
+
+def load_per_algo_eval(
+    cfg: dict[str, Any],
+    algo: str,
+    *,
+    run_id: str | None = None,
+) -> tuple[dict, dict]:
+    """Run 격리 경로 우선, 없으면 전역 algorithms/{algo}/eval_metrics.json."""
+    payload = load_per_algo_eval_payload(cfg, algo, run_id=run_id)
+    return payload.get("metrics") or {}, payload.get("lift") or {}
+
+
+def load_per_algo_pr_curve(
+    cfg: dict[str, Any],
+    algo: str,
+    *,
+    run_id: str | None = None,
+) -> dict[str, Any] | None:
+    """eval_metrics.json 의 pr_curve (Run 우선)."""
+    payload = load_per_algo_eval_payload(cfg, algo, run_id=run_id)
+    curve = payload.get("pr_curve")
+    return curve if isinstance(curve, dict) else None
 
 
 def pick_eval_for_algo(

@@ -28,6 +28,7 @@ sys.path.insert(0, str(ROOT))
 
 from src.evaluate.metrics import (  # noqa: E402
     compute_classification_metrics,
+    compute_pr_curve_points,
     score_bin_target_rate,
     top_k_lift,
 )
@@ -111,6 +112,7 @@ def main() -> None:
     all_metrics = {}
     all_lift = {}
     all_bins = {}
+    all_pr_curves = {}
     algo_root = resolve_data_path(cfg, "algorithms")
 
     for algo in algorithms:
@@ -132,6 +134,7 @@ def main() -> None:
         )
 
         metrics = compute_classification_metrics(y_test, pred, proba)
+        pr_curve = compute_pr_curve_points(y_test, proba)
         lift = top_k_lift(y_test, scores, eval_cfg.get("top_k_percents", [1, 5, 10]))
         bins = score_bin_target_rate(
             y_test,
@@ -142,6 +145,8 @@ def main() -> None:
         all_metrics[algo] = metrics
         all_lift[algo] = lift
         all_bins[algo] = bins
+        if pr_curve:
+            all_pr_curves[algo] = pr_curve
 
         top_feats = resolve_top_features_for_algo(algo, cfg, top_n=top_n)
         if not top_feats:
@@ -195,6 +200,7 @@ def main() -> None:
                     "metrics": metrics,
                     "lift": lift,
                     "score_bins": bins,
+                    "pr_curve": pr_curve,
                     "score_extra_top_features": [
                         {"rank": i + 1, "feature": en, "feature_ko": ko}
                         for i, (en, ko) in enumerate(top_feats)
@@ -208,7 +214,12 @@ def main() -> None:
     summary_path = algo_root / "eval_summary.json"
     with open(summary_path, "w", encoding="utf-8") as f:
         json.dump(
-            {"metrics": all_metrics, "lift": all_lift, "bins": all_bins},
+            {
+                "metrics": all_metrics,
+                "lift": all_lift,
+                "bins": all_bins,
+                "pr_curves": all_pr_curves,
+            },
             f,
             ensure_ascii=False,
             indent=2,

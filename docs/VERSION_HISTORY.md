@@ -1,10 +1,23 @@
 # 버전 이력
 
-현재 버전: **v0.7.0**  
+현재 버전: **v0.7.1**  
 저장소: [LocalSubsidies_SupervisedLearning](https://github.com/lky9464/LocalSubsidies_SupervisedLearning)  
 릴리스: [Releases](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases)
 
 새 버전을 낼 때 이 문서 상단에 항목을 추가하고, GitHub Release/태그와 맞춥니다.
+
+---
+
+## v0.7.1 — 모델 비교·평가 SHAP·PR-AUC · CleanupLegacy tuning 보존
+
+- **모델 비교·평가 UI:** 레이더 축 max·체크박스 범례 · SHAP TOP10(주·보·참) · PR-AUC 곡선 · Test 4×4 제거(타겟 포착 분포로 이관)
+- **06 SHAP:** 전역 mean |SHAP| · 방향(±) · `SHAP_total.xlsx` · Run-scoped `runs/{run_id}/reports/{algo}/`
+- **07:** Test PR curve 포인트 `eval_metrics.json` 저장 · API insights 연동
+- **SHAP TOP10 차트:** 일방향 막대(절대 기여비중) — 점수 방향 오해 방지
+- **CleanupLegacy:** `outputs/reports/tuning/` 보존 · `--also-tuning` 옵션
+- **deps:** `shap` 추가 — 오프라인 PC는 wheels 재설치 권장 ([`offline_update.md`](offline_update.md))
+
+[Release v0.7.1](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases/tag/v0.7.1)
 
 ---
 

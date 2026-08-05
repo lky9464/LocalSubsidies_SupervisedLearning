@@ -19,7 +19,8 @@ echo ========================================
 echo.
 echo Stop RunWebNext.bat first.
 echo Keeps: raw\, raw_inference\, configs\local.yaml
-echo Removes: interim, processed, algorithms, runs, ops, outputs\reports\*
+echo Removes: interim, processed, algorithms, runs, ops, outputs\reports\* (except tuning\)
+echo Keeps tuning: outputs\reports\tuning\  (v2, v3 hyperparam results)
 echo.
 echo Guide: docs\offline_setup.md / scripts\cleanup_legacy_artifacts.py
 echo.

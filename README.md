@@ -1,9 +1,10 @@
 # 지방보조금 부정수급 위험도 — 지도학습
 
-[![Release v0.7.0](https://img.shields.io/github/v/tag/lky9464/LocalSubsidies_SupervisedLearning?label=v0.7.0)](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases/tag/v0.7.0)
+[![Release v0.7.1](https://img.shields.io/github/v/tag/lky9464/LocalSubsidies_SupervisedLearning?label=v0.7.1)](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases/tag/v0.7.1)
 
 지방보조금 부정수급 **위험도 점수(0~1000)** 측정을 위한 지도학습 파이프라인 + **로컬 웹 UI**입니다.
 
+- **v0.7.1** — 모델 비교·평가 SHAP·PR-AUC · 06 SHAP_total · CleanupLegacy tuning 보존 · ([`VERSION_HISTORY`](docs/VERSION_HISTORY.md))
 - **v0.7.0** — 엔티티 무중복 Valid 튜닝 · `{family}_v3` · `configs/tune.yaml` · `tuning/vN/` · CLI `tune_batch` · ([`VERSION_HISTORY`](docs/VERSION_HISTORY.md))
 - **v0.6.2** — 행 PK 결측 제외(03·04~07·11) · labeled/mask 정렬 · ([`VERSION_HISTORY`](docs/VERSION_HISTORY.md))
 - **v0.6.1** — 사업·기관 무중복 분할(`group_random`) · 04 그룹 감사 · UI · ([`VERSION_HISTORY`](docs/VERSION_HISTORY.md))

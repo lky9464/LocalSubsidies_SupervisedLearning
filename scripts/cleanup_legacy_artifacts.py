@@ -7,17 +7,20 @@
   - {data_root}/runs/**  (run_config·로그·Job·스냅샷·_*.json)
   - {data_root}/ops/**   (ops.sqlite 포함)
   - 프로젝트 outputs/reports/**  (Excel·PDF 등, 폴더는 유지)
+    ※ outputs/reports/tuning/ (v2·v3 튜닝 결과) 는 기본 보존
 
 보존 (기본):
   - {data_root}/raw/**
   - {data_root}/raw_inference/**
   - configs/local.yaml
+  - outputs/reports/tuning/**  (하이퍼파라미터 튜닝 v2·v3 등)
 
 Cursor Agent는 실행하지 마세요. 웹 서버를 종료한 뒤 사용자가 로컬에서 실행합니다.
 
   python scripts/cleanup_legacy_artifacts.py
   python scripts/cleanup_legacy_artifacts.py --yes
   python scripts/cleanup_legacy_artifacts.py --yes --also-raw   # raw 까지 삭제 (주의)
+  python scripts/cleanup_legacy_artifacts.py --yes --also-tuning  # tuning/ 까지 삭제 (주의)
 """
 
 from __future__ import annotations
@@ -45,6 +48,9 @@ REPO_REPORT_DIRS = (
     ROOT / "outputs" / "reports",
 )
 
+# 서비스 업데이트·Run 초기화 후에도 유지할 reports 하위 (튜닝 v2·v3 등)
+REPORTS_PRESERVE_SUBDIRS = frozenset({"tuning"})
+
 
 def _rm_tree(path: Path) -> bool:
     if not path.exists():
@@ -56,14 +62,24 @@ def _rm_tree(path: Path) -> bool:
     return True
 
 
-def _clear_dir_contents(path: Path) -> int:
-    """디렉터리 자체는 두고 하위만 삭제. 없으면 생성."""
-    path.mkdir(parents=True, exist_ok=True)
-    n = 0
-    for child in list(path.iterdir()):
+
+def _clear_reports_dir(
+    reports_dir: Path,
+    *,
+    preserve_subdirs: frozenset[str] = REPORTS_PRESERVE_SUBDIRS,
+) -> tuple[int, list[str]]:
+    """outputs/reports 내용 정리. tuning/ 등 preserve_subdirs 는 유지."""
+    reports_dir.mkdir(parents=True, exist_ok=True)
+    removed = 0
+    kept: list[str] = []
+    for child in list(reports_dir.iterdir()):
+        if child.is_dir() and child.name in preserve_subdirs:
+            kept.append(child.name)
+            continue
         _rm_tree(child)
-        n += 1
-    return n
+        removed += 1
+    (reports_dir / "comparison").mkdir(parents=True, exist_ok=True)
+    return removed, kept
 
 
 def main() -> int:
@@ -85,6 +101,11 @@ def main() -> int:
         "--skip-reports",
         action="store_true",
         help="Do not clear project outputs/reports",
+    )
+    parser.add_argument(
+        "--also-tuning",
+        action="store_true",
+        help="Also delete outputs/reports/tuning/ (hyperparam tune v2·v3 artifacts)",
     )
     parser.add_argument(
         "data_root",
@@ -127,13 +148,20 @@ def main() -> int:
         print(f"  - {label}  [{mark}]")
     if not args.skip_reports:
         for rd in REPO_REPORT_DIRS:
-            print(f"  - (repo) {rd.relative_to(ROOT)}/  [contents]")
+            if args.also_tuning:
+                print(f"  - (repo) {rd.relative_to(ROOT)}/  [contents incl. tuning]")
+            else:
+                print(
+                    f"  - (repo) {rd.relative_to(ROOT)}/  [contents except tuning/]"
+                )
     print()
     print("Will KEEP:")
     if not args.also_raw:
         print("  - raw/")
         print("  - raw_inference/")
     print("  - configs/local.yaml")
+    if not args.skip_reports and not args.also_tuning:
+        print("  - outputs/reports/tuning/  (hyperparam tune v2·v3)")
     print()
 
     if not args.yes:
@@ -152,11 +180,11 @@ def main() -> int:
         print(f"  removed: {t.name}/")
 
     if not args.skip_reports:
+        preserve = frozenset() if args.also_tuning else REPORTS_PRESERVE_SUBDIRS
         for rd in REPO_REPORT_DIRS:
-            n = _clear_dir_contents(rd)
-            # keep comparison subdir empty for scripts that assume it
-            (rd / "comparison").mkdir(parents=True, exist_ok=True)
-            print(f"  cleared: outputs/reports/ ({n} top-level entries) + comparison/")
+            n, kept = _clear_reports_dir(rd, preserve_subdirs=preserve)
+            kept_msg = f", kept {', '.join(kept)}" if kept else ""
+            print(f"  cleared: outputs/reports/ ({n} top-level entries{kept_msg}) + comparison/")
 
     # Recreate empty skeleton (shared only — Run outputs live under runs/{run_id}/)
     for name in ("ops", "runs"):

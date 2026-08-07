@@ -139,6 +139,9 @@ algo_id 형식·마이그레이션: [`algo_id_migration.md`](algo_id_migration.m
 
 ## 5. 타겟 포착 분포 · 점검 우선순위표 (주·보 = ops_queue 설정)
 
+> **확장 설계 (진행 중):** PK·엔티티 4매트릭스, 주/참·보/참 케이스, ops UI 개편 — [`target_capture_distribution.md`](target_capture_distribution.md) (Phase 0).  
+> 아래 §5.1~5.2는 **percentile·우선순위 공식**의 기준 문서이며, 구현 완료 후 표·산출물 표를 동기화한다.
+
 동일 주·보 상위% 구간 규칙을 쓰되 용도를 나눈다.  
 **주·보에 쓰는 알고리즘**은 `configs/default.yaml`의 `ops_queue.primary_algo` / `aux_algo` (웹 대시보드·모델 비교에서 확인).
 
@@ -181,8 +184,8 @@ Test 집계(양성 비율 약 0.27%) 및 상위 K% 리프트·점수구간 결�
 | 9~12 | 주C×보A~보D | 주C 구간 |
 | 13~16 | 주D×보A~보D | 후순위(보조만 높아도 주D면 후순위) |
 
-산출(로컬 전용): `{data_root}/algorithms/operations/ops_queue_test.csv`  
-및 `ops_queue_test.xlsx` (시트 `전체` / `우선순위요약` / `4x4전체` / `4x4실제양성` / `주A` / `주B` / `주C`).
+산출(로컬 전용): `{data_root}/algorithms/operations/ops_queue_test_pk.csv` · `ops_queue_test_pk.xlsx`  
+및 `ops_queue_test_entity.csv` · `ops_queue_test_entity.xlsx` (케이스별 시트 · 4×4). 상세: [`target_capture_distribution.md`](target_capture_distribution.md).
 
 **Test vs 추론 화면**
 
@@ -268,7 +271,7 @@ Stacked 등 **참고 모델**은 분쟁·재검토 시에만 사용 (단독 4×4
 | 모델 성능 비교 | `outputs/reports/comparison/model_evaluation_comparison.xlsx` |
 | 누수 감사 | `outputs/reports/comparison/leakage_audit.xlsx` |
 | Feature TOP10 | `outputs/reports/comparison/feature_importance_top10_all.xlsx` |
-| 타겟 포착 분포 (Test, 로컬) | `{data_root}/algorithms/operations/ops_queue_test.*` |
+| 타겟 포착 분포 (Test, 로컬) | `{data_root}/algorithms/operations/ops_queue_test_pk.*` · `ops_queue_test_entity.*` |
 | 점검 우선순위표 (추론, 로컬) | `{data_root}/algorithms/operations/ops_queue_inference.*` |
 | 지표 해설 | `docs/metrics_guide.md` |
 | 타겟 정의 | `docs/label_definition.md` |

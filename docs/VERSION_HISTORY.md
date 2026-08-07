@@ -1,10 +1,22 @@
 # 버전 이력
 
-현재 버전: **v0.7.1**  
+현재 버전: **v0.7.2**  
 저장소: [LocalSubsidies_SupervisedLearning](https://github.com/lky9464/LocalSubsidies_SupervisedLearning)  
 릴리스: [Releases](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases)
 
 새 버전을 낼 때 이 문서 상단에 항목을 추가하고, GitHub Release/태그와 맞춥니다.
+
+---
+
+## v0.7.2 — 타겟 포착 분포 확장 · 모델 점수·TOP10 분포 UI
+
+- **타겟 포착 분포 (`/ops`):** 3케이스(주/보·주/참·보/참) · PK·엔티티 4×4(A-1~B-2) · `ops_queue_test_pk.*` / `ops_queue_test_entity.*` · `10_ops_queue`·`ops.sqlite` 확장
+- **모델 비교·평가:** Test 점수 10구간 분포(주·보·참, PK/엔티티 탭) · SHAP 카드 「TOP10별 점수분포」 팝업(수치·범주형, PK/엔티티)
+- **API:** `/models/score-distribution` · `/models/feature-distribution` · `ops-queue` cases 페이로드
+- **설계 문서:** [`target_capture_distribution.md`](target_capture_distribution.md) · pipeline·operations_criteria 갱신
+- **deps/UI 빌드:** `web/out` 갱신 · 오프라인 full sync ([`offline_update.md`](offline_update.md))
+
+[Release v0.7.2](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases/tag/v0.7.2)
 
 ---
 

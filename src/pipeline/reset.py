@@ -157,8 +157,10 @@ def delete_run_artifacts_from(
             if "ops_queue" in ids:
                 ops = algorithms / "operations"
                 for name in (
-                    "ops_queue_test.csv",
-                    "ops_queue_test.xlsx",
+                    "ops_queue_test_pk.csv",
+                    "ops_queue_test_pk.xlsx",
+                    "ops_queue_test_entity.csv",
+                    "ops_queue_test_entity.xlsx",
                 ):
                     p = ops / name
                     if p.exists():

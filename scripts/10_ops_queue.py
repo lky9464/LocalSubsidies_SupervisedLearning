@@ -1,15 +1,13 @@
 """
-[로컬 전용] Test 타겟 포착 분포 (주/보 상위% A~D · 4×4 · 우선순위 1~16)
+[로컬 전용] Test 타겟 포착 분포 (3케이스 · PK·엔티티 · 4×4)
 
-Test 평가용: 주·보조가 실제 타겟을 어디에 모았는지 집계.
-(추론 단계의「점검 우선순위표」와 동일 구간 규칙, 용도만 다름)
-
-선행: 07_evaluate.py (주·보조 *_test_scores.csv), 08_update_ranking.py 권장
+선행: 07_evaluate.py, 08_update_ranking.py 권장
 
 출력 (GitHub 금지):
-→ {data_root}/algorithms/operations/ops_queue_test.csv
-→ {data_root}/algorithms/operations/ops_queue_test.xlsx
-   (시트: 전체, 우선순위요약, 4x4전체, 4x4실제양성, 주A, 주B, 주C)
+→ {data_root}/algorithms/operations/ops_queue_test_pk.csv
+→ {data_root}/algorithms/operations/ops_queue_test_pk.xlsx
+→ {data_root}/algorithms/operations/ops_queue_test_entity.csv
+→ {data_root}/algorithms/operations/ops_queue_test_entity.xlsx
 
 Cursor Agent는 이 스크립트를 실행하지 마세요.
 """
@@ -30,47 +28,64 @@ from src.io.config import (  # noqa: E402
     resolve_data_path,
 )
 from src.ops_db.repository import OpsRepository  # noqa: E402
-from src.pipeline.ranking import load_model_ranking  # noqa: E402
 from src.pipeline.run_config import pipeline_run_id, resolve_pipeline_run_id  # noqa: E402
-from src.scoring.ops_queue import (  # noqa: E402
-    GRADE_COL,
-    PRIMARY_LABELS,
-    PRIORITY_COL,
-    build_ops_queue,
-    summarize_matrix,
-    write_ops_queue_excel,
+from src.scoring.ops_capture import (  # noqa: E402
+    CASE_AUX_REF,
+    CASE_ID_COL,
+    CASE_PRIMARY_AUX,
+    CASE_PRIMARY_REF,
+    OPS_PAIR_SPECS,
+    OpsPairSpec,
+    aggregate_entity_queue,
+    build_ops_pair_queue,
+    parse_entity_keys,
+    summarize_matrix_for,
+    write_capture_workbook,
 )
-
-
-def _resolve_primary_aux(cfg: dict) -> tuple[str, str, str | None]:
-    """ranking.json → ops DB(현재 Run) → default.yaml 순."""
-    ops_cfg = cfg.get("ops_queue", {})
-    default_p = ops_cfg.get("primary_algo", "random_forest_v1")
-    default_a = ops_cfg.get("aux_algo", "catboost_v1")
-    run_id = pipeline_run_id() or None
-
-    rank_path = resolve_data_path(cfg, "algorithms") / "operations" / "model_ranking.json"
-    ranking = load_model_ranking(rank_path)
-    if ranking:
-        primary = next((r["algo"] for r in ranking if r.get("role") == "primary"), None)
-        aux = next((r["algo"] for r in ranking if r.get("role") == "aux"), None)
-        if primary and aux:
-            return primary, aux, run_id
-
-    try:
-        repo = OpsRepository(cfg)
-        rid = run_id or repo.get_latest_run_id()
-        return (*repo.get_primary_aux(rid), rid)
-    except Exception:  # noqa: BLE001
-        return default_p, default_a, run_id
 
 
 def _load_scores(path: Path, encoding: str):
     if not path.exists():
-        raise FileNotFoundError(f"{path} 없음. 먼저 07_evaluate.py를 실행하세요.")
+        return None
     import pandas as pd
 
     return pd.read_csv(path, encoding=encoding, dtype=str, low_memory=False)
+
+
+def _score_df(cfg: dict, algo: str | None):
+    if not algo:
+        return None
+    path = resolve_algo_score_csv(cfg, algo, "test")
+    encoding = cfg.get("encoding", "EUC-KR")
+    return _load_scores(path, encoding)
+
+
+def _case_row_col_dfs(
+    spec: OpsPairSpec,
+    scores: dict[str, object],
+    roles: dict[str, str | None],
+) -> tuple[object | None, object | None, str | None]:
+    primary = roles.get("primary")
+    aux = roles.get("aux")
+    reference = roles.get("reference")
+
+    if spec.case_id == CASE_PRIMARY_AUX:
+        return scores.get(primary), scores.get(aux), None
+    if spec.case_id == CASE_PRIMARY_REF:
+        if not reference:
+            return None, None, "참조 모델(reference) 없음 — 08 순위 3위 또는 Test 점수 필요"
+        ref_df = scores.get(reference)
+        if ref_df is None:
+            return None, None, f"참조 모델 Test 점수 없음: {reference}"
+        return scores.get(primary), ref_df, None
+    if spec.case_id == CASE_AUX_REF:
+        if not reference:
+            return None, None, "참조 모델(reference) 없음 — 08 순위 3위 또는 Test 점수 필요"
+        ref_df = scores.get(reference)
+        if ref_df is None:
+            return None, None, f"참조 모델 Test 점수 없음: {reference}"
+        return scores.get(aux), ref_df, None
+    return None, None, "unknown case"
 
 
 def main() -> None:
@@ -78,58 +93,84 @@ def main() -> None:
     cfg = load_config()
     encoding = cfg.get("encoding", "EUC-KR")
     ops_cfg = dict(cfg.get("ops_queue", {}))
-    primary, aux, run_id = _resolve_primary_aux(cfg)
-    ops_cfg["primary_algo"] = primary
-    ops_cfg["aux_algo"] = aux
     keys = list(cfg.get("key_columns", []))
-    print(f"[ops] 타겟 포착 분포(Test) · 주={primary}, 보조={aux}")
-
-    primary_path = resolve_algo_score_csv(cfg, primary, "test")
-    aux_path = resolve_algo_score_csv(cfg, aux, "test")
-
-    print(f"[ops] 주 모델 점수 로드: {primary_path}")
-    primary_df = _load_scores(primary_path, encoding)
-
-    aux_df = None
-    if aux_path.exists():
-        print(f"[ops] 보조 모델 점수 로드: {aux_path}")
-        aux_df = _load_scores(aux_path, encoding)
-    else:
-        print(f"[ops] 경고: {aux_path} 없음. 보조등급은 보D로 둡니다.")
-
-    queue = build_ops_queue(primary_df, aux_df, keys, ops_cfg)
-
-    out_dir = resolve_data_path(cfg, "algorithms") / "operations"
-    out_dir.mkdir(parents=True, exist_ok=True)
-    csv_path = out_dir / "ops_queue_test.csv"
-    xlsx_path = out_dir / "ops_queue_test.xlsx"
-
-    queue.to_csv(csv_path, index=False, encoding=encoding)
-    write_ops_queue_excel(queue, xlsx_path, mode="test")
+    entity_keys = parse_entity_keys(cfg)
 
     repo = OpsRepository(cfg)
     run_id = resolve_pipeline_run_id(cfg, repo=repo)
-    repo.ensure_run(run_id, note="ops_priority")
-    n = repo.replace_ops_queue(run_id, queue)
-    print(f"[ops] DB 적재: run_id={run_id}, rows={n:,}")
+    roles = repo.get_roles(run_id)
+    primary, aux, reference = (
+        roles["primary"],
+        roles["aux"],
+        roles["reference"],
+    )
+    ops_cfg["primary_algo"] = primary
+    ops_cfg["aux_algo"] = aux
 
-    counts = queue[GRADE_COL].value_counts().reindex(list(PRIMARY_LABELS)).fillna(0)
-    print("[ops] 주등급별 건수:")
-    for g, n_g in counts.items():
-        print(f"  {g}: {int(n_g):,}")
-    print("[ops] 4×4 전체:")
-    print(summarize_matrix(queue).to_string())
-    print("[ops] 4×4 실제 타겟=1:")
-    print(summarize_matrix(queue, positive_only=True).to_string())
-    top = queue.head(5)
-    if PRIORITY_COL in top.columns:
-        print(
-            f"[ops] 최우선 미리보기(집계): 우선순위 "
-            f"{int(top[PRIORITY_COL].iloc[0])} ~ "
-            f"{int(top[PRIORITY_COL].iloc[-1])} 구간 상위 행"
+    print(
+        f"[ops] 타겟 포착 분포(Test) · 주={primary}, 보={aux}, 참={reference or '(없음)'}"
+    )
+
+    score_cache: dict[str, object] = {}
+    for algo in {primary, aux, reference}:
+        if algo and algo not in score_cache:
+            df = _score_df(cfg, algo)
+            if df is not None:
+                print(f"[ops] 점수 로드: {algo}")
+            score_cache[algo] = df
+
+    pk_queues: list = []
+    entity_queues: list = []
+    pk_by_case: dict[str, object] = {}
+    entity_by_case: dict[str, object] = {}
+
+    import pandas as pd
+
+    for spec in OPS_PAIR_SPECS:
+        row_df, col_df, err = _case_row_col_dfs(spec, score_cache, roles)
+        if err or row_df is None:
+            print(f"[ops] {spec.title}: skip — {err or '행 모델 점수 없음'}")
+            continue
+        if col_df is None:
+            print(f"[ops] {spec.title}: skip — 열 모델 점수 없음")
+            continue
+
+        pk_q = build_ops_pair_queue(row_df, col_df, keys, ops_cfg, spec)
+        ent_q = aggregate_entity_queue(pk_q, entity_keys, ops_cfg, spec)
+        pk_queues.append(pk_q)
+        entity_queues.append(ent_q)
+        pk_by_case[spec.case_id] = pk_q
+        entity_by_case[spec.case_id] = ent_q
+
+        print(f"[ops] {spec.title}: PK={len(pk_q):,}, entity={len(ent_q):,}")
+        print(f"[ops]   4×4 PK 전체:\n{summarize_matrix_for(pk_q, spec).to_string()}")
+
+    out_dir = resolve_data_path(cfg, "algorithms") / "operations"
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    pk_csv = out_dir / "ops_queue_test_pk.csv"
+    pk_xlsx = out_dir / "ops_queue_test_pk.xlsx"
+    ent_csv = out_dir / "ops_queue_test_entity.csv"
+    ent_xlsx = out_dir / "ops_queue_test_entity.xlsx"
+
+    if pk_queues:
+        pd.concat(pk_queues, ignore_index=True).to_csv(
+            pk_csv, index=False, encoding=encoding
         )
-    print(f"[ops] 저장(로컬전용): {csv_path}")
-    print(f"[ops] 저장(로컬전용): {xlsx_path}")
+        write_capture_workbook(pk_by_case, entity_by_case, pk_xlsx, unit="pk")
+    if entity_queues:
+        pd.concat(entity_queues, ignore_index=True).to_csv(
+            ent_csv, index=False, encoding=encoding
+        )
+        write_capture_workbook(pk_by_case, entity_by_case, ent_xlsx, unit="entity")
+
+    repo.ensure_run(run_id, note="ops_capture")
+    pk_n, ent_n = repo.replace_ops_capture(run_id, pk_queues, entity_queues)
+    print(f"[ops] DB 적재: run_id={run_id}, pk_rows={pk_n:,}, entity_rows={ent_n:,}")
+    print(f"[ops] 저장(로컬전용): {pk_csv}")
+    print(f"[ops] 저장(로컬전용): {pk_xlsx}")
+    print(f"[ops] 저장(로컬전용): {ent_csv}")
+    print(f"[ops] 저장(로컬전용): {ent_xlsx}")
     print(f"[ops] data_root={get_data_root(cfg)}")
 
 

@@ -2,22 +2,17 @@ import type { CSSProperties } from "react";
 import type { MatrixPayload } from "@/lib/types";
 import { cn, formatDisplayValue } from "@/lib/utils";
 
-/** ops_queue.priority_from_bands 와 동일: 주×보 → 1(최우선)~16 */
-const BAND_RANK: Record<string, number> = {
-  주A: 0,
-  주B: 1,
-  주C: 2,
-  주D: 3,
-  보A: 0,
-  보B: 1,
-  보C: 2,
-  보D: 3,
-};
+/** ops_queue.priority_from_bands 와 동일: 행×열 → 1(최우선)~16 */
+const LETTER_RANK: Record<string, number> = { A: 0, B: 1, C: 2, D: 3 };
+
+function bandRank(label: string): number {
+  const m = /^[주보참]([ABCD])$/.exec(label);
+  if (!m) return 3;
+  return LETTER_RANK[m[1]] ?? 3;
+}
 
 export function priorityFromBands(primary: string, aux: string): number {
-  const p = BAND_RANK[primary] ?? 3;
-  const a = BAND_RANK[aux] ?? 3;
-  return p * 4 + a + 1;
+  return bandRank(primary) * 4 + bandRank(aux) + 1;
 }
 
 /** 우선순위 1=진한 적색 … 16=옅은 적색 */
@@ -60,12 +55,15 @@ export function MatrixTable({
   title,
   caption,
   heatByPriority = false,
+  rowAxis = "주",
+  colAxis = "보",
 }: {
   matrix?: MatrixPayload | null;
   title?: string;
   caption?: string;
-  /** 추론 점검용: 셀을 우선순위(1~16) 적색 스케일로 칠함 */
   heatByPriority?: boolean;
+  rowAxis?: string;
+  colAxis?: string;
 }) {
   if (!matrix?.data?.length) return null;
   return (
@@ -78,9 +76,9 @@ export function MatrixTable({
           <thead>
             <tr className="border-b">
               <th className="bg-slate-200/90 px-2 py-2.5 text-left">
-                <span className="text-base font-bold tracking-tight text-slate-900">주</span>
+                <span className="text-base font-bold tracking-tight text-slate-900">{rowAxis}</span>
                 <span className="mx-0.5 font-normal text-slate-400">＼</span>
-                <span className="text-xs font-medium text-slate-500">보</span>
+                <span className="text-xs font-medium text-slate-500">{colAxis}</span>
               </th>
               {matrix.columns.map((c) => (
                 <th
@@ -124,9 +122,9 @@ export function MatrixTable({
         </table>
       </div>
       <p className="text-[11px] text-muted-foreground">
-        행=<span className="font-semibold text-slate-800">주모델 등급</span>
+        행=<span className="font-semibold text-slate-800">{rowAxis} 등급</span>
         {" · "}
-        열=보조모델 등급
+        열={colAxis} 등급
         {heatByPriority ? " · 색이 진할수록 점검 우선순위 높음(1→16)" : null}
       </p>
     </div>
@@ -215,14 +213,112 @@ export function DualMatrices({
         </div>
       </div>
       <div className="grid gap-6 lg:grid-cols-2">
-        <MatrixTable matrix={block.matrix_all} title="(A) 평가 데이터 전체" />
-        <MatrixTable matrix={block.matrix_pos} title="(B) 실제 타겟 분포" />
+        <MatrixTable matrix={block.matrix_all} title="(A-1) 평가 데이터 전체 (PK)" />
+        <MatrixTable matrix={block.matrix_pos} title="(A-2) 실제 타겟 분포 (PK)" />
       </div>
       {block.positive_in_abc_pct != null && block.meta?.positive ? (
         <p className="text-xs text-muted-foreground">
           실제 타겟의 약 {formatDisplayValue(block.positive_in_abc_pct)}%가{" "}
           <span className="font-semibold text-slate-800">주A~주C</span> 구간에 포함됩니다.
         </p>
+      ) : null}
+    </div>
+  );
+}
+
+type MatrixUnitBlock = {
+  all?: MatrixPayload | null;
+  positive?: MatrixPayload | null;
+  meta?: { total?: number; positive?: number };
+  positive_in_abc_pct?: number | null;
+};
+
+export function CaptureMatrixPanel({
+  rowAxis,
+  colAxis,
+  pk,
+  entity,
+}: {
+  rowAxis: string;
+  colAxis: string;
+  pk?: MatrixUnitBlock | null;
+  entity?: MatrixUnitBlock | null;
+}) {
+  const topRow = `${rowAxis}A~${rowAxis}C`;
+  return (
+    <div className="space-y-6">
+      {pk?.meta ? (
+        <div className="space-y-3">
+          <p className="text-sm font-medium">PK 단위 (행)</p>
+          <div className="flex gap-6 text-sm">
+            <div>
+              <span className="text-muted-foreground">평가 전체 </span>
+              <span className="font-semibold">{formatDisplayValue(pk.meta.total ?? 0)}</span>
+            </div>
+            <div>
+              <span className="text-muted-foreground">실제 타겟=1 </span>
+              <span className="font-semibold">{formatDisplayValue(pk.meta.positive ?? 0)}</span>
+            </div>
+          </div>
+          <div className="grid gap-4 xl:grid-cols-2">
+            <MatrixTable
+              matrix={pk.all}
+              title="(A-1) 평가 데이터 전체 (PK)"
+              rowAxis={rowAxis}
+              colAxis={colAxis}
+            />
+            <MatrixTable
+              matrix={pk.positive}
+              title="(A-2) 실제 타겟 분포 (PK)"
+              rowAxis={rowAxis}
+              colAxis={colAxis}
+            />
+          </div>
+          {pk.positive_in_abc_pct != null && pk.meta.positive ? (
+            <p className="text-xs text-muted-foreground">
+              실제 타겟(PK)의 약 {formatDisplayValue(pk.positive_in_abc_pct)}%가{" "}
+              <span className="font-semibold text-slate-800">{topRow}</span> 구간에 포함됩니다.
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+
+      {entity?.meta ? (
+        <div className="space-y-3">
+          <p className="text-sm font-medium">엔티티 단위 (PFM_BIZ_ID · INST_ID)</p>
+          <div className="flex gap-6 text-sm">
+            <div>
+              <span className="text-muted-foreground">평가 전체 </span>
+              <span className="font-semibold">{formatDisplayValue(entity.meta.total ?? 0)}</span>
+            </div>
+            <div>
+              <span className="text-muted-foreground">실제 타겟=1 </span>
+              <span className="font-semibold">
+                {formatDisplayValue(entity.meta.positive ?? 0)}
+              </span>
+            </div>
+          </div>
+          <div className="grid gap-4 xl:grid-cols-2">
+            <MatrixTable
+              matrix={entity.all}
+              title="(B-1) 평가 데이터 전체 (엔티티)"
+              rowAxis={rowAxis}
+              colAxis={colAxis}
+            />
+            <MatrixTable
+              matrix={entity.positive}
+              title="(B-2) 실제 타겟 분포 (엔티티)"
+              rowAxis={rowAxis}
+              colAxis={colAxis}
+            />
+          </div>
+          {entity.positive_in_abc_pct != null && entity.meta.positive ? (
+            <p className="text-xs text-muted-foreground">
+              실제 타겟(엔티티)의 약 {formatDisplayValue(entity.positive_in_abc_pct)}%가{" "}
+              <span className="font-semibold text-slate-800">{topRow}</span> 구간에 포함됩니다.
+            </p>
+          ) : null}
+        </div>
       ) : null}
     </div>
   );

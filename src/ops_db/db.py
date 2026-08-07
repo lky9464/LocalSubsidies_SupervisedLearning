@@ -96,7 +96,31 @@ CREATE TABLE IF NOT EXISTS ops_queue_rows (
 );
 
 CREATE INDEX IF NOT EXISTS idx_ops_queue_grade
-    ON ops_queue_rows(run_id, ops_grade);
+    ON ops_queue_rows(run_id, case_id, ops_grade);
+
+CREATE TABLE IF NOT EXISTS ops_queue_entity_rows (
+    run_id TEXT NOT NULL,
+    case_id TEXT NOT NULL,
+    pfm_biz_id TEXT,
+    inst_id TEXT,
+    biz_nm TEXT,
+    inst_nm TEXT,
+    sbat_amt TEXT,
+    pyhwy_amt TEXT,
+    score_row REAL,
+    score_col REAL,
+    ops_grade TEXT,
+    grade_col TEXT,
+    cross_check TEXT,
+    priority INTEGER,
+    pred_label TEXT,
+    actual_label TEXT,
+    PRIMARY KEY (run_id, case_id, pfm_biz_id, inst_id),
+    FOREIGN KEY (run_id) REFERENCES runs(run_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_ops_entity_grade
+    ON ops_queue_entity_rows(run_id, case_id, ops_grade);
 """
 
 
@@ -177,6 +201,58 @@ def _migrate(conn: sqlite3.Connection) -> None:
 
     _migrate_model_ranking_pk(conn)
     _migrate_model_ranking_metrics(conn)
+    _migrate_ops_queue_case_id(conn)
+
+
+def _migrate_ops_queue_case_id(conn: sqlite3.Connection) -> None:
+    """ops_queue_rows에 case_id 추가 · PK (run_id, case_id, crtr_ym, pfm_biz_id, inst_id)."""
+    row = conn.execute(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name='ops_queue_rows'"
+    ).fetchone()
+    if not row or not row[0]:
+        return
+    ddl = row[0]
+    if "case_id" in ddl and "PRIMARY KEY (run_id, case_id" in ddl.replace("\n", " "):
+        return
+    conn.executescript(
+        """
+        CREATE TABLE ops_queue_rows_new (
+            run_id TEXT NOT NULL,
+            case_id TEXT NOT NULL DEFAULT 'primary_aux',
+            crtr_ym TEXT,
+            pfm_biz_id TEXT,
+            inst_id TEXT,
+            biz_nm TEXT,
+            inst_nm TEXT,
+            sbat_amt TEXT,
+            pyhwy_amt TEXT,
+            score_primary REAL,
+            score_aux REAL,
+            ops_grade TEXT,
+            cross_check TEXT,
+            grade_aux TEXT,
+            priority INTEGER,
+            pred_label TEXT,
+            actual_label TEXT,
+            PRIMARY KEY (run_id, case_id, crtr_ym, pfm_biz_id, inst_id),
+            FOREIGN KEY (run_id) REFERENCES runs(run_id)
+        );
+        INSERT INTO ops_queue_rows_new(
+            run_id, case_id, crtr_ym, pfm_biz_id, inst_id, biz_nm, inst_nm,
+            sbat_amt, pyhwy_amt, score_primary, score_aux, ops_grade, cross_check,
+            grade_aux, priority, pred_label, actual_label
+        )
+        SELECT
+            run_id, 'primary_aux', crtr_ym, pfm_biz_id, inst_id, biz_nm, inst_nm,
+            sbat_amt, pyhwy_amt, score_primary, score_aux, ops_grade, cross_check,
+            grade_aux, priority, pred_label, actual_label
+        FROM ops_queue_rows;
+        DROP TABLE ops_queue_rows;
+        ALTER TABLE ops_queue_rows_new RENAME TO ops_queue_rows;
+        CREATE INDEX IF NOT EXISTS idx_ops_queue_grade
+            ON ops_queue_rows(run_id, case_id, ops_grade);
+        """
+    )
 
 
 def _migrate_model_ranking_metrics(conn: sqlite3.Connection) -> None:

@@ -341,7 +341,7 @@ Job 실패 또는 PC 재부팅
 |------|-----------|
 | Test 점수 | `{data_root}/algorithms/{algo}/scores/test/` |
 | 추론 점수 | `{data_root}/algorithms/{algo}/scores/inference/` |
-| Test 타겟 포착 | `{data_root}/algorithms/operations/ops_queue_test.xlsx` |
+| Test 타겟 포착 | `{data_root}/algorithms/operations/ops_queue_test_pk.xlsx` · `ops_queue_test_entity.xlsx` |
 | 추론 점검 우선순위 | `{data_root}/algorithms/operations/ops_queue_inference.xlsx` |
 | 집계 리포트 | `프로젝트/outputs/reports/` |
 

@@ -181,7 +181,7 @@ algorithm_registry:
         script: scripts/05_train_catboost_v2.py
       v3:
         algo_id: catboost_v3
-        label: CatBoost (v3 · group Valid)
+        label: CatBoost (v3)
         script: scripts/05_train_catboost_v3.py
   stacked_ensemble:
     label: Stacked Ensemble
@@ -195,7 +195,7 @@ algorithm_registry:
         script: scripts/05_train_stacked_ensemble_v2.py
       v3:
         algo_id: stacked_ensemble_v3
-        label: Stacked Ensemble (v3 · group Valid)
+        label: Stacked Ensemble (v3)
         script: scripts/05_train_stacked_ensemble_v3.py
   easy_ensemble:
     label: EasyEnsemble
@@ -209,7 +209,7 @@ algorithm_registry:
         script: scripts/05_train_easy_ensemble_v2.py
       v3:
         algo_id: easy_ensemble_v3
-        label: EasyEnsemble (v3 · group Valid)
+        label: EasyEnsemble (v3)
         script: scripts/05_train_easy_ensemble_v3.py
   gradient_boosting:
     label: Gradient Boosting
@@ -223,7 +223,7 @@ algorithm_registry:
         script: scripts/05_train_gradient_boosting_v2.py
       v3:
         algo_id: gradient_boosting_v3
-        label: Gradient Boosting (v3 · group Valid)
+        label: Gradient Boosting (v3)
         script: scripts/05_train_gradient_boosting_v3.py
   random_forest:
     label: RandomForest
@@ -237,7 +237,7 @@ algorithm_registry:
         script: scripts/05_train_random_forest_v2.py
       v3:
         algo_id: random_forest_v3
-        label: RandomForest (v3 · group Valid)
+        label: RandomForest (v3)
         script: scripts/05_train_random_forest_v3.py
 
 # 알고리즘별 하이퍼파라미터 (키 = algo_id). v1 = v0.3.0 기준선, v2 = 행단위 Valid, v3 = 엔티티 Valid

@@ -7,31 +7,56 @@ import { apiGet } from "@/lib/api";
 import { useRun } from "@/components/run-context";
 import { Alert } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DualMatrices, DataTable } from "@/components/matrix-table";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { CaptureMatrixPanel, DataTable } from "@/components/matrix-table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
+type CaptureCase = {
+  id: string;
+  title: string;
+  row_axis: string;
+  col_axis: string;
+  available: boolean;
+  reason?: string | null;
+  matrices?: {
+    pk?: {
+      all?: unknown;
+      positive?: unknown;
+      meta?: { total?: number; positive?: number };
+      positive_in_abc_pct?: number | null;
+    };
+    entity?: {
+      all?: unknown;
+      positive?: unknown;
+      meta?: { total?: number; positive?: number };
+      positive_in_abc_pct?: number | null;
+    };
+  };
+  summary?: Record<string, unknown>[];
+};
+
+type Roles = {
+  primary?: string;
+  aux?: string;
+  reference?: string | null;
+  primary_label?: string | null;
+  aux_label?: string | null;
+  reference_label?: string | null;
+};
 
 export default function OpsPage() {
   const { runId } = useRun();
-  const [grade, setGrade] = useState("(전체)");
-  const [limit, setLimit] = useState(30);
+  const [caseTab, setCaseTab] = useState("primary_aux");
 
   const { data, isLoading } = useQuery({
-    queryKey: ["ops", runId, grade, limit],
-    queryFn: () =>
-      apiGet<Record<string, unknown>>(
-        `/api/runs/${runId}/ops-queue?grade=${encodeURIComponent(grade)}&limit=${limit}`,
-      ),
+    queryKey: ["ops", runId],
+    queryFn: () => apiGet<Record<string, unknown>>(`/api/runs/${runId}/ops-queue`),
     enabled: !!runId,
   });
 
   const bandHelp = (data?.band_help as Record<string, string>) || {};
-  const matrices = data?.test_matrices as { empty?: boolean } | undefined;
+  const roles = (data?.roles as Roles) || {};
+  const cases = (data?.cases as CaptureCase[]) || [];
+  const hasData = cases.some((c) => c.available);
 
   return (
     <div className="space-y-6">
@@ -64,62 +89,65 @@ export default function OpsPage() {
         <Alert>Run을 선택하세요.</Alert>
       ) : isLoading ? (
         <p className="text-sm text-muted-foreground">불러오는 중...</p>
-      ) : !matrices || matrices.empty ? (
+      ) : !hasData ? (
         <p className="text-sm text-muted-foreground">10 단계를 실행하면 표시됩니다.</p>
       ) : (
         <>
-          <DualMatrices block={data?.test_matrices as never} />
-
           <Card>
             <CardHeader>
-              <CardTitle>조합별 건수·우선순위 (상세)</CardTitle>
+              <CardTitle className="text-base">선정 모델 (08 순위)</CardTitle>
             </CardHeader>
-            <CardContent>
-              <DataTable rows={(data?.summary as Record<string, unknown>[]) || []} />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>미리보기</CardTitle>
-              <p className="text-xs text-muted-foreground">
-                미리보기만 표시 · 전체는 Excel/로컬 파일
-              </p>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex flex-wrap gap-3">
-                <Select value={grade} onValueChange={setGrade}>
-                  <SelectTrigger className="w-[140px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="(전체)">(전체)</SelectItem>
-                    {((data?.primary_labels as string[]) || []).map((g) => (
-                      <SelectItem key={g} value={g}>
-                        {g}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Select value={String(limit)} onValueChange={(v) => setLimit(Number(v))}>
-                  <SelectTrigger className="w-[120px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {((data?.preview_options as number[]) || [10, 30, 50, 100]).map((n) => (
-                      <SelectItem key={n} value={String(n)}>
-                        {n}건
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            <CardContent className="flex flex-wrap gap-4 text-sm">
+              <div>
+                <span className="text-muted-foreground">주 </span>
+                <span className="font-medium">{roles.primary_label || roles.primary || "—"}</span>
               </div>
-              <DataTable
-                rows={(data?.preview as Record<string, unknown>[]) || []}
-                maxHeight={360}
-              />
+              <div>
+                <span className="text-muted-foreground">보 </span>
+                <span className="font-medium">{roles.aux_label || roles.aux || "—"}</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">참 </span>
+                <span className="font-medium">
+                  {roles.reference_label || roles.reference || "—"}
+                </span>
+              </div>
             </CardContent>
           </Card>
+
+          <Tabs value={caseTab} onValueChange={setCaseTab}>
+            <TabsList>
+              {cases.map((c) => (
+                <TabsTrigger key={c.id} value={c.id}>
+                  {c.title}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+            {cases.map((c) => (
+              <TabsContent key={c.id} value={c.id} className="space-y-4">
+                {!c.available ? (
+                  <p className="text-sm text-muted-foreground">{c.reason || "해당 없음"}</p>
+                ) : (
+                  <>
+                    <CaptureMatrixPanel
+                      rowAxis={c.row_axis}
+                      colAxis={c.col_axis}
+                      pk={c.matrices?.pk as never}
+                      entity={c.matrices?.entity as never}
+                    />
+                    <details className="text-sm">
+                      <summary className="cursor-pointer font-medium">
+                        조합별 건수·우선순위 (상세) — {c.title}
+                      </summary>
+                      <div className="mt-3">
+                        <DataTable rows={c.summary || []} />
+                      </div>
+                    </details>
+                  </>
+                )}
+              </TabsContent>
+            ))}
+          </Tabs>
         </>
       )}
 

@@ -9,6 +9,7 @@ from typing import Any
 import pandas as pd
 
 from src.ops_db.db import connect, init_db
+from src.scoring.ops_capture import CASE_PRIMARY_AUX, OpsPairSpec, OPS_PAIR_SPECS
 from src.scoring.ops_queue import (
     ACTUAL_COL,
     AUX_LABELS,
@@ -180,6 +181,9 @@ class OpsRepository:
     def clear_ops_queue(self, run_id: str) -> None:
         with connect(self.cfg) as conn:
             conn.execute("DELETE FROM ops_queue_rows WHERE run_id=?", (run_id,))
+            conn.execute(
+                "DELETE FROM ops_queue_entity_rows WHERE run_id=?", (run_id,)
+            )
             conn.commit()
 
     def save_ranking(self, run_id: str, ranking: list[dict[str, Any]]) -> None:
@@ -504,21 +508,104 @@ class OpsRepository:
                     (table, max_id),
                 )
 
+    def get_roles(self, run_id: str | None = None) -> dict[str, str | None]:
+        rid = run_id or self.get_latest_run_id()
+        primary, aux = self.get_primary_aux(rid)
+        reference = None
+        if rid:
+            ranking = self.get_ranking(rid)
+            reference = next(
+                (r["algo"] for r in ranking if r.get("role") == "reference"), None
+            )
+        return {"primary": primary, "aux": aux, "reference": reference}
+
     def replace_ops_queue(self, run_id: str, queue_df: pd.DataFrame) -> int:
-        """주·보 구간·우선순위 운영 컬럼만 적재 (기여도 TOP 등 제외)."""
+        """하위 호환: primary_aux PK queue만 적재."""
+        return self.replace_ops_capture_pk(run_id, CASE_PRIMARY_AUX, queue_df)
+
+    def replace_ops_capture(
+        self,
+        run_id: str,
+        pk_queues: list[pd.DataFrame],
+        entity_queues: list[pd.DataFrame],
+    ) -> tuple[int, int]:
         self.ensure_run(run_id)
+        init_db(self.cfg)
+        pk_n = 0
+        ent_n = 0
+        with connect(self.cfg) as conn:
+            conn.execute("DELETE FROM ops_queue_rows WHERE run_id=?", (run_id,))
+            conn.execute(
+                "DELETE FROM ops_queue_entity_rows WHERE run_id=?", (run_id,)
+            )
+            for q in pk_queues:
+                if q is None or q.empty:
+                    continue
+                pk_n += self._insert_pk_queue(conn, run_id, q)
+            for q in entity_queues:
+                if q is None or q.empty:
+                    continue
+                ent_n += self._insert_entity_queue(conn, run_id, q)
+            conn.commit()
+        return pk_n, ent_n
+
+    def replace_ops_capture_pk(
+        self, run_id: str, case_id: str, queue_df: pd.DataFrame
+    ) -> int:
+        self.ensure_run(run_id)
+        init_db(self.cfg)
+        with connect(self.cfg) as conn:
+            conn.execute(
+                "DELETE FROM ops_queue_rows WHERE run_id=? AND case_id=?",
+                (run_id, case_id),
+            )
+            n = self._insert_pk_queue(conn, run_id, queue_df)
+            conn.commit()
+        return n
+
+    def _insert_pk_queue(
+        self, conn: Any, run_id: str, queue_df: pd.DataFrame
+    ) -> int:
+        from src.scoring.ops_capture import CASE_ID_COL
+
         keys = self.cfg.get("key_columns", ["CRTR_YM", "PFM_BIZ_ID", "INST_ID"])
-        col_ym, col_biz, col_inst = keys[0], keys[1], keys[2]
+        spec = _spec_for_queue(queue_df)
+        case_id = (
+            str(queue_df[CASE_ID_COL].iloc[0])
+            if CASE_ID_COL in queue_df.columns
+            else CASE_PRIMARY_AUX
+        )
+        rows = [
+            self._queue_row_tuple(run_id, case_id, row, spec, keys)
+            for _, row in queue_df.iterrows()
+        ]
+        conn.executemany(
+            """
+            INSERT INTO ops_queue_rows(
+                run_id, case_id, crtr_ym, pfm_biz_id, inst_id, biz_nm, inst_nm,
+                sbat_amt, pyhwy_amt, score_primary, score_aux,
+                ops_grade, cross_check, grade_aux, priority,
+                pred_label, actual_label
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            rows,
+        )
+        return len(rows)
 
-        def _get(row: pd.Series, *names: str) -> Any:
-            for n in names:
-                if n in row.index and pd.notna(row[n]):
-                    return row[n]
-            return None
+    def _insert_entity_queue(
+        self, conn: Any, run_id: str, queue_df: pd.DataFrame
+    ) -> int:
+        from src.scoring.ops_capture import CASE_ID_COL
 
+        spec = _spec_for_queue(queue_df)
+        case_id = (
+            str(queue_df[CASE_ID_COL].iloc[0])
+            if CASE_ID_COL in queue_df.columns
+            else CASE_PRIMARY_AUX
+        )
         rows = []
         for _, row in queue_df.iterrows():
-            pri = _get(row, PRIORITY_COL)
+            pri = _row_get(row, PRIORITY_COL)
             try:
                 pri_i = int(pri) if pri is not None and str(pri) != "" else None
             except (TypeError, ValueError):
@@ -526,90 +613,173 @@ class OpsRepository:
             rows.append(
                 (
                     run_id,
-                    str(_get(row, col_ym) or ""),
-                    str(_get(row, col_biz) or ""),
-                    str(_get(row, col_inst) or ""),
-                    str(_get(row, "수행사업명칭(PFM_BIZ_NM)") or ""),
-                    str(_get(row, "기관명(INST_NM)") or ""),
-                    str(_get(row, "사업비보조금금액(BIZCT_SBAT_AMT)") or ""),
-                    str(_get(row, "사업비자부담금액(BIZCT_PYHWY_AMT)") or ""),
-                    _to_float(_get(row, RF_SCORE_COL)),
-                    _to_float(_get(row, CB_SCORE_COL)),
-                    str(_get(row, GRADE_COL) or ""),
-                    str(_get(row, CELL_COL) or ""),
-                    str(_get(row, CB_GRADE_COL) or ""),
+                    case_id,
+                    str(_row_get(row, "PFM_BIZ_ID") or ""),
+                    str(_row_get(row, "INST_ID") or ""),
+                    str(_row_get(row, "수행사업명칭(PFM_BIZ_NM)") or ""),
+                    str(_row_get(row, "기관명(INST_NM)") or ""),
+                    str(_row_get(row, "사업비보조금금액(BIZCT_SBAT_AMT)") or ""),
+                    str(_row_get(row, "사업비자부담금액(BIZCT_PYHWY_AMT)") or ""),
+                    _to_float(_row_get(row, spec.row_score_col)),
+                    _to_float(_row_get(row, spec.col_score_col)),
+                    str(_row_get(row, spec.row_grade_col) or ""),
+                    str(_row_get(row, spec.col_grade_col) or ""),
+                    str(_row_get(row, CELL_COL) or ""),
                     pri_i,
-                    str(_get(row, PRED_COL) if PRED_COL in row.index else ""),
-                    str(_get(row, ACTUAL_COL) if ACTUAL_COL in row.index else ""),
+                    str(_row_get(row, PRED_COL) if PRED_COL in row.index else ""),
+                    str(_row_get(row, ACTUAL_COL) if ACTUAL_COL in row.index else ""),
                 )
             )
-
-        with connect(self.cfg) as conn:
-            conn.execute("DELETE FROM ops_queue_rows WHERE run_id=?", (run_id,))
-            conn.executemany(
-                """
-                INSERT INTO ops_queue_rows(
-                    run_id, crtr_ym, pfm_biz_id, inst_id, biz_nm, inst_nm,
-                    sbat_amt, pyhwy_amt, score_primary, score_aux,
-                    ops_grade, cross_check, grade_aux, priority,
-                    pred_label, actual_label
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                rows,
-            )
-            conn.commit()
+        conn.executemany(
+            """
+            INSERT INTO ops_queue_entity_rows(
+                run_id, case_id, pfm_biz_id, inst_id, biz_nm, inst_nm,
+                sbat_amt, pyhwy_amt, score_row, score_col,
+                ops_grade, grade_col, cross_check, priority,
+                pred_label, actual_label
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            rows,
+        )
         return len(rows)
 
+    def _queue_row_tuple(
+        self,
+        run_id: str,
+        case_id: str,
+        row: pd.Series,
+        spec: OpsPairSpec,
+        keys: list[str],
+    ) -> tuple:
+        col_ym, col_biz, col_inst = keys[0], keys[1], keys[2]
+        pri = _row_get(row, PRIORITY_COL)
+        try:
+            pri_i = int(pri) if pri is not None and str(pri) != "" else None
+        except (TypeError, ValueError):
+            pri_i = None
+        return (
+            run_id,
+            case_id,
+            str(_row_get(row, col_ym) or ""),
+            str(_row_get(row, col_biz) or ""),
+            str(_row_get(row, col_inst) or ""),
+            str(_row_get(row, "수행사업명칭(PFM_BIZ_NM)") or ""),
+            str(_row_get(row, "기관명(INST_NM)") or ""),
+            str(_row_get(row, "사업비보조금금액(BIZCT_SBAT_AMT)") or ""),
+            str(_row_get(row, "사업비자부담금액(BIZCT_PYHWY_AMT)") or ""),
+            _to_float(_row_get(row, spec.row_score_col)),
+            _to_float(_row_get(row, spec.col_score_col)),
+            str(_row_get(row, spec.row_grade_col) or ""),
+            str(_row_get(row, CELL_COL) or ""),
+            str(_row_get(row, spec.col_grade_col) or ""),
+            pri_i,
+            str(_row_get(row, PRED_COL) if PRED_COL in row.index else ""),
+            str(_row_get(row, ACTUAL_COL) if ACTUAL_COL in row.index else ""),
+        )
+
     def ops_queue_summary(self, run_id: str) -> pd.DataFrame:
-        """주×보 조합별 건수 (우선순위 순)."""
+        df = self.ops_capture_summary(run_id, CASE_PRIMARY_AUX)
+        if df.empty:
+            return df
+        out = df.copy()
+        if "count_pk" in out.columns:
+            out = out.rename(columns={"count_pk": "cnt"})
+        return out
+
+    def ops_capture_summary(self, run_id: str, case_id: str) -> pd.DataFrame:
+        spec = _spec_by_id(case_id)
         with connect(self.cfg) as conn:
-            rows = conn.execute(
+            pk_rows = conn.execute(
                 """
-                SELECT ops_grade AS primary_band,
-                       grade_aux AS aux_band,
-                       cross_check AS cell,
-                       MIN(priority) AS priority,
-                       COUNT(*) AS cnt
+                SELECT ops_grade AS row_band, grade_aux AS col_band,
+                       cross_check AS cell, MIN(priority) AS priority,
+                       COUNT(*) AS count_pk
                 FROM ops_queue_rows
-                WHERE run_id=?
+                WHERE run_id=? AND case_id=?
                 GROUP BY ops_grade, grade_aux, cross_check
                 ORDER BY COALESCE(MIN(priority), 99), ops_grade, grade_aux
                 """,
-                (run_id,),
+                (run_id, case_id),
             ).fetchall()
-        return pd.DataFrame([dict(r) for r in rows])
+            ent_rows = conn.execute(
+                """
+                SELECT ops_grade AS row_band, grade_col AS col_band,
+                       cross_check AS cell, MIN(priority) AS priority,
+                       COUNT(*) AS count_entity
+                FROM ops_queue_entity_rows
+                WHERE run_id=? AND case_id=?
+                GROUP BY ops_grade, grade_col, cross_check
+                ORDER BY COALESCE(MIN(priority), 99), ops_grade, grade_col
+                """,
+                (run_id, case_id),
+            ).fetchall()
+
+        pk_df = pd.DataFrame([dict(r) for r in pk_rows])
+        ent_df = pd.DataFrame([dict(r) for r in ent_rows])
+        if pk_df.empty and ent_df.empty:
+            return pd.DataFrame()
+        if pk_df.empty:
+            out = ent_df.copy()
+            out["count_pk"] = 0
+        elif ent_df.empty:
+            out = pk_df.copy()
+            out["count_entity"] = 0
+        else:
+            out = pk_df.merge(
+                ent_df[["cell", "priority", "count_entity"]],
+                on=["cell", "priority"],
+                how="outer",
+            )
+            out["count_pk"] = out["count_pk"].fillna(0).astype(int)
+            out["count_entity"] = out["count_entity"].fillna(0).astype(int)
+        if spec:
+            out["row_axis"] = spec.row_prefix
+            out["col_axis"] = spec.col_prefix
+        return out
 
     def ops_queue_matrices(
         self, run_id: str
     ) -> tuple[pd.DataFrame, pd.DataFrame, dict[str, int]]:
-        """
-        Test 타겟 포착 4×4: (전체 건수, 실제 타겟=1 건수, 메타).
-        행단위 raw는 반환하지 않고 집계만 사용.
-        """
+        return self.ops_capture_matrices(run_id, CASE_PRIMARY_AUX, unit="pk")
+
+    def ops_capture_matrices(
+        self,
+        run_id: str,
+        case_id: str,
+        *,
+        unit: str = "pk",
+    ) -> tuple[pd.DataFrame, pd.DataFrame, dict[str, int]]:
+        spec = _spec_by_id(case_id)
+        if spec is None:
+            return empty_band_matrix(), empty_band_matrix(), {"total": 0, "positive": 0}
+
+        table = "ops_queue_rows" if unit == "pk" else "ops_queue_entity_rows"
+        col_field = "grade_aux" if unit == "pk" else "grade_col"
+
         with connect(self.cfg) as conn:
             all_rows = conn.execute(
-                """
-                SELECT ops_grade, grade_aux, COUNT(*) AS cnt
-                FROM ops_queue_rows
-                WHERE run_id=?
-                GROUP BY ops_grade, grade_aux
+                f"""
+                SELECT ops_grade, {col_field} AS grade_col, COUNT(*) AS cnt
+                FROM {table}
+                WHERE run_id=? AND case_id=?
+                GROUP BY ops_grade, {col_field}
                 """,
-                (run_id,),
+                (run_id, case_id),
             ).fetchall()
             pos_rows = conn.execute(
-                """
-                SELECT ops_grade, grade_aux, COUNT(*) AS cnt
-                FROM ops_queue_rows
-                WHERE run_id=?
+                f"""
+                SELECT ops_grade, {col_field} AS grade_col, COUNT(*) AS cnt
+                FROM {table}
+                WHERE run_id=? AND case_id=?
                   AND LOWER(TRIM(COALESCE(actual_label, '')))
                       IN ('1', '1.0', 'y', 'yes', 'true', 't')
-                GROUP BY ops_grade, grade_aux
+                GROUP BY ops_grade, {col_field}
                 """,
-                (run_id,),
+                (run_id, case_id),
             ).fetchall()
 
-        matrix_all = _band_counts_to_matrix(all_rows)
-        matrix_pos = _band_counts_to_matrix(pos_rows)
+        matrix_all = _band_counts_to_matrix(all_rows, spec)
+        matrix_pos = _band_counts_to_matrix(pos_rows, spec)
         total = int(matrix_all.to_numpy().sum())
         pos_total = int(matrix_pos.to_numpy().sum())
         return matrix_all, matrix_pos, {"total": total, "positive": pos_total}
@@ -620,8 +790,8 @@ class OpsRepository:
         grade: str | None = None,
         limit: int = 200,
     ) -> pd.DataFrame:
-        sql = "SELECT * FROM ops_queue_rows WHERE run_id=?"
-        params: list[Any] = [run_id]
+        sql = "SELECT * FROM ops_queue_rows WHERE run_id=? AND case_id=?"
+        params: list[Any] = [run_id, CASE_PRIMARY_AUX]
         if grade:
             sql += " AND ops_grade=?"
             params.append(grade)
@@ -641,12 +811,51 @@ def _to_float(v: Any) -> float | None:
         return None
 
 
-def _band_counts_to_matrix(rows: list[Any]) -> pd.DataFrame:
-    mat = empty_band_matrix()
+def _row_get(row: pd.Series, *names: str) -> Any:
+    for n in names:
+        if n in row.index and pd.notna(row[n]):
+            return row[n]
+    return None
+
+
+def _spec_by_id(case_id: str) -> OpsPairSpec | None:
+    for s in OPS_PAIR_SPECS:
+        if s.case_id == case_id:
+            return s
+    return None
+
+
+def _spec_for_queue(queue_df: pd.DataFrame) -> OpsPairSpec:
+    from src.scoring.ops_capture import CASE_ID_COL
+
+    if CASE_ID_COL in queue_df.columns and len(queue_df):
+        cid = str(queue_df[CASE_ID_COL].iloc[0])
+        spec = _spec_by_id(cid)
+        if spec:
+            return spec
+    return OPS_PAIR_SPECS[0]
+
+
+def _band_counts_to_matrix(
+    rows: list[Any], spec: OpsPairSpec | None = None
+) -> pd.DataFrame:
+    if spec is None:
+        mat = empty_band_matrix()
+        row_labels, col_labels = PRIMARY_LABELS, AUX_LABELS
+    else:
+        from src.scoring.ops_capture import empty_band_matrix_for
+
+        mat = empty_band_matrix_for(spec)
+        row_labels, col_labels = spec.row_labels, spec.col_labels
+
+    col_key = "grade_col"
     for r in rows:
-        p = str(r["ops_grade"] if hasattr(r, "keys") else r[0] or "")
-        a = str(r["grade_aux"] if hasattr(r, "keys") else r[1] or "")
-        c = int(r["cnt"] if hasattr(r, "keys") else r[2] or 0)
-        if p in PRIMARY_LABELS and a in AUX_LABELS:
+        rd = dict(r) if hasattr(r, "keys") else {}
+        if not rd and hasattr(r, "__getitem__"):
+            rd = {"ops_grade": r[0], "grade_col": r[1], "cnt": r[2]}
+        p = str(rd.get("ops_grade") or "")
+        a = str(rd.get(col_key) or rd.get("grade_aux") or "")
+        c = int(rd.get("cnt") or 0)
+        if p in row_labels and a in col_labels:
             mat.loc[p, a] = c
     return mat.astype(int)

@@ -13,7 +13,7 @@
 | 07 | `07_evaluate.py` | 평가·점수 파일 | `scores/test/{algo}_test_scores*` |
 | 08 | `08_update_ranking.py` | 모델 순위·역할 | `model_ranking.json` (+ `ranking_confidence`) + SQLite · [`ranking_methodology.md`](ranking_methodology.md) |
 | 09 | `09_report.py` | 집계 리포트 | `outputs/reports/` |
-| 10 | `10_ops_queue.py` | 타겟 포착 분포 (Test 주/보 A~D · 4×4) | `algorithms/operations/ops_queue_test.*` |
+| 10 | `10_ops_queue.py` | 타겟 포착 분포 (Test 3케이스 · PK·엔티티 4×4) | `algorithms/operations/ops_queue_test_pk.*` · `ops_queue_test_entity.*` |
 | 11 | `11_score_inference.py` | 라벨 미지 추론 · 점검 우선순위표 | `scores/inference/{algo}_inference_scores*` · `ops_queue_inference.*` |
 | 12 | `12_tune_hyperparams.py` | Validation 하이퍼 탐색 (Test 미사용) | `outputs/reports/tuning/{output_tag}/hyperparam_tune_*` |
 

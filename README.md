@@ -5,111 +5,13 @@
 지방보조금 부정수급 **위험도 점수(0~1000)** 측정을 위한 지도학습 파이프라인 + **로컬 웹 UI**입니다.
 
 - **v1.0.0** — 추론 결과 3케이스·PK/엔티티 · 점수분포 성능·비중색 · Feature분포 UI 제거 · ([`VERSION_HISTORY`](docs/VERSION_HISTORY.md))
-- **v0.7.2** — 타겟 포착 3케이스·PK/엔티티 · 모델 점수·TOP10 분포 UI · ([`VERSION_HISTORY`](docs/VERSION_HISTORY.md))
-- **v0.7.1** — 모델 비교·평가 SHAP·PR-AUC · 06 SHAP_total · CleanupLegacy tuning 보존 · ([`VERSION_HISTORY`](docs/VERSION_HISTORY.md))
-- **v0.7.0** — 엔티티 무중복 Valid 튜닝 · `{family}_v3` · `configs/tune.yaml` · `tuning/vN/` · CLI `tune_batch` · ([`VERSION_HISTORY`](docs/VERSION_HISTORY.md))
-- **v0.6.2** — 행 PK 결측 제외(03·04~07·11) · labeled/mask 정렬 · ([`VERSION_HISTORY`](docs/VERSION_HISTORY.md))
-- **v0.6.1** — 사업·기관 무중복 분할(`group_random`) · 04 그룹 감사 · UI · ([`VERSION_HISTORY`](docs/VERSION_HISTORY.md))
-- **v0.6.0** — GBM·Stacked·EasyEnsemble v2 튜닝·등록 · ([`VERSION_HISTORY`](docs/VERSION_HISTORY.md))
-- **v0.5.2** — Run 격리·재실행 초기화 · 오프라인 full sync · ([`VERSION_HISTORY`](docs/VERSION_HISTORY.md))
-- **v0.5.1** — 01~04 완료 후 알고리즘 저장·05~10 진행 (설정 잠금 분리) · ([`VERSION_HISTORY`](docs/VERSION_HISTORY.md))
-- **v0.5** — 학습 UI 2섹션 · Run별 모델 비교 · Job 취소 · ([`VERSION_HISTORY`](docs/VERSION_HISTORY.md))
-- **v0.4** — 하이퍼파라미터 튜닝·`random_forest_v2` / `catboost_v2` · algo_id `{family}_vN` · ([`VERSION_HISTORY`](docs/VERSION_HISTORY.md))
-- **v0.3** — Next.js + FastAPI 웹 UI(`127.0.0.1:8600`), 백그라운드 Job, 운영 DB(`ops.sqlite`), 추론 결과 조회
-- **v0.2** — Streamlit UI (제거됨) · **v0.1** — CLI 전용 ([`v0.1.0`](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases/tag/v0.1.0))
-- 알고리즘: CatBoost, Stacked Ensemble, EasyEnsemble, Gradient Boosting, RandomForest
+- **v0.7.2** — 타겟 포착 3케이스·PK/엔티티 · 모델 점수분포 UI · ([`VERSION_HISTORY`](docs/VERSION_HISTORY.md))
+- **v0.7.1** — 모델 비교·평가 SHAP·PR-AUC · 06 SHAP_total · ([`VERSION_HISTORY`](docs/VERSION_HISTORY.md))
+- **v0.7.0** — 엔티티 무중복 Valid 튜닝 · `{family}_v3` · `configs/tune.yaml` · ([`VERSION_HISTORY`](docs/VERSION_HISTORY.md))
+- 이전 이력: v0.6.x ~ v0.1 — [`VERSION_HISTORY.md`](docs/VERSION_HISTORY.md)
+- 알고리즘: CatBoost, Stacked Ensemble, EasyEnsemble, Gradient Boosting, RandomForest (`*_v3` 등)
 - 학습 데이터·모델·행단위 점수는 **프로젝트 폴더 밖** `{data_root}`에만 보관
-- Cursor Agent는 코드/문서만 다루며, raw·학습 실행은 **사용자 로컬 Python**에서 수행
-
-## 일반 사용자 — 오프라인 PC 설치·사용 (권장)
-
-대상: Windows 10/11 x64 · 인터넷이 없는 업무 PC ·  
-온라인에서는 **[Release v0.6.2](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases/tag/v0.6.2) 한곳**에서 소스·wheels·UI·Python·VC++까지 받은 뒤 USB로 옮김.  
-(학습·추론 raw CSV는 사용자가 별도 준비. Node.js·개발 환경 불필요.)
-
-### A. 온라인 PC에서 받을 것 (USB에 복사)
-
-모두 같은 [Release v0.6.2](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases/tag/v0.6.2) Assets / Source:
-
-| # | 파일 | 비고 |
-|---|------|------|
-| 1 | **Source code (zip)** | 권장 (Code 버튼 ZIP보다 태그 정합) |
-| 2 | **`wheels-win-amd64-py312.zip`** | 오프라인 pip용 |
-| 3 | **`web-out.zip`** | UI (**필수**) |
-| 4 | **`python-3.12.10-amd64.exe`** | 공식 Python 3.12.10 x64 (이미 있으면 생략) |
-| 5 | **`VC_redist.x64.exe`** | VC++ x64 (CatBoost 등 · 이미 있으면 생략) |
-
-### B. 오프라인 PC 설치 순서 (1회)
-
-| # | 단계 | 할 일 / 확인 |
-|---|------|----------------|
-| 1 | 소스 압축 해제 | 예: `C:\work\LocalSubsidies_SupervisedLearning\` — `SetupOffline.bat`, `RunWebNext.bat`이 보이면 루트 |
-| 2 | wheels 배치 | `wheels-win-amd64-py312.zip`의 `.whl`을 **`vendor\wheels\`** 바로 아래 (`wheels\wheels\` 이중 폴더 금지) |
-| 3 | UI 배치 | `web-out.zip` → **`web\out\`** (`web\out\index.html` 확인; zip 루트가 `index.html`이면 `web\out\`에 풀기) |
-| 4 | VC++ · Python | (필요 시) `VC_redist.x64.exe` → `python-3.12.10-amd64.exe` (“Add to PATH” 권장) → `py -3.12 --version` |
-| 5 | 패키지 설치 | **`SetupOffline.bat`** 더블클릭 (인터넷 불필요 · `.venv` 생성) |
-| 6 | data_root | `notepad configs\local.yaml` → 예: `data_root: "C:/work/LocalSubsidies_ML_Data"` (프로젝트 **형제 폴더** 권장) |
-| 7 | 폴더 골격 · raw | **`InitDataRoot.bat`** → 학습 CSV는 `{data_root}\raw\`, 추론은 `raw_inference\` ([스키마](TLS4902R_Layout.csv), 보통 EUC-KR) |
-| 8 | 웹 실행 | **`RunWebNext.bat`** → **`http://127.0.0.1:8600`** (**콘솔 창을 닫지 마세요** — 서버·Job 종료) |
-
-설치·폴더 그림·문제 해결 상세: [`docs/offline_setup.md`](docs/offline_setup.md)
-
-### B-2. 이미 설치된 PC — 버전 업데이트 (full sync)
-
-최초 설치(§B)가 끝난 PC(**v0.3.0 이상**)는 **프로젝트 통째 교체 없이** 최신으로 동기화합니다.
-
-1. USB: Release **`update-to-vX.Y.Z.zip`** 을 프로젝트 루트에 복사 (**zip은 풀지 않음**)  
-   - **v0.6.2 기준**: deps 변경 없음 — **`wheels-win-amd64-py312.zip`** 은 최초 설치·v0.5.2 hop 시에만 필요
-2. **`UpdateOffline.bat`** 실행 (신버전: 더블클릭 · zip 자동 탐색)  
-3. 안내에 따라 **`SetupOffline.bat`** → **`RunWebNext.bat`**
-
-`configs\local.yaml` · raw · `{data_root}`는 **그대로** 둡니다.  
-구버전 UpdateOffline Usage만 뜨거나 · Setup `Fatal error in launcher` · UI(`web\out`) 비어 있음 → [`docs/offline_update.md`](docs/offline_update.md) **§5**.  
-Release 노트: [v0.6.2](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases/tag/v0.6.2)
-
-### C. 일상 사용 (웹 UI)
-
-| 순서 | 메뉴 | 할 일 |
-|------|------|--------|
-| 1 | Run ID 발급 | 새 Run 발급·선택 |
-| 2 | 데이터 등록 | 학습 raw / 추론 raw 업로드 (메타만 DB 기록) |
-| 3 | 학습 실행 | 분할·알고리즘 선택 후 파이프라인 Job 실행 (상단 배너로 진행률) |
-| 4 | 모델 비교·평가 / 타겟 포착 | 순위·Test 4×4 확인 |
-| 5 | 추론 실행 → 결과 확인 | 학습된 모델로 추론 · 점검 우선 4×4·Excel |
-
-| 메뉴 | 기능 |
-|------|------|
-| 대시보드 | 모델 평가(순위·타겟 포착 4×4) + 추론(점검 우선 4×4) |
-| 데이터 등록 | 학습 raw + 추론 raw |
-| ▼ 모델 학습 및 평가 | 학습 실행 / 모델 비교·평가 / 타겟 포착 분포 |
-| ▼ 추론 | 추론 실행 / 결과 확인(점검 우선순위표·Excel) |
-| Run 이력 · PC 사양 · 가이드 · 설정 | Run 메타·리소스·문서·경로 |
-
-- 더 자세한 화면 안내: [`docs/user_guide.md`](docs/user_guide.md) · PDF [`docs/user_guide.pdf`](docs/user_guide.pdf)
-- 로컬 UI 원칙: [`docs/web_local.md`](docs/web_local.md)
-
-### D. 자주 막히는 경우
-
-| 증상 | 확인 |
-|------|------|
-| `UpdateOffline` — Usage만 / `changed files only` | 구버전 bat → zip에서 새 `UpdateOffline.bat`·`apply_offline_update.ps1` 덮어쓴 뒤 재실행 ([`offline_update.md`](docs/offline_update.md) §5-1) |
-| `SetupOffline` — wheels 없음 | Release zip을 `vendor\wheels\`에 풀었는지 |
-| `SetupOffline` — `Fatal error in launcher` · 경로에 `0.5.0`/`0.5.1` 혼재 | 폴더 이동·이름 변경 후 깨진 `.venv` → **`.venv`만 삭제** 후 SetupOffline 재실행 ([`offline_update.md`](docs/offline_update.md) §5-2) |
-| `SetupOffline.bat` 더블클릭 후 창이 바로 닫힘 | 최신 `SetupOffline.bat` 사용(창 유지). 또는 `cmd`에서 `SetupOffline.bat` 실행. `SetupOffline.log` 확인 |
-| `InitDataRoot.bat` 경로/명령 오류·깨진 한글 | 최신 `InitDataRoot.bat` + `scripts\init_data_root.py` 사용. `configs\local.yaml`의 `data_root` 확인 후 재실행. 배치 파일은 ASCII 전용(코드페이지 무관) |
-| UI 안 뜸 / 빈 화면 · `web\out` 없음 | `web-out.zip` 또는 update zip 안 UI → `web\out\` ([`offline_update.md`](docs/offline_update.md) §5-3) |
-| `file://` 로 HTML만 연 경우 | 반드시 `RunWebNext.bat` → `http://127.0.0.1:8600` |
-| import / catboost 오류 | Python **3.12 x64**, Release의 `VC_redist.x64.exe` 설치 |
-| 데이터 오류 | `configs\local.yaml`의 `data_root`, raw 위치 |
-
-### (개발자용) 온라인 PC에서 소스만 받아 실행
-
-인터넷·Node가 있는 PC:
-
-1. `configs/local.yaml.example` → `configs/local.yaml` · `data_root` 설정  
-2. `python -m venv .venv` → `pip install -r requirements.txt`  
-3. `git pull` 로 `web/out/` 포함 여부 확인 (UI 소스만 수정한 경우 `scripts\build_web.bat` 후 커밋)  
-4. `RunWebNext.bat` → `http://127.0.0.1:8600`
+- Cursor Agent는 코드/문서만 다루며, raw·학습 실행은 **사용자 로컬**에서 수행
 
 ## 유의사항
 
@@ -133,6 +35,104 @@ Release 노트: [v0.6.2](https://github.com/lky9464/LocalSubsidies_SupervisedLea
 | 저장장치 | SSD/HDD C: 약 232 GB (여유 약 67 GB, 측정 시점 기준) |
 | 메인보드 | MSI MS-7C51 |
 
+## 일반 사용자 — 오프라인 PC 설치·사용 (권장)
+
+대상: Windows 10/11 x64 · 인터넷이 없는 업무 PC ·  
+온라인에서는 **[Release v1.0.0](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases/tag/v1.0.0) 한곳**에서 소스·wheels·UI·Python·VC++까지 받은 뒤 USB로 옮김.  
+(학습·추론 raw CSV는 사용자가 별도 준비. Node.js·개발 환경 불필요.)
+
+### A. 온라인 PC에서 받을 것 (USB에 복사)
+
+모두 같은 [Release v1.0.0](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases/tag/v1.0.0) Assets / Source:
+
+| # | 파일 | 비고 |
+|---|------|------|
+| 1 | **Source code (zip)** | 권장 (Code 버튼 ZIP보다 태그 정합) |
+| 2 | **`wheels-win-amd64-py312.zip`** | 오프라인 pip용 (최초 설치·`wheels_reinstall` 시) |
+| 3 | **`web-out.zip`** | UI (**필수**) |
+| 4 | **`python-3.12.10-amd64.exe`** | 공식 Python 3.12.10 x64 (이미 있으면 생략) |
+| 5 | **`VC_redist.x64.exe`** | VC++ x64 (CatBoost 등 · 이미 있으면 생략) |
+
+이미 **v0.3.0 이상**이 설치된 PC는 Source 전체 대신 **`update-to-v1.0.0.zip`** + **`web-out.zip`** 만으로 갱신할 수 있습니다 (§B-2).
+
+### B. 오프라인 PC 설치 순서 (1회)
+
+| # | 단계 | 할 일 / 확인 |
+|---|------|----------------|
+| 1 | 소스 압축 해제 | 예: `C:\work\LocalSubsidies_SupervisedLearning\` — `SetupOffline.bat`, `RunWebNext.bat`이 보이면 루트 |
+| 2 | wheels 배치 | `wheels-win-amd64-py312.zip`의 `.whl`을 **`vendor\wheels\`** 바로 아래 (`wheels\wheels\` 이중 폴더 금지) |
+| 3 | UI 배치 | `web-out.zip` → **`web\out\`** (`web\out\index.html` 확인; zip 루트가 `index.html`이면 `web\out\`에 풀기) |
+| 4 | VC++ · Python | (필요 시) `VC_redist.x64.exe` → `python-3.12.10-amd64.exe` (“Add to PATH” 권장) → `py -3.12 --version` |
+| 5 | 패키지 설치 | **`SetupOffline.bat`** 더블클릭 (인터넷 불필요 · `.venv` 생성) |
+| 6 | data_root | `notepad configs\local.yaml` → 예: `data_root: "C:/work/LocalSubsidies_ML_Data"` (프로젝트 **형제 폴더** 권장) |
+| 7 | 폴더 골격 · raw | **`InitDataRoot.bat`** → 학습 CSV는 `{data_root}\raw\`, 추론은 `raw_inference\` ([스키마](TLS4902R_Layout.csv), 보통 EUC-KR) |
+| 8 | 웹 실행 | **`RunWebNext.bat`** → **`http://127.0.0.1:8600`** (**콘솔 창을 닫지 마세요** — 서버·Job 종료) |
+
+설치·폴더 그림·문제 해결 상세: [`docs/offline_setup.md`](docs/offline_setup.md)
+
+### B-2. 이미 설치된 PC — 버전 업데이트 (full sync)
+
+최초 설치(§B)가 끝난 PC(**v0.3.0 이상**)는 **프로젝트 통째 교체 없이** 최신으로 동기화합니다.
+
+1. USB: Release **`update-to-v1.0.0.zip`** 을 프로젝트 루트에 복사 (**zip은 풀지 않음**)  
+   - **v1.0.0**: deps 변경 없음 — **`wheels-win-amd64-py312.zip`** 은 최초 설치·구버전 `wheels_reinstall` 시에만 필요
+2. **`UpdateOffline.bat`** 실행 (더블클릭 · zip 자동 탐색)  
+3. 안내에 따라 **`SetupOffline.bat`**(필요 시) → **`RunWebNext.bat`**
+
+`configs\local.yaml` · raw · `{data_root}`는 **그대로** 둡니다.  
+구버전 UpdateOffline Usage만 뜨거나 · Setup `Fatal error in launcher` · UI(`web\out`) 비어 있음 → [`docs/offline_update.md`](docs/offline_update.md) **§5**.  
+Release 노트: [v1.0.0](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases/tag/v1.0.0)
+
+### C. 일상 사용 (웹 UI)
+
+| 순서 | 메뉴 | 할 일 |
+|------|------|--------|
+| 1 | Run ID 발급 | 새 Run 발급·선택 |
+| 2 | 데이터 등록 | 학습 raw / 추론 raw 업로드 (메타만 DB 기록) |
+| 3 | 학습 실행 | 분할·알고리즘 선택 후 파이프라인 Job 실행 (상단 배너로 진행률) |
+| 4 | 모델 비교·평가 / 타겟 포착 | 순위·Test 점수분포 · 타겟 포착 3케이스(PK·엔티티) |
+| 5 | 추론 실행 → 결과 확인 | 08 주·보·참만 선택 · 점검 우선순위 3케이스(PK·엔티티) |
+
+| 메뉴 | 기능 |
+|------|------|
+| 대시보드 | 모델 평가(순위·타겟 포착) + 추론(점검 우선) 요약 |
+| 데이터 등록 | 학습 raw + 추론 raw |
+| ▼ 모델 학습 및 평가 | 학습 실행 / 모델 비교·평가 / 타겟 포착 분포 |
+| ▼ 추론 | 추론 실행 / 결과 확인(주·보·참 3케이스 · PK·엔티티) |
+| Run 이력 · PC 사양 · 가이드 · 설정 | Run 메타·리소스·문서·경로 |
+
+| 구분 | 데이터 | 목적 | 웹 메뉴 |
+|------|--------|------|---------|
+| **Test(평가)** | 라벨 있는 hold-out | 타겟 **포착 품질** (전체 + 실제 타겟 분포) | 타겟 포착 분포 |
+| **추론** | 라벨 미지 운영 데이터 | **점검 우선순위** 선정 (전체만, A-1/B-1) | 추론 → 결과 확인 |
+
+- 더 자세한 화면 안내: [`docs/user_guide.md`](docs/user_guide.md) · PDF [`docs/user_guide.pdf`](docs/user_guide.pdf)
+- 로컬 UI 원칙: [`docs/web_local.md`](docs/web_local.md)
+
+### D. 자주 막히는 경우
+
+| 증상 | 확인 |
+|------|------|
+| `UpdateOffline` — Usage만 / `changed files only` | 구버전 bat → zip에서 새 `UpdateOffline.bat`·`apply_offline_update.ps1` 덮어쓴 뒤 재실행 ([`offline_update.md`](docs/offline_update.md) §5-1) |
+| `SetupOffline` — wheels 없음 | Release zip을 `vendor\wheels\`에 풀었는지 |
+| `SetupOffline` — `Fatal error in launcher` · 경로에 옛 버전 폴더명 혼재 | 폴더 이동·이름 변경 후 깨진 `.venv` → **`.venv`만 삭제** 후 SetupOffline 재실행 ([`offline_update.md`](docs/offline_update.md) §5-2) |
+| `SetupOffline.bat` 더블클릭 후 창이 바로 닫힘 | 최신 `SetupOffline.bat` 사용(창 유지). 또는 `cmd`에서 `SetupOffline.bat` 실행. `SetupOffline.log` 확인 |
+| `InitDataRoot.bat` 경로/명령 오류·깨진 한글 | 최신 `InitDataRoot.bat` + `scripts\init_data_root.py` 사용. `configs\local.yaml`의 `data_root` 확인 후 재실행 |
+| UI 안 뜸 / 빈 화면 · `web\out` 없음 | `web-out.zip` 또는 update zip 안 UI → `web\out\` ([`offline_update.md`](docs/offline_update.md) §5-3) |
+| `file://` 로 HTML만 연 경우 | 반드시 `RunWebNext.bat` → `http://127.0.0.1:8600` |
+| import / catboost 오류 | Python **3.12 x64**, Release의 `VC_redist.x64.exe` 설치 |
+| 데이터 오류 | `configs\local.yaml`의 `data_root`, raw 위치 |
+| 추론 결과 주/참·보/참 비어 있음 | 추론 실행에서 **참(3위) 모델**까지 선택했는지 · 11 재실행 여부 |
+
+### (개발자용) 온라인 PC에서 소스만 받아 실행
+
+인터넷·Node가 있는 PC:
+
+1. `configs/local.yaml.example` → `configs/local.yaml` · `data_root` 설정  
+2. `python -m venv .venv` → `pip install -r requirements.txt`  
+3. `git pull` 로 `web/out/` 포함 여부 확인 (UI 소스만 수정한 경우 `scripts\build_web.bat` 후 커밋)  
+4. `RunWebNext.bat` → `http://127.0.0.1:8600`
+
 ## 폴더 구조
 
 | 위치 | 내용 |
@@ -140,11 +140,11 @@ Release 노트: [v0.6.2](https://github.com/lky9464/LocalSubsidies_SupervisedLea
 | 이 repo | `api/`·`web/` 웹 UI, `src/`·`scripts/`, 설정 템플릿, 스키마, 집계 리포트 |
 | `{data_root}/raw`, `interim`, `processed` | **공통** 입력·통합·전처리 (1벌) |
 | `{data_root}/raw_inference/` | 추론용 raw (라벨 미지, 예: 2026) |
-| `{data_root}/algorithms/{algo}/` | **알고리즘별** 모델·평가·행단위 점수 (5폴더) |
-| `{data_root}/algorithms/operations/` | 타겟 포착·점검 우선순위표 (`ops_queue_test_pk.*`, `ops_queue_test_entity.*`, `ops_queue_inference_pk.*`, `ops_queue_inference_entity.*`) |
-| `{data_root}/ops/ops.sqlite` | Run 이력·운영 큐 메타 (raw 미포함, GitHub 금지) |
-| `outputs/reports/comparison/` | 04·07·08·06 **모델 비교** 집계 (누수·eval·순위·feature TOP10) |
-| `outputs/reports/tuning/vN/` | **튜닝 캠페인** N (`hyperparam_tune_*`, `tune_manifest.yaml`) |
+| `{data_root}/algorithms/{algo}/` | **알고리즘별** 모델·평가·행단위 점수 |
+| `{data_root}/algorithms/operations/` | 타겟 포착·점검 우선순위표 (`ops_queue_test_pk/entity.*`, `ops_queue_inference_pk/entity.*`) |
+| `{data_root}/ops/ops.sqlite` | Run 이력·타겟 포착·추론 큐 메타 (raw 미포함, GitHub 금지) |
+| `outputs/reports/comparison/` | 04·07·08·06 **모델 비교** 집계 |
+| `outputs/reports/tuning/vN/` | **튜닝 캠페인** N |
 | `outputs/reports/{algo}/` | 알고리즘별 집계 리포트 |
 | `configs/tune.yaml` | 12·`tune_batch` 전용 (웹과 분리) |
 | `tune_batch/` | 5종 일괄 튜닝 스크립트·로그 |
@@ -156,24 +156,24 @@ LocalSubsidies_ML_Data/                 # 프로젝트 밖 ({data_root})
 ├── interim/
 ├── processed/
 ├── ops/
-│   └── ops.sqlite                      # Run·운영 큐 메타 (웹 UI)
+│   └── ops.sqlite                      # Run·타겟포착·추론 큐 메타 (웹 UI)
 └── algorithms/
     ├── operations/
     │   ├── ops_queue_test_pk.xlsx      # 타겟 포착 분포 (Test, PK)
     │   ├── ops_queue_test_entity.xlsx  # 타겟 포착 분포 (Test, 엔티티)
     │   ├── ops_queue_inference_pk.xlsx     # 점검 우선순위표 (추론, PK)
     │   └── ops_queue_inference_entity.xlsx # 점검 우선순위표 (추론, 엔티티)
-    ├── catboost_v1/
-    │   ├── model.joblib
-    │   ├── train_meta.json
-    │   ├── eval_metrics.json
-    │   └── scores/
-    │       ├── test/
-    │       └── inference/
-    ├── stacked_ensemble_v1/
-    ├── easy_ensemble_v1/
-    ├── gradient_boosting_v1/
-    └── random_forest_v1/
+    ├── catboost_v3/
+    ├── stacked_ensemble_v3/
+    ├── easy_ensemble_v3/
+    ├── gradient_boosting_v3/
+    └── random_forest_v3/
+        ├── model.joblib
+        ├── train_meta.json
+        ├── eval_metrics.json
+        └── scores/
+            ├── test/
+            └── inference/
 
 LocalSubsidies_SupervisedLearning/      # 이 repo
 ├── api/                                # FastAPI BFF
@@ -181,20 +181,19 @@ LocalSubsidies_SupervisedLearning/      # 이 repo
 ├── RunWebNext.bat                      # 웹 UI 실행 (더블클릭 → :8600)
 └── outputs/reports/
     ├── comparison/                     # 07·08·04·06 모델 비교
-    ├── tuning/                         # 튜닝 이력 (v2, v3, v4, …)
-    │   └── v3/
-    ├── catboost_v1/
-    ├── stacked_ensemble_v1/
-    ├── easy_ensemble_v1/
-    ├── gradient_boosting_v1/
-    └── random_forest_v1/
+    ├── tuning/                         # 튜닝 이력 (v2, v3, …)
+    └── {algo}/                         # 알고리즘별 집계
 ```
 
-## 사전 준비 (사용자)
+행단위 점수·큐 파일은 `{data_root}` 전용(GitHub 금지).  
+집계 리포트만 `outputs/reports/`에 둡니다.  
+파이프라인 단계·파일명 상세: [`docs/pipeline.md`](docs/pipeline.md)
 
-1. 외부 데이터 루트 생성 후 raw CSV(EUC-KR) 8개 배치  
+## 사전 준비 (개발자 · 온라인)
+
+1. 외부 데이터 루트 생성 후 raw CSV(EUC-KR) 배치  
    예: `...\LocalSubsidies_ML_Data\raw\`  
-   (`LocalSubsidies_ML_Data` 폴더는 본 프로젝트 폴더와 **같은 위치**(형제 경로)에 두는 것을 권장)
+   (`LocalSubsidies_ML_Data`는 본 프로젝트와 **형제 경로** 권장)
 2. 설정 복사:
    ```text
    copy configs\local.yaml.example configs\local.yaml
@@ -206,146 +205,6 @@ LocalSubsidies_SupervisedLearning/      # 이 repo
    .venv\Scripts\activate
    pip install -r requirements.txt
    ```
-   (`tqdm`이 있으면 진행바, 없으면 텍스트 진행률로 자동 대체됩니다.)
-
-## CLI 실행 순서 (터미널)
-
-웹 UI **「학습 파이프라인」** 메뉴와 동일한 단계입니다. 스크립트를 직접 실행할 때 참고하세요.
-
-```text
-python scripts/01_merge_raw.py
-python scripts/02_fix_target.py
-python scripts/03_preprocess.py
-python scripts/04_leakage_audit.py      # 누수점검 (학습 전)
-python scripts/05_train.py              # 모델 학습
-python scripts/06_feature_importance.py # Feature TOP10 (evaluate 전에 필수)
-python scripts/07_evaluate.py           # 평가·점수 (명칭/금액/TOP10피처값 포함)
-python scripts/08_update_ranking.py     # 모델 순위 (eval 기반)
-python scripts/09_report.py             # 집계 리포트
-python scripts/10_ops_queue.py          # 타겟 포착 분포 Test (주/보 A~D · 4×4)
-# 운영 추론 (라벨 미지 데이터, 예: 2026) — 주·보 모델 각각 (configs/default.yaml ops_queue 참고)
-python scripts/11_score_inference.py --algo random_forest_v1
-python scripts/11_score_inference.py --algo catboost_v1
-# (선택) Validation 하이퍼 탐색 — Test 미사용 · configs/tune.yaml
-python scripts/12_tune_hyperparams.py
-# 5종 일괄
-python tune_batch/run_tune_batch.py
-```
-
-> 의심 피처가 있으면 Feature 제외 후 `03`부터 다시 실행하고, `04` PASS 후 `05`로 진행합니다.  
-> 웹 UI에서는 누수 FAIL 시 **「제외 반영 후 03부터 재개」** 로 동일하게 처리합니다.  
-> 알고리즘 ID·튜닝: [`docs/algo_id_migration.md`](docs/algo_id_migration.md) · [`docs/model_tuning.md`](docs/model_tuning.md) · [`docs/hyperparam_methodology.md`](docs/hyperparam_methodology.md)
-
-## Owner — CLI 전용 하이퍼파라미터 튜닝 (웹 최소 · v4 예시)
-
-**대상:** Repo Owner · 웹 UI 없이 yaml + 터미널만으로 `12` 튜닝  
-**설정:** [`configs/tune.yaml`](configs/tune.yaml) (+ 선택 [`configs/tune_local.yaml`](configs/tune_local.yaml.example))  
-**산출:** `outputs/reports/tuning/{output_tag}/` (예: `v4/` — **덮어쓰지 않음**)
-
-| 구분 | 튜닝 (12) | 웹·05~11 |
-|------|-----------|----------|
-| 설정 파일 | `tune.yaml` | `default.yaml` + `run_config.yaml` |
-| API/Job | **사용 안 함** | FastAPI · 백그라운드 Job |
-| Run ID | `data_run_id` / `--run-id` | 웹 Run 발급 |
-
-### 경로 A — 03 산출물 재사용 (가장 간단 · 웹 불필요)
-
-v3와 **동일 raw·동일 group_random Run**(`run_20260730_172901` 등)에서 격자만 바꿀 때.
-
-1. **`configs/tune.yaml` 수정**
-   ```yaml
-   output_tag: v4
-   data_run_id: run_20260730_172901   # 기존 03 Run 유지
-
-   tune:
-     algorithms:                      # baseline = default.yaml model_params
-       - random_forest_v3             # v4 채택 시 *_v4 등록
-       - catboost_v3
-       - gradient_boosting_v3
-       - stacked_ensemble_v3
-       - easy_ensemble_v3
-     grids:
-       random_forest_v3:              # 키 = algorithms 와 동일 algo_id
-         n_estimators: [250, 300, 350]
-         max_depth: [20, 24, 28]
-         min_samples_leaf: [3, 5]
-       # … 5종
-   ```
-2. **일괄 튜닝** (웹·RunWebNext.bat 불필요)
-   ```powershell
-   cd C:\work\LocalSubsidies_SupervisedLearning
-   .\.venv\Scripts\activate
-   python tune_batch/run_tune_batch.py
-   ```
-3. **결과 확인** — `outputs/reports/tuning/v4/hyperparam_tune_*.xlsx` · `hyperparam_tune_best.yaml`
-4. **채택** — `default.yaml`에 `model_params.{family}_v4` + `algorithm_registry` v4 + `05_train_*_v4.py`
-5. **Test 1회** (CLI 또는 웹) — 동일 Run에서 `05`→`07`→`08`→`10` · v3와 **같은 Run**에서만 비교
-
-### 경로 B — 01~04도 CLI만 (신규 Run · 웹 최소)
-
-raw 경로만 알고 있을 때. 웹은 **Run ID 발급·Job 실행 없이** 터미널만 사용.
-
-1. **Run ID 결정** — 예: `run_tune_v4_20260801`
-2. **`run_config` 배치** — [`configs/tune_run.yaml.example`](configs/tune_run.yaml.example)를 복사:
-   ```text
-   {data_root}\runs\run_tune_v4_20260801\run_config.yaml
-   ```
-   - `split.mode: group_random` 유지  
-   - `raw_files:` 에 `{data_root}` 기준 CSV 상대경로 나열 (웹 데이터 등록 대신 직접 기입)
-3. **선행 파이프라인** (웹 없음)
-   ```powershell
-   $env:LSL_RUN_ID = "run_tune_v4_20260801"
-   python scripts/01_merge_raw.py
-   python scripts/02_fix_target.py
-   python scripts/03_preprocess.py
-   python scripts/04_leakage_audit.py
-   ```
-4. **`tune.yaml`** — `output_tag: v4`, `data_run_id: run_tune_v4_20260801`, `grids`·`algorithms` (경로 A와 동일)
-5. **`python tune_batch/run_tune_batch.py`**
-6. 채택·Test — 경로 A 4~5단계와 동일
-
-### v4 체크리스트
-
-- [ ] `require_preprocess_split_mode: group_random` — 03이 `random`이면 12가 거부
-- [ ] `tune.grids` 키 = `tune.algorithms` algo_id (v4부터 **`*_v3` baseline** 권장)
-- [ ] 산출은 `tuning/v4/` — `comparison/`에는 07·08만
-- [ ] Test로 반복 튜닝 금지 — Valid에서 best → Test **1회**
-- [ ] v2·v3 튜닝 Run과 Test 수치 **직접 비교 금지** (분할·Valid 방식 상이)
-
-상세: [`docs/model_tuning.md`](docs/model_tuning.md) §3.1 · §4
-
-### 학습(05) — 일괄 / 개별
-
-```text
-# 5종 일괄 (알고리즘 전환 + 모델 내부 진행 표시)
-python scripts/05_train.py
-
-# 특정 알고리즘만 (--algo 반복 가능)
-python scripts/05_train.py --algo catboost_v1
-python scripts/05_train.py --algo random_forest_v1 --algo gradient_boosting_v1
-
-# 알고리즘별 전용 스크립트
-python scripts/05_train_catboost_v1.py
-python scripts/05_train_stacked_ensemble_v1.py
-python scripts/05_train_easy_ensemble_v1.py
-python scripts/05_train_gradient_boosting_v1.py
-python scripts/05_train_random_forest_v1.py
-```
-
-- 집계 결과: `outputs/reports/comparison/`, `outputs/reports/{algo}/`
-- 행단위 점수: `{data_root}/algorithms/{algo}/scores/` (GitHub 금지)  
-  - `test/{algo}_test_scores.csv` · `test/{algo}_test_scores_top.xlsx`  
-  - `inference/{algo}_inference_scores.csv` · `inference/{algo}_inference_scores_top.xlsx`  
-  - 컬럼: 키·명칭/금액 → 위험도점수·양성확률·예측/실제라벨 → 기여도TOP10  
-  - 타겟 포착 분포(Test): `{data_root}/algorithms/operations/ops_queue_test_pk.*` · `ops_queue_test_entity.*` (`10`) — 웹 **타겟 포착 분포**  
-  - 점검 우선순위표(추론): `{data_root}/algorithms/operations/ops_queue_inference_pk.*` · `ops_queue_inference_entity.*` — 웹 **추론 → 결과 확인**
-
-### Test vs 추론 (요약)
-
-| 구분 | 데이터 | 목적 | 웹 메뉴 |
-|------|--------|------|---------|
-| **Test(평가)** | 라벨 있는 hold-out | 타겟 **포착 품질** (4×4 + 실제 타겟 분포) | 타겟 포착 분포 |
-| **추론** | 라벨 미지 운영 데이터 | **점검 우선순위** 선정 (4×4) | 추론 → 결과 확인 |
 
 ## 타겟(TAET_YN) 규칙
 
@@ -370,9 +229,10 @@ python scripts/05_train_random_forest_v1.py
 | [`docs/operations_criteria.md`](docs/operations_criteria.md) | 주·보 선정 원칙·4×4·평가 스냅샷 |
 | [`docs/metrics_guide.md`](docs/metrics_guide.md) | 평가 지표 해설 |
 | [`docs/offline_setup.md`](docs/offline_setup.md) | **오프라인 사용법** (GitHub 다운로드 → 설치 → 실행) |
-| [`docs/model_tuning.md`](docs/model_tuning.md) | 하이퍼파라미터 튜닝·**CLI 독립 실행(v4)** · v3/v4 반영 |
-| [`docs/hyperparam_methodology.md`](docs/hyperparam_methodology.md) | 5종 하이퍼 수정 **방법론** (수치 미적용) |
-| [`docs/algo_id_migration.md`](docs/algo_id_migration.md) | algo_id `*_v1` 로컬 마이그레이션 |
+| [`docs/offline_update.md`](docs/offline_update.md) | 오프라인 **버전 업데이트** (full sync) |
+| [`docs/model_tuning.md`](docs/model_tuning.md) | 하이퍼파라미터 튜닝 · CLI 독립 실행 |
+| [`docs/hyperparam_methodology.md`](docs/hyperparam_methodology.md) | 5종 하이퍼 수정 **방법론** |
+| [`docs/algo_id_migration.md`](docs/algo_id_migration.md) | algo_id `*_vN` 로컬 마이그레이션 |
 | [`docs/VERSION_HISTORY.md`](docs/VERSION_HISTORY.md) | 버전 이력 (v0.1~) |
 | [`docs/AGENT_BOUNDARY.md`](docs/AGENT_BOUNDARY.md) | Cursor Agent / 민감데이터 격리 |
 
@@ -382,8 +242,8 @@ python scripts/05_train_random_forest_v1.py
 
 아래는 비전문가도 흐름을 잡을 수 있도록 **직관 설명 + 도식**으로 정리한 것입니다.
 
-**주·보 모델:** 5종을 학습·비교한 뒤 **평가(07)·순위(08)** 와 `configs/default.yaml`의 `ops_queue.primary_algo` / `aux_algo`로 정합니다.  
-데이터·타겟 정의·재학습에 따라 **주·보에 쓰는 알고리즘은 바뀔 수 있습니다** (고정 아님).  
+**주·보·참 모델:** 5종을 학습·비교한 뒤 **평가(07)·순위(08)** 와 `configs/default.yaml`의 `ops_queue` / 순위 `role`로 정합니다.  
+데이터·타겟 정의·재학습에 따라 **주·보·참에 쓰는 알고리즘은 바뀔 수 있습니다** (고정 아님).  
 현재 평가 스냅샷·선정 기준: [`docs/operations_criteria.md`](docs/operations_criteria.md)
 
 ```mermaid
@@ -439,7 +299,7 @@ flowchart LR
 
 - 1층: 여러 기본 모델이 각자 점수/확률을 냄  
 - 2층: 그 결과들을 입력으로 받아 최종 판단을 냄  
-- **참고·비교용**으로 학습하며, 평가 순위에 따라 주·보 후보가 될 수 있습니다.
+- **참고·비교용**으로 학습하며, 평가 순위에 따라 주·보·참 후보가 될 수 있습니다.
 
 ```mermaid
 flowchart TB

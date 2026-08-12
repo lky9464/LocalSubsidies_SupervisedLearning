@@ -1,36 +1,48 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { AppLink } from "@/components/app-link";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { apiGet } from "@/lib/api";
-import { formatDisplayValue } from "@/lib/utils";
+import { apiGet, ApiError } from "@/lib/api";
 import { useRun } from "@/components/run-context";
 import { Alert } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DataTable, MatrixTable } from "@/components/matrix-table";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
-import type { ConfigMeta } from "@/lib/types";
+import { CaptureMatrixPanel, DataTable } from "@/components/matrix-table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
+type CaptureCase = {
+  id: string;
+  title: string;
+  row_axis: string;
+  col_axis: string;
+  available: boolean;
+  reason?: string | null;
+  loaded?: boolean;
+  matrices?: {
+    pk?: {
+      all?: unknown;
+      meta?: { total?: number };
+    };
+    entity?: {
+      all?: unknown;
+      meta?: { total?: number };
+    };
+  };
+  summary?: Record<string, unknown>[];
+};
+
+type Roles = {
+  primary?: string;
+  aux?: string;
+  reference?: string | null;
+  primary_label?: string | null;
+  aux_label?: string | null;
+  reference_label?: string | null;
+};
 
 export default function InferenceResultsPage() {
   const { runId } = useRun();
-  const [view, setView] = useState<"grade" | "algo">("grade");
-  const [grade, setGrade] = useState("(전체)");
-  const [limit, setLimit] = useState(30);
-  const [algo, setAlgo] = useState("");
-  const [sortDesc, setSortDesc] = useState(true);
-
-  const { data: meta } = useQuery({
-    queryKey: ["configMeta"],
-    queryFn: () => apiGet<ConfigMeta>("/api/config/meta"),
-  });
+  const [caseTab, setCaseTab] = useState("primary_aux");
 
   const { data: metaRes } = useQuery({
     queryKey: ["inferResults", runId],
@@ -38,28 +50,35 @@ export default function InferenceResultsPage() {
     enabled: !!runId,
   });
 
-  const { data: queue } = useQuery({
-    queryKey: ["inferQueue", runId, grade, limit],
-    queryFn: () =>
-      apiGet<Record<string, unknown>>(
-        `/api/inference/ops-queue?run_id=${runId}&grade=${encodeURIComponent(grade)}&limit=${limit}`,
-      ),
-    enabled: !!runId && view === "grade",
+  const { data, isLoading, isError, error } = useQuery({
+    queryKey: ["inferOps", runId],
+    queryFn: ({ signal }) =>
+      apiGet<Record<string, unknown>>(`/api/inference/ops-queue?run_id=${runId}`, {
+        signal,
+        timeoutMs: 60_000,
+      }),
+    enabled: !!runId,
   });
 
-  const available = (metaRes?.available as { algo: string }[]) || [];
+  const bandHelp = (data?.band_help as Record<string, string>) || {};
+  const roles = (data?.roles as Roles) || {};
+  const cases = (data?.cases as CaptureCase[]) || [];
+  const hasData = cases.some((c) => c.available);
 
-  useEffect(() => {
-    if (!algo && available.length) setAlgo(available[0].algo);
-  }, [available, algo]);
-
-  const { data: scores } = useQuery({
-    queryKey: ["inferScores", runId, algo, limit, sortDesc],
-    queryFn: () =>
-      apiGet<Record<string, unknown>>(
-        `/api/inference/scores/${algo}?run_id=${encodeURIComponent(runId || "")}&limit=${limit}&sort_desc=${sortDesc}`,
+  const activeMeta = cases.find((c) => c.id === caseTab);
+  const {
+    data: caseDetail,
+    isLoading: caseLoading,
+    isError: caseError,
+    error: caseErr,
+  } = useQuery({
+    queryKey: ["inferOps", runId, "case", caseTab],
+    queryFn: ({ signal }) =>
+      apiGet<CaptureCase>(
+        `/api/inference/ops-queue/cases/${caseTab}?run_id=${runId}`,
+        { signal, timeoutMs: 90_000 },
       ),
-    enabled: view === "algo" && !!algo && !!runId,
+    enabled: !!runId && !!activeMeta?.available,
   });
 
   return (
@@ -67,9 +86,9 @@ export default function InferenceResultsPage() {
       <div>
         <h1 className="text-2xl font-semibold">결과 확인</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          점수·점검 우선순위표 미리보기. 추론 완료 시 CSV·Excel은{" "}
-          <code className="text-xs">runs/&#123;run_id&#125;/algorithms/operations/</code> 에
-          자동 저장됩니다.
+          점검 우선순위(3케이스 · PK·엔티티). 산출물은{" "}
+          <code className="text-xs">runs/&#123;run_id&#125;/algorithms/operations/</code>{" "}
+          (<code className="text-xs">ops_queue_inference_pk/entity.*</code>)에 저장됩니다.
         </p>
       </div>
 
@@ -96,101 +115,105 @@ export default function InferenceResultsPage() {
             </CardContent>
           </Card>
 
-          <div className="flex gap-4 text-sm">
-            <label className="flex items-center gap-2">
-              <input
-                type="radio"
-                checked={view === "grade"}
-                onChange={() => setView("grade")}
-              />
-              점검 우선순위 (주·보 4×4)
-            </label>
-            <label className="flex items-center gap-2">
-              <input type="radio" checked={view === "algo"} onChange={() => setView("algo")} />
-              알고리즘별 점수
-            </label>
+          <div className="grid gap-4 sm:grid-cols-4">
+            {(["주A", "주B", "주C", "주D"] as const).map((g) => (
+              <div key={g} className="rounded-lg border p-3" title={bandHelp[g]}>
+                <p className="text-xs text-muted-foreground">{g}</p>
+                <p className="text-sm font-medium">
+                  {g === "주A" && "상위1%"}
+                  {g === "주B" && "1~5%"}
+                  {g === "주C" && "5~10%"}
+                  {g === "주D" && ">10%"}
+                </p>
+              </div>
+            ))}
           </div>
 
-          {view === "grade" ? (
-            <Card>
-              <CardContent className="space-y-4 pt-6">
-                <p className="text-sm">
-                  주 {(queue?.primary_label as string) || ""} / 보 {(queue?.aux_label as string) || ""}
-                </p>
-                <MatrixTable
-                  matrix={queue?.matrix as never}
-                  title="4×4 매트릭스 (점검 선정용)"
-                  heatByPriority
-                />
-                <div className="flex gap-3">
-                  <Select value={grade} onValueChange={setGrade}>
-                    <SelectTrigger className="w-[140px]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="(전체)">(전체)</SelectItem>
-                      {["주A", "주B", "주C", "주D"].map((g) => (
-                        <SelectItem key={g} value={g}>
-                          {g}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Select value={String(limit)} onValueChange={(v) => setLimit(Number(v))}>
-                    <SelectTrigger className="w-[100px]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {[10, 30, 50, 100].map((n) => (
-                        <SelectItem key={n} value={String(n)}>
-                          {n}건
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <DataTable
-                  rows={(queue?.preview_rows as Record<string, unknown>[]) || []}
-                  columns={(queue?.preview_columns as string[]) || undefined}
-                  maxHeight={360}
-                />
-              </CardContent>
-            </Card>
+          {isLoading ? (
+            <p className="text-sm text-muted-foreground">불러오는 중...</p>
+          ) : isError ? (
+            <Alert variant="destructive">
+              {error instanceof ApiError
+                ? error.message
+                : "점검 우선순위 목록을 불러오지 못했습니다."}
+            </Alert>
+          ) : !hasData ? (
+            <p className="text-sm text-muted-foreground">
+              추론 완료 후 표시됩니다. 11 단계 산출물이 없으면 추론을 다시 실행하세요.
+            </p>
           ) : (
-            <Card>
-              <CardContent className="space-y-4 pt-6">
-                <Select value={algo} onValueChange={setAlgo}>
-                  <SelectTrigger className="w-[200px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {available.map((a) => (
-                      <SelectItem key={a.algo} value={a.algo}>
-                        {meta?.algo_labels?.[a.algo] || a.algo}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <div className="grid gap-4 sm:grid-cols-4 text-sm">
-                  <div>행 수: {formatDisplayValue(scores?.row_count ?? "-")}</div>
-                  <div>평균: {formatDisplayValue(scores?.avg_score ?? "-")}</div>
-                  <div>최고: {formatDisplayValue(scores?.max_score ?? "-")}</div>
-                  <div>상위1% 추정: {formatDisplayValue(scores?.top1_est ?? "-")}</div>
-                </div>
-                {Array.isArray(scores?.crtr_ym) ? (
-                  <DataTable rows={scores.crtr_ym as Record<string, unknown>[]} />
-                ) : null}
-                <label className="flex items-center gap-2 text-sm">
-                  <Checkbox checked={sortDesc} onCheckedChange={(c) => setSortDesc(!!c)} />
-                  위험도 점수 내림차순
-                </label>
-                <DataTable
-                  rows={(scores?.preview_rows as Record<string, unknown>[]) || []}
-                  columns={(scores?.preview_columns as string[]) || undefined}
-                  maxHeight={360}
-                />
-              </CardContent>
-            </Card>
+            <>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">선정 모델 (08 순위 · 이번 추론)</CardTitle>
+                </CardHeader>
+                <CardContent className="flex flex-wrap gap-4 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">주 </span>
+                    <span className="font-medium">
+                      {roles.primary_label || roles.primary || "—"}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">보 </span>
+                    <span className="font-medium">{roles.aux_label || roles.aux || "—"}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">참 </span>
+                    <span className="font-medium">
+                      {roles.reference_label || roles.reference || "—"}
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Tabs value={caseTab} onValueChange={setCaseTab}>
+                <TabsList>
+                  {cases.map((c) => (
+                    <TabsTrigger key={c.id} value={c.id}>
+                      {c.title}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+                {cases.map((c) => (
+                  <TabsContent key={c.id} value={c.id} className="space-y-4">
+                    {!c.available ? (
+                      <p className="text-sm text-muted-foreground">{c.reason || "해당 없음"}</p>
+                    ) : caseTab !== c.id ? null : caseLoading ? (
+                      <p className="text-sm text-muted-foreground">매트릭스 불러오는 중...</p>
+                    ) : caseError ? (
+                      <Alert variant="destructive">
+                        {caseErr instanceof ApiError
+                          ? caseErr.message
+                          : "케이스 데이터를 불러오지 못했습니다."}
+                      </Alert>
+                    ) : caseDetail && !caseDetail.available ? (
+                      <p className="text-sm text-muted-foreground">
+                        {caseDetail.reason || "해당 없음"}
+                      </p>
+                    ) : (
+                      <>
+                        <CaptureMatrixPanel
+                          variant="inference"
+                          rowAxis={caseDetail?.row_axis || c.row_axis}
+                          colAxis={caseDetail?.col_axis || c.col_axis}
+                          pk={caseDetail?.matrices?.pk as never}
+                          entity={caseDetail?.matrices?.entity as never}
+                        />
+                        <details className="text-sm">
+                          <summary className="cursor-pointer font-medium">
+                            조합별 건수·우선순위 (상세) — {c.title}
+                          </summary>
+                          <div className="mt-3">
+                            <DataTable rows={caseDetail?.summary || []} />
+                          </div>
+                        </details>
+                      </>
+                    )}
+                  </TabsContent>
+                ))}
+              </Tabs>
+            </>
           )}
         </>
       )}

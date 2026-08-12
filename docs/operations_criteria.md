@@ -272,7 +272,7 @@ Stacked 등 **참고 모델**은 분쟁·재검토 시에만 사용 (단독 4×4
 | 누수 감사 | `outputs/reports/comparison/leakage_audit.xlsx` |
 | Feature TOP10 | `outputs/reports/comparison/feature_importance_top10_all.xlsx` |
 | 타겟 포착 분포 (Test, 로컬) | `{data_root}/algorithms/operations/ops_queue_test_pk.*` · `ops_queue_test_entity.*` |
-| 점검 우선순위표 (추론, 로컬) | `{data_root}/algorithms/operations/ops_queue_inference.*` |
+| 점검 우선순위표 (추론, 로컬) | `{data_root}/algorithms/operations/ops_queue_inference_pk.*` · `ops_queue_inference_entity.*` |
 | 지표 해설 | `docs/metrics_guide.md` |
 | 타겟 정의 | `docs/label_definition.md` |
 | Agent/데이터 경계 | `docs/AGENT_BOUNDARY.md` |

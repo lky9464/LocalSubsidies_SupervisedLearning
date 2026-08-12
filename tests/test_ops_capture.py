@@ -71,6 +71,29 @@ def test_entity_aggregate_any_positive_and_round():
     assert ent[ACTUAL_COL].max() in ("1", 1)
 
 
+def test_entity_aggregate_blank_actual_stays_blank():
+    """추론처럼 실제라벨 공란이면 엔티티 집계도 0이 아니라 공란."""
+    ops_cfg = {"a_top_pct": 50, "b_top_pct": 80, "c_top_pct": 100}
+    spec = OPS_PAIR_SPECS[0]
+    keys = ["CRTR_YM", "PFM_BIZ_ID", "INST_ID"]
+    row_df = _make_score_df(4, 100.0, entity_pairs=2)
+    col_df = _make_score_df(4, 90.0, entity_pairs=2)
+    row_df[ACTUAL_COL] = ""
+    col_df[ACTUAL_COL] = ""
+    pk = build_ops_pair_queue(row_df, col_df, keys, ops_cfg, spec)
+    ent = aggregate_entity_queue(
+        pk, ("PFM_BIZ_ID", "INST_ID"), ops_cfg, spec, preserve_blank_actual=True
+    )
+    assert len(ent) == 2
+    assert ACTUAL_COL in ent.columns
+    for v in ent[ACTUAL_COL]:
+        assert v == "" or (isinstance(v, float) and pd.isna(v))
+
+    # Test 기본 경로: 공란이어도 any-positive → 0
+    ent_test = aggregate_entity_queue(pk, ("PFM_BIZ_ID", "INST_ID"), ops_cfg, spec)
+    assert set(int(x) for x in ent_test[ACTUAL_COL]) == {0}
+
+
 def test_entity_aggregate_string_amount_columns():
     """점수 CSV dtype=str 로드 시 금액 열 mean 집계."""
     from src.scoring.score_table import FIXED_SCORE_EXTRA_COLUMNS

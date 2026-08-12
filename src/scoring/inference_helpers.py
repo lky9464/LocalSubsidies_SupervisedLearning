@@ -11,15 +11,12 @@ import pandas as pd
 from src.io.config import (
     resolve_algo_score_csv,
     resolve_algo_score_top_xlsx,
-    resolve_data_path,
 )
 from src.models.registry import list_algo_ids
 from src.ops_db.repository import OpsRepository
 from src.pipeline.run_config import load_run_config
 from src.scoring.ops_queue import (
-    GRADE_COL,
     build_ops_queue,
-    write_ops_queue_excel,
 )
 from src.scoring.score_table import SCORE_COL
 
@@ -35,13 +32,6 @@ def inference_top_xlsx_path(
     cfg: dict[str, Any], algo: str, *, run_id: str | None = None
 ) -> Path:
     return resolve_algo_score_top_xlsx(cfg, algo, "inference", run_id=run_id)
-
-
-def inference_export_paths(
-    cfg: dict[str, Any], *, run_id: str | None = None
-) -> tuple[Path, Path]:
-    out_dir = resolve_data_path(cfg, "algorithms", run_id=run_id) / "operations"
-    return out_dir / "ops_queue_inference.csv", out_dir / "ops_queue_inference.xlsx"
 
 
 def _order_algos_by_ranking(cfg: dict[str, Any], run_id: str, algos: list[str]) -> list[str]:
@@ -197,91 +187,22 @@ def load_inference_queue_lite(
     return build_ops_queue(primary_df, aux_df, keys, ops_cfg)
 
 
-def load_inference_queue(
-    cfg: dict[str, Any],
-    run_id: str,
-    *,
-    require_step: bool = True,
-) -> pd.DataFrame | None:
-    """주·보조 inference 점수로 우선순위표 생성. 주 모델 파일 없으면 None."""
-    if require_step and not run_has_inference_step(cfg, run_id):
-        return None
-    primary, aux = resolve_inference_primary_aux(cfg, run_id)
-    primary_path = inference_score_path(cfg, primary, run_id=run_id)
-    if not primary_path.exists():
-        return None
-
-    encoding = cfg.get("encoding", "EUC-KR")
-    ops_cfg = dict(cfg.get("ops_queue") or {})
-    keys = list(cfg.get("key_columns") or [])
-
-    primary_df = pd.read_csv(primary_path, encoding=encoding, dtype=str, low_memory=False)
-    aux_path = inference_score_path(cfg, aux, run_id=run_id)
-    aux_df = None
-    if aux_path.exists():
-        aux_df = pd.read_csv(aux_path, encoding=encoding, dtype=str, low_memory=False)
-
-    return build_ops_queue(primary_df, aux_df, keys, ops_cfg)
-
-
-def inference_grade_counts(queue: pd.DataFrame) -> dict[str, int]:
-    if queue.empty or GRADE_COL not in queue.columns:
-        return {}
-    from src.scoring.ops_queue import PRIMARY_LABELS
-
-    vc = queue[GRADE_COL].value_counts()
-    return {g: int(vc.get(g, 0)) for g in PRIMARY_LABELS}
-
-
 def export_inference_ops_queue(
     cfg: dict[str, Any],
     run_id: str,
     *,
     require_step: bool = True,
+    infer_algos: list[str] | None = None,
 ) -> tuple[Path, Path, int]:
-    """추론 점검 우선순위표 CSV·Excel 저장 (구간 규칙은 10과 동일, 시트는 추론용)."""
-    queue = load_inference_queue(cfg, run_id, require_step=require_step)
-    if queue is None or queue.empty:
-        primary, _ = resolve_inference_primary_aux(cfg, run_id)
-        raise FileNotFoundError(
-            f"주 모델 scores/inference/{primary}_inference_scores.csv 가 없습니다."
-        )
+    """추론 점검 우선순위표 PK CSV·Excel 저장 + DB 적재 (3케이스·엔티티)."""
+    if require_step and not run_has_inference_step(cfg, run_id):
+        raise FileNotFoundError("이 Run에서 inference step이 완료되지 않았습니다.")
 
-    csv_path, xlsx_path = inference_export_paths(cfg, run_id=run_id)
-    csv_path.parent.mkdir(parents=True, exist_ok=True)
-    encoding = cfg.get("encoding", "EUC-KR")
-    queue.to_csv(csv_path, index=False, encoding=encoding)
-    write_ops_queue_excel(queue, xlsx_path, mode="inference")
-    return csv_path, xlsx_path, len(queue)
+    algos = infer_algos or inference_algorithms_for_run(cfg, run_id)
+    if not algos:
+        raise FileNotFoundError("추론 알고리즘 목록이 없습니다.")
 
+    from src.scoring.inference_capture import export_inference_capture
 
-def dashboard_inference_line(cfg: dict[str, Any], run_id: str) -> str | None:
-    """대시보드 한 줄 요약. 없으면 None."""
-    if not run_has_inference_step(cfg, run_id):
-        return None
-    available = available_inference_algos(cfg, run_id)
-    if not available:
-        return None
-
-    primary, _ = resolve_inference_primary_aux(cfg, run_id)
-    primary_path = inference_score_path(cfg, primary, run_id=run_id)
-    meta = file_meta(primary_path)
-    if not meta["exists"]:
-        algos = ", ".join(available[:3])
-        return f"추론 결과: {algos} 등 {len(available)}종 (주 모델 파일 없음)"
-
-    try:
-        queue = load_inference_queue(cfg, run_id)
-    except Exception:  # noqa: BLE001
-        return f"추론 결과: 주 모델 파일 있음 · 등급 집계 실패 ({meta['mtime']})"
-
-    if queue is None:
-        return None
-
-    counts = inference_grade_counts(queue)
-    total = len(queue)
-    return (
-        f"추론 {total:,}건 · 주A={counts.get('주A', 0):,} "
-        f"주B={counts.get('주B', 0):,} 주C={counts.get('주C', 0):,} "
-        f"· 갱신 {meta['mtime']}"
-    )
+    pk_csv, pk_xlsx, _, _, pk_n, _ = export_inference_capture(cfg, run_id, algos)
+    return pk_csv, pk_xlsx, pk_n

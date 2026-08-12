@@ -188,8 +188,8 @@ def main() -> None:
             )
 
         # Test(07)와 동일 조립: 고정4열 → 점수/확률/예측/실제 → TOP10
-        # 추론은 실제 라벨이 없으므로 스키마 유지를 위해 빈 값
-        actual_empty = np.full(len(detail_df), np.nan)
+        # 추론은 실제 라벨 미지 → 스키마만 유지하고 공란 (NaN/0 금지)
+        actual_empty = pd.Series([""] * len(detail_df), dtype=object)
         fixed_df = build_fixed_score_extra_frame(detail_df)
         top_df = build_top_feature_extra_frame(detail_df, top_feats, top_n=top_n)
         out_scores = assemble_score_table(
@@ -219,16 +219,18 @@ def main() -> None:
             f"(상위1%≈{n_top1:,}행, 상위5%≈{n_top5:,}행): {top_xlsx}"
         )
 
-    # 10 ops_queue_test 와 동일: 추론 완료 시 우선순위표 자동 저장
+    # 10 ops_queue_test 와 동일: 추론 완료 시 점검 우선순위표(PK·entity·DB) 자동 저장
     if run_id and algorithms:
         from src.scoring.inference_helpers import export_inference_ops_queue
 
         try:
-            csv_path, xlsx_path, n_q = export_inference_ops_queue(
-                cfg, run_id, require_step=False
+            pk_csv, pk_xlsx, n_q = export_inference_ops_queue(
+                cfg, run_id, require_step=False, infer_algos=algorithms
             )
-            print(f"[inference] 점검 우선순위표 저장(로컬전용): {csv_path} ({n_q:,}건)")
-            print(f"[inference] 점검 우선순위표 저장(로컬전용): {xlsx_path}")
+            print(
+                f"[inference] 점검 우선순위표 PK 저장(로컬전용): {pk_csv} ({n_q:,}건)"
+            )
+            print(f"[inference] 점검 우선순위표 PK 저장(로컬전용): {pk_xlsx}")
         except FileNotFoundError as exc:
             print(f"[inference] 경고: 우선순위표 자동 저장 생략 — {exc}")
 

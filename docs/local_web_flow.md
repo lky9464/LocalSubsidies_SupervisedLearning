@@ -203,7 +203,7 @@ flowchart TB
 
   subgraph infer_path [추론 — 웹 「추론」 11]
     I0[raw_inference 선택] --> I1[11_score_inference]
-    I1 --> I2[scores/inference/\nops_queue_inference]
+    I1 --> I2[scores/inference/\nops_queue_inference_pk/entity]
   end
 
   subgraph tune_path [튜닝 — CLI 전용 12]
@@ -236,7 +236,7 @@ flowchart TB
 | 학습 실행 · 01~10 | `pipeline/start` → Job | `interim/`, `processed/`, `algorithms/`, `scores/test/`, repo `outputs/reports/` |
 | 모델 비교·평가 | `/api/models/*` | `algorithms/eval_summary.json`, SQLite 순위 |
 | 타겟 포착 분포 | `/api/runs/{run_id}/ops-queue` | `algorithms/operations/ops_queue_test_pk.*` · `ops_queue_test_entity.*` · 설계: [`target_capture_distribution.md`](target_capture_distribution.md) |
-| 추론 실행 | `/api/inference/*` | `scores/inference/`, `ops_queue_inference.*` |
+| 추론 실행 | `/api/inference/*` | `scores/inference/`, `ops_queue_inference_pk.*` · `ops_queue_inference_entity.*` |
 | 대시보드 | Run 선택 + 위 결과 조회 | (조회만, 새 파일 없음) |
 | 설정 | `data_root` 표시 | `configs/local.yaml` |
 

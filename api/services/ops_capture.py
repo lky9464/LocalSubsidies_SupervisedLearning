@@ -44,12 +44,10 @@ def _matrix_block(
     }
 
 
-def build_ops_queue_payload(cfg: dict, run_id: str) -> dict[str, Any]:
-    repo = OpsRepository(cfg)
+def _role_payload(cfg: dict, run_id: str, repo: OpsRepository) -> dict[str, Any]:
     roles = repo.get_roles(run_id)
     labels_map = build_algo_labels_map(cfg)
-
-    role_payload = {
+    return {
         **roles,
         "primary_label": resolve_algo_label(roles["primary"] or "", labels_map)
         if roles.get("primary")
@@ -62,6 +60,20 @@ def build_ops_queue_payload(cfg: dict, run_id: str) -> dict[str, Any]:
         else None,
     }
 
+
+def build_ops_queue_payload(
+    cfg: dict,
+    run_id: str,
+    *,
+    include_matrices: bool = False,
+) -> dict[str, Any]:
+    """타겟 포착 목록.
+
+    include_matrices=False(기본): 케이스 메타만 — 화면 첫 로드용.
+    include_matrices=True: 레거시 전체(3케이스 매트릭스) — 호환용.
+    """
+    repo = OpsRepository(cfg)
+    role_payload = _role_payload(cfg, run_id, repo)
     band_help = {**BAND_HELP, **BAND_HELP_REF}
 
     cases: list[dict[str, Any]] = []
@@ -73,10 +85,11 @@ def build_ops_queue_payload(cfg: dict, run_id: str) -> dict[str, Any]:
             "col_axis": spec.col_prefix,
             "available": True,
             "reason": None,
+            "loaded": False,
         }
 
         needs_ref = spec.case_id in (CASE_PRIMARY_REF, CASE_AUX_REF)
-        if needs_ref and not roles.get("reference"):
+        if needs_ref and not role_payload.get("reference"):
             case["available"] = False
             case["reason"] = (
                 "참조 모델(reference) 없음 — 08 순위 3위 또는 해당 algo Test 점수 필요"
@@ -84,35 +97,31 @@ def build_ops_queue_payload(cfg: dict, run_id: str) -> dict[str, Any]:
             cases.append(case)
             continue
 
-        pk_block = _matrix_block(repo, run_id, spec.case_id, "pk")
-        ent_block = _matrix_block(repo, run_id, spec.case_id, "entity")
-        if pk_block["meta"].get("total", 0) <= 0:
+        n = repo.ops_capture_row_count(run_id, spec.case_id)
+        if n <= 0:
             case["available"] = False
             case["reason"] = "10 단계 산출물 없음 — 타겟 포착 분포를 실행하세요."
             cases.append(case)
             continue
 
-        summary_df = sort_ops_summary_priority(
-            repo.ops_capture_summary(run_id, spec.case_id)
-        )
-        summary_fmt = format_capture_summary(summary_df, spec.row_prefix, spec.col_prefix)
-
-        case["matrices"] = {"pk": pk_block, "entity": ent_block}
-        case["summary"] = df_to_records(summary_fmt)
-        case["positive_in_abc_pct"] = pk_block.get("positive_in_abc_pct")
+        if include_matrices:
+            detail = build_ops_case_payload(cfg, run_id, spec.case_id, repo=repo)
+            case.update(detail)
+            case["loaded"] = True
         cases.append(case)
 
-    primary_case = next((c for c in cases if c["id"] == CASE_PRIMARY_AUX), None)
     test_matrices: dict[str, Any] = {"empty": True}
-    if primary_case and primary_case.get("available") and primary_case.get("matrices"):
-        pk = primary_case["matrices"]["pk"]
-        test_matrices = {
-            "empty": False,
-            "meta": pk["meta"],
-            "matrix_all": pk["all"],
-            "matrix_pos": pk["positive"],
-            "positive_in_abc_pct": pk.get("positive_in_abc_pct"),
-        }
+    if include_matrices:
+        primary_case = next((c for c in cases if c["id"] == CASE_PRIMARY_AUX), None)
+        if primary_case and primary_case.get("available") and primary_case.get("matrices"):
+            pk = primary_case["matrices"]["pk"]
+            test_matrices = {
+                "empty": False,
+                "meta": pk["meta"],
+                "matrix_all": pk["all"],
+                "matrix_pos": pk["positive"],
+                "positive_in_abc_pct": pk.get("positive_in_abc_pct"),
+            }
 
     return {
         "run_id": run_id,
@@ -120,6 +129,68 @@ def build_ops_queue_payload(cfg: dict, run_id: str) -> dict[str, Any]:
         "roles": role_payload,
         "cases": cases,
         "test_matrices": test_matrices,
+        "lazy": not include_matrices,
+    }
+
+
+def build_ops_case_payload(
+    cfg: dict,
+    run_id: str,
+    case_id: str,
+    *,
+    repo: OpsRepository | None = None,
+) -> dict[str, Any]:
+    """단일 케이스 매트릭스·요약 (탭 선택 시 로드)."""
+    repo = repo or OpsRepository(cfg)
+    roles = repo.get_roles(run_id)
+    spec = next((s for s in OPS_PAIR_SPECS if s.case_id == case_id), None)
+    if spec is None:
+        return {
+            "id": case_id,
+            "available": False,
+            "reason": f"알 수 없는 case_id: {case_id}",
+            "loaded": True,
+        }
+
+    needs_ref = case_id in (CASE_PRIMARY_REF, CASE_AUX_REF)
+    if needs_ref and not roles.get("reference"):
+        return {
+            "id": case_id,
+            "title": spec.title,
+            "row_axis": spec.row_prefix,
+            "col_axis": spec.col_prefix,
+            "available": False,
+            "reason": "참조 모델(reference) 없음 — 08 순위 3위 또는 해당 algo Test 점수 필요",
+            "loaded": True,
+        }
+
+    pk_block = _matrix_block(repo, run_id, case_id, "pk")
+    if pk_block["meta"].get("total", 0) <= 0:
+        return {
+            "id": case_id,
+            "title": spec.title,
+            "row_axis": spec.row_prefix,
+            "col_axis": spec.col_prefix,
+            "available": False,
+            "reason": "10 단계 산출물 없음 — 타겟 포착 분포를 실행하세요.",
+            "loaded": True,
+        }
+
+    ent_block = _matrix_block(repo, run_id, case_id, "entity")
+    summary_df = sort_ops_summary_priority(repo.ops_capture_summary(run_id, case_id))
+    summary_fmt = format_capture_summary(summary_df, spec.row_prefix, spec.col_prefix)
+
+    return {
+        "id": case_id,
+        "title": spec.title,
+        "row_axis": spec.row_prefix,
+        "col_axis": spec.col_prefix,
+        "available": True,
+        "reason": None,
+        "loaded": True,
+        "matrices": {"pk": pk_block, "entity": ent_block},
+        "summary": df_to_records(summary_fmt),
+        "positive_in_abc_pct": pk_block.get("positive_in_abc_pct"),
     }
 
 

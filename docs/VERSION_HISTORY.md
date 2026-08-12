@@ -1,10 +1,22 @@
 # 버전 이력
 
-현재 버전: **v0.7.2**  
+현재 버전: **v1.0.0**  
 저장소: [LocalSubsidies_SupervisedLearning](https://github.com/lky9464/LocalSubsidies_SupervisedLearning)  
 릴리스: [Releases](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases)
 
 새 버전을 낼 때 이 문서 상단에 항목을 추가하고, GitHub Release/태그와 맞춥니다.
+
+---
+
+## v1.0.0 — 추론 결과 확인 3케이스·PK/엔티티 · 성능·UI 정리
+
+- **추론 결과 확인:** 주/보·주/참·보/참 · PK·엔티티(A-1/B-1) · `ops_queue_inference_pk/entity.*` · `ops.sqlite` inference 테이블 · 11 자동 적재
+- **추론 실행:** 08 주·보·참만 선택(엄격) · 2모델 시 주/참·보/참 「해당 없음」
+- **모델 비교·평가:** Test 점수 분포 색상=타겟 비중 · SHAP TOP10 「TOP10별 점수분포」·관련 API 제거 · 점수분포 캐시·지연 로드
+- **타겟 포착 API:** `/ops-queue` 메타 + 케이스 지연 로드 · 데드 코드·구 `ops_queue_inference` 명 정리
+- **deps 변경 없음** — `update-to-v1.0.0.zip` · `web-out.zip` full sync ([`offline_update.md`](offline_update.md))
+
+[Release v1.0.0](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases/tag/v1.0.0)
 
 ---
 

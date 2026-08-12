@@ -177,6 +177,17 @@ def main() -> None:
         scores_dir.mkdir(parents=True, exist_ok=True)
         score_path = scores_dir / f"{algo}_test_scores.csv"
         out_scores.to_csv(score_path, index=False, encoding=encoding)
+        try:
+            from src.scoring.score_distribution import (
+                build_score_distribution_payload,
+                write_score_distribution_cache,
+            )
+
+            dist_payload = build_score_distribution_payload(out_scores, cfg)
+            write_score_distribution_cache(score_path, dist_payload)
+            print(f"[evaluate] 점수 분포 캐시 저장: {score_path.stem}_distribution.json")
+        except Exception as exc:  # noqa: BLE001
+            print(f"[evaluate] 점수 분포 캐시 생략: {exc}")
         top_xlsx = scores_dir / f"{algo}_test_scores_top.xlsx"
         write_top_pct_score_excel(out_scores, top_xlsx, percents=(1.0, 5.0))
         n_top1 = max(1, int(np.ceil(len(out_scores) * 0.01)))

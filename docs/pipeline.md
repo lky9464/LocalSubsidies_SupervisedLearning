@@ -14,7 +14,7 @@
 | 08 | `08_update_ranking.py` | 모델 순위·역할 | `model_ranking.json` (+ `ranking_confidence`) + SQLite · [`ranking_methodology.md`](ranking_methodology.md) |
 | 09 | `09_report.py` | 집계 리포트 | `outputs/reports/` |
 | 10 | `10_ops_queue.py` | 타겟 포착 분포 (Test 3케이스 · PK·엔티티 4×4) | `algorithms/operations/ops_queue_test_pk.*` · `ops_queue_test_entity.*` |
-| 11 | `11_score_inference.py` | 라벨 미지 추론 · 점검 우선순위표 | `scores/inference/{algo}_inference_scores*` · `ops_queue_inference.*` |
+| 11 | `11_score_inference.py` | 라벨 미지 추론 · 점검 우선순위표 | `scores/inference/{algo}_inference_scores*` · `ops_queue_inference_pk.*` · `ops_queue_inference_entity.*` |
 | 12 | `12_tune_hyperparams.py` | Validation 하이퍼 탐색 (Test 미사용) | `outputs/reports/tuning/{output_tag}/hyperparam_tune_*` |
 
 웹 UI **학습 파이프라인**은 01~10만 포함합니다. 추론(11)은 **추론** 메뉴입니다.  

@@ -1,9 +1,10 @@
 # 지방보조금 부정수급 위험도 — 지도학습
 
-[![Release v0.7.2](https://img.shields.io/github/v/tag/lky9464/LocalSubsidies_SupervisedLearning?label=v0.7.2)](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases/tag/v0.7.2)
+[![Release v1.0.0](https://img.shields.io/github/v/tag/lky9464/LocalSubsidies_SupervisedLearning?label=v1.0.0)](https://github.com/lky9464/LocalSubsidies_SupervisedLearning/releases/tag/v1.0.0)
 
 지방보조금 부정수급 **위험도 점수(0~1000)** 측정을 위한 지도학습 파이프라인 + **로컬 웹 UI**입니다.
 
+- **v1.0.0** — 추론 결과 3케이스·PK/엔티티 · 점수분포 성능·비중색 · Feature분포 UI 제거 · ([`VERSION_HISTORY`](docs/VERSION_HISTORY.md))
 - **v0.7.2** — 타겟 포착 3케이스·PK/엔티티 · 모델 점수·TOP10 분포 UI · ([`VERSION_HISTORY`](docs/VERSION_HISTORY.md))
 - **v0.7.1** — 모델 비교·평가 SHAP·PR-AUC · 06 SHAP_total · CleanupLegacy tuning 보존 · ([`VERSION_HISTORY`](docs/VERSION_HISTORY.md))
 - **v0.7.0** — 엔티티 무중복 Valid 튜닝 · `{family}_v3` · `configs/tune.yaml` · `tuning/vN/` · CLI `tune_batch` · ([`VERSION_HISTORY`](docs/VERSION_HISTORY.md))
@@ -140,7 +141,7 @@ Release 노트: [v0.6.2](https://github.com/lky9464/LocalSubsidies_SupervisedLea
 | `{data_root}/raw`, `interim`, `processed` | **공통** 입력·통합·전처리 (1벌) |
 | `{data_root}/raw_inference/` | 추론용 raw (라벨 미지, 예: 2026) |
 | `{data_root}/algorithms/{algo}/` | **알고리즘별** 모델·평가·행단위 점수 (5폴더) |
-| `{data_root}/algorithms/operations/` | 타겟 포착·점검 우선순위표 (`ops_queue_test_pk.*`, `ops_queue_test_entity.*`, `ops_queue_inference.*`) |
+| `{data_root}/algorithms/operations/` | 타겟 포착·점검 우선순위표 (`ops_queue_test_pk.*`, `ops_queue_test_entity.*`, `ops_queue_inference_pk.*`, `ops_queue_inference_entity.*`) |
 | `{data_root}/ops/ops.sqlite` | Run 이력·운영 큐 메타 (raw 미포함, GitHub 금지) |
 | `outputs/reports/comparison/` | 04·07·08·06 **모델 비교** 집계 (누수·eval·순위·feature TOP10) |
 | `outputs/reports/tuning/vN/` | **튜닝 캠페인** N (`hyperparam_tune_*`, `tune_manifest.yaml`) |
@@ -160,7 +161,8 @@ LocalSubsidies_ML_Data/                 # 프로젝트 밖 ({data_root})
     ├── operations/
     │   ├── ops_queue_test_pk.xlsx      # 타겟 포착 분포 (Test, PK)
     │   ├── ops_queue_test_entity.xlsx  # 타겟 포착 분포 (Test, 엔티티)
-    │   └── ops_queue_inference.xlsx    # 점검 우선순위표 (추론)
+    │   ├── ops_queue_inference_pk.xlsx     # 점검 우선순위표 (추론, PK)
+    │   └── ops_queue_inference_entity.xlsx # 점검 우선순위표 (추론, 엔티티)
     ├── catboost_v1/
     │   ├── model.joblib
     │   ├── train_meta.json
@@ -336,7 +338,7 @@ python scripts/05_train_random_forest_v1.py
   - `inference/{algo}_inference_scores.csv` · `inference/{algo}_inference_scores_top.xlsx`  
   - 컬럼: 키·명칭/금액 → 위험도점수·양성확률·예측/실제라벨 → 기여도TOP10  
   - 타겟 포착 분포(Test): `{data_root}/algorithms/operations/ops_queue_test_pk.*` · `ops_queue_test_entity.*` (`10`) — 웹 **타겟 포착 분포**  
-  - 점검 우선순위표(추론): `{data_root}/algorithms/operations/ops_queue_inference.*` — 웹 **추론 → 결과 확인**
+  - 점검 우선순위표(추론): `{data_root}/algorithms/operations/ops_queue_inference_pk.*` · `ops_queue_inference_entity.*` — 웹 **추론 → 결과 확인**
 
 ### Test vs 추론 (요약)
 

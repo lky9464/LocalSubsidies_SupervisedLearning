@@ -3,7 +3,7 @@
 import { AppLink } from "@/components/app-link";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { apiGet } from "@/lib/api";
+import { apiGet, ApiError } from "@/lib/api";
 import { useRun } from "@/components/run-context";
 import { Alert } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,7 +20,6 @@ import {
   ScoreDistributionBarChart,
   type ScoreBinRow,
 } from "@/components/score-distribution-chart";
-import { FeatureDistributionDialog } from "@/components/feature-distribution-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -47,13 +46,6 @@ type ScoreDistPanel = RolePanel<{
   pk?: { bins: ScoreBinRow[]; total?: number };
   entity?: { bins: ScoreBinRow[]; total?: number };
 }>;
-
-type FeatureDialogState = {
-  roleKey: string;
-  roleTitle: string;
-  label: string | null;
-  top10: ShapBarRow[];
-} | null;
 
 const ROLE_ORDER = [
   { key: "primary", title: "주 모델" },
@@ -96,28 +88,37 @@ export default function ModelsPage() {
   const [metrics, setMetrics] = useState<string[]>(DEFAULT_RADAR_METRICS);
   const [visibleSeries, setVisibleSeries] = useState<Set<string>>(new Set());
   const [scoreUnit, setScoreUnit] = useState<"pk" | "entity">("pk");
-  const [featureDialog, setFeatureDialog] = useState<FeatureDialogState>(null);
-  const [featureDialogOpen, setFeatureDialogOpen] = useState(false);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error } = useQuery({
     queryKey: ["models", runId, metrics.join(",")],
-    queryFn: () =>
+    queryFn: ({ signal }) =>
       apiGet<Record<string, unknown>>(
         `/api/runs/${runId}/models?metrics=${encodeURIComponent(metrics.join(","))}`,
+        { signal, timeoutMs: 60_000 },
       ),
     enabled: !!runId,
   });
 
-  const { data: scoreDist, isLoading: scoreDistLoading } = useQuery({
+  const {
+    data: scoreDist,
+    isLoading: scoreDistLoading,
+    isFetching: scoreDistFetching,
+    isError: scoreDistError,
+    error: scoreDistErr,
+    refetch: refetchScoreDist,
+  } = useQuery({
     queryKey: ["models", runId, "score-distribution"],
-    queryFn: () =>
+    queryFn: ({ signal }) =>
       apiGet<{ panels: Record<string, ScoreDistPanel> }>(
         `/api/runs/${runId}/models/score-distribution`,
+        { signal, timeoutMs: 60_000 },
       ),
-    enabled: !!runId && !data?.empty,
+    enabled: !!runId && !!data && data.empty !== true,
+    retry: false,
   });
 
   const scorePanels = scoreDist?.panels || {};
+  const scoreDistBusy = scoreDistLoading || (scoreDistFetching && !scoreDist);
 
   const radar = (data?.radar as {
     metrics?: string[];
@@ -175,6 +176,12 @@ export default function ModelsPage() {
         <Alert>Run을 선택하세요.</Alert>
       ) : isLoading ? (
         <Skeleton className="h-64" />
+      ) : isError ? (
+        <Alert variant="destructive">
+          {error instanceof ApiError
+            ? error.message
+            : "모델 비교 데이터를 불러오지 못했습니다."}
+        </Alert>
       ) : data?.empty ? (
         <Alert>모델 순위 없음 — 07·08 단계를 완료하세요.</Alert>
       ) : (
@@ -267,34 +274,61 @@ export default function ModelsPage() {
                 <summary className="cursor-pointer font-medium">점수 분포 설명</summary>
                 <p className="mt-2 text-muted-foreground">
                   위험도점수 100점 단위 10구간(07과 동일: [0,100) … [900,1000])별 분포입니다.
-                  막대 높이는 전체 건수, 색 농도는 Target 건수(모델·구간 내 비교, Target 0=흰색)입니다.
+                  막대 높이는 전체 건수(최대·최소 비율이 클 때 Y축 로그), 색 농도는 해당 구간 Target 비중(target÷total, 높을수록 진함, Target 0=흰색)입니다.
                   엔티티 기준은 타겟 포착 분포와 동일하게 PFM_BIZ_ID+INST_ID 평균 점수입니다.
                 </p>
               </details>
-              {scoreDistLoading ? (
-                <Skeleton className="h-48" />
+              {!!runId && !data ? (
+                <p className="text-sm text-muted-foreground">모델 순위 로드 후 표시됩니다.</p>
+              ) : scoreDistBusy ? (
+                <div className="space-y-2">
+                  <Skeleton className="h-48" />
+                  <p className="text-sm text-muted-foreground">
+                    점수 분포 불러오는 중… (캐시가 있으면 즉시, 없으면 최초 1회 생성)
+                  </p>
+                </div>
+              ) : scoreDistError ? (
+                <div className="space-y-2">
+                  <Alert variant="destructive">
+                    {scoreDistErr instanceof ApiError
+                      ? scoreDistErr.message
+                      : "점수 분포를 불러오지 못했습니다."}
+                  </Alert>
+                  <Button type="button" size="sm" variant="outline" onClick={() => void refetchScoreDist()}>
+                    다시 불러오기
+                  </Button>
+                </div>
+              ) : Object.keys(scorePanels).length === 0 ? (
+                <Alert>점수 분포 데이터 없음 — 07 평가 후 주·보·참 모델 Test 점수를 확인하세요.</Alert>
               ) : (
                 <Tabs value={scoreUnit} onValueChange={(v) => setScoreUnit(v as "pk" | "entity")}>
                   <TabsList>
                     <TabsTrigger value="pk">PK기준</TabsTrigger>
                     <TabsTrigger value="entity">엔티티기준</TabsTrigger>
                   </TabsList>
-                  <TabsContent value={scoreUnit}>
-                    <RoleTriplePanel
-                      panels={scorePanels as Record<string, RolePanel<unknown>>}
-                      renderAvailable={(_key, panel) => {
-                        const p = panel as ScoreDistPanel;
-                        const block = scoreUnit === "pk" ? p.pk : p.entity;
-                        const bins = block?.bins || [];
-                        return <ScoreDistributionBarChart bins={bins} />;
-                      }}
-                      renderEmpty={(_key, panel) => (
-                        <p className="text-sm text-muted-foreground">
-                          {panel.reason || "해당 없음"}
-                        </p>
-                      )}
-                    />
-                  </TabsContent>
+                  {(["pk", "entity"] as const).map((unit) => (
+                    <TabsContent key={unit} value={unit}>
+                      <RoleTriplePanel
+                        panels={scorePanels as Record<string, RolePanel<unknown>>}
+                        renderAvailable={(_key, panel) => {
+                          const p = panel as ScoreDistPanel;
+                          const block = unit === "pk" ? p.pk : p.entity;
+                          const bins = block?.bins || [];
+                          if (!bins.length) {
+                            return (
+                              <p className="text-sm text-muted-foreground">구간 데이터 없음</p>
+                            );
+                          }
+                          return <ScoreDistributionBarChart bins={bins} />;
+                        }}
+                        renderEmpty={(_key, panel) => (
+                          <p className="text-sm text-muted-foreground">
+                            {panel.reason || "해당 없음"}
+                          </p>
+                        )}
+                      />
+                    </TabsContent>
+                  ))}
                 </Tabs>
               )}
             </CardContent>
@@ -318,26 +352,7 @@ export default function ModelsPage() {
                   const panel = (insights.shap || {})[key] as ShapPanel | undefined;
                   if (!panel) return null;
                   return (
-                    <div key={key} className="relative min-w-0 rounded-lg border p-3 pt-10">
-                      {panel.available ? (
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          className="absolute right-2 top-2 text-xs"
-                          onClick={() => {
-                            setFeatureDialog({
-                              roleKey: key,
-                              roleTitle: title,
-                              label: panel.label || null,
-                              top10: panel.top10 || [],
-                            });
-                            setFeatureDialogOpen(true);
-                          }}
-                        >
-                          TOP10별 점수분포
-                        </Button>
-                      ) : null}
+                    <div key={key} className="min-w-0 rounded-lg border p-3">
                       <h4 className="mb-2 text-sm font-semibold">
                         {title}
                         {panel.label ? (
@@ -387,18 +402,6 @@ export default function ModelsPage() {
           </Card>
         </>
       )}
-
-      {featureDialog && runId ? (
-        <FeatureDistributionDialog
-          runId={runId}
-          roleKey={featureDialog.roleKey}
-          roleTitle={featureDialog.roleTitle}
-          modelLabel={featureDialog.label}
-          top10={featureDialog.top10}
-          open={featureDialogOpen}
-          onOpenChange={setFeatureDialogOpen}
-        />
-      ) : null}
 
       <Alert>
         재실행은 「학습 실행」05~10에서 하세요. Test 4×4는 「타겟 포착 분포」 메뉴에서

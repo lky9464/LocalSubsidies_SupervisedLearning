@@ -222,36 +222,6 @@ def build_ops_queue(
     return out[ordered]
 
 
-def summarize_ops_queue(queue_df: pd.DataFrame) -> pd.DataFrame:
-    """주등급×보등급 4×4 집계 + 우선순위."""
-    rows: list[dict[str, Any]] = []
-    if GRADE_COL not in queue_df.columns:
-        return pd.DataFrame(rows)
-
-    for p in PRIMARY_LABELS:
-        for a in AUX_LABELS:
-            g = queue_df[(queue_df[GRADE_COL] == p) & (queue_df[CB_GRADE_COL] == a)]
-            rows.append(
-                {
-                    "주등급": p,
-                    "보등급": a,
-                    "조합": cell_label(p, a),
-                    "우선순위": priority_from_bands(p, a),
-                    "건수(count)": int(len(g)),
-                }
-            )
-    rows.append(
-        {
-            "주등급": "합계",
-            "보등급": "",
-            "조합": "",
-            "우선순위": "",
-            "건수(count)": int(len(queue_df)),
-        }
-    )
-    return pd.DataFrame(rows)
-
-
 def empty_band_matrix() -> pd.DataFrame:
     mat = pd.DataFrame(0, index=list(PRIMARY_LABELS), columns=list(AUX_LABELS))
     mat.index.name = "주＼보"
@@ -302,44 +272,3 @@ def summarize_matrix(
     ct = ct.reindex(index=list(PRIMARY_LABELS), columns=list(AUX_LABELS), fill_value=0)
     ct.index.name = "주＼보"
     return ct.astype(int)
-
-
-def write_ops_queue_excel(
-    queue_df: pd.DataFrame,
-    out_path: Any,
-    *,
-    mode: str = "auto",
-) -> None:
-    """
-    시트: 전체, 우선순위요약, 4×4, 주A~주C.
-    mode:
-      - test: 4x4전체 + 4x4실제양성 (평가·타겟 포착용)
-      - inference: 4x4매트릭스만 (점검 선정용)
-      - auto: 실제라벨 양성이 있으면 test, 없으면 inference
-    """
-    from pathlib import Path
-
-    path = Path(out_path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    clean = sanitize_for_excel(queue_df)
-    summary = summarize_ops_queue(clean)
-    matrix_all = summarize_matrix(clean)
-
-    has_pos = False
-    if ACTUAL_COL in clean.columns:
-        has_pos = bool(is_positive_label(clean[ACTUAL_COL]).any())
-    use_test = mode == "test" or (mode == "auto" and has_pos)
-
-    with pd.ExcelWriter(path, engine="openpyxl") as writer:
-        clean.to_excel(writer, sheet_name="전체", index=False)
-        summary.to_excel(writer, sheet_name="우선순위요약", index=False)
-        if use_test:
-            matrix_all.to_excel(writer, sheet_name="4x4전체")
-            summarize_matrix(clean, positive_only=True).to_excel(
-                writer, sheet_name="4x4실제양성"
-            )
-        else:
-            matrix_all.to_excel(writer, sheet_name="4x4매트릭스")
-        for grade in ["주A", "주B", "주C"]:
-            subset = clean[clean[GRADE_COL] == grade]
-            subset.to_excel(writer, sheet_name=grade, index=False)

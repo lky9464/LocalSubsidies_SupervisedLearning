@@ -229,7 +229,7 @@ Job 실패 또는 PC 재부팅
     → 추론 → 실행 (주·보 모델 2종 이상 — `ops_queue` 설정과 동일 알고리즘)
     → 추론 → 결과 확인
         · 점검 우선순위표(4×4) 미리보기
-        · Excel 생성 → ops_queue_inference.xlsx
+        · Excel 생성 → ops_queue_inference_pk.xlsx · ops_queue_inference_entity.xlsx
     → 대시보드 추론 요약 확인
 ```
 
@@ -342,7 +342,7 @@ Job 실패 또는 PC 재부팅
 | Test 점수 | `{data_root}/algorithms/{algo}/scores/test/` |
 | 추론 점수 | `{data_root}/algorithms/{algo}/scores/inference/` |
 | Test 타겟 포착 | `{data_root}/algorithms/operations/ops_queue_test_pk.xlsx` · `ops_queue_test_entity.xlsx` |
-| 추론 점검 우선순위 | `{data_root}/algorithms/operations/ops_queue_inference.xlsx` |
+| 추론 점검 우선순위 | `{data_root}/algorithms/operations/ops_queue_inference_pk.xlsx` · `ops_queue_inference_entity.xlsx` |
 | 집계 리포트 | `프로젝트/outputs/reports/` |
 
 ---

@@ -18,8 +18,11 @@ type TrainedPayload = {
   trained_labels?: Record<string, string>;
   primary?: string | null;
   aux?: string | null;
+  reference?: string | null;
   primary_label?: string | null;
   aux_label?: string | null;
+  reference_label?: string | null;
+  allowed?: string[];
   defaults?: string[];
 };
 
@@ -80,14 +83,14 @@ export default function InferenceRunPage() {
   });
 
   const trainedSet = new Set(trainedInfo?.trained || []);
+  const allowedAlgos = trainedInfo?.allowed || [];
+  const allowedSet = new Set(allowedAlgos);
   const labels = meta?.algo_labels || {};
   const hasInferData = Boolean(prereq?.has_data);
 
   useEffect(() => {
     if (!runId || !trainedInfo) return;
-    const nextDefaults = (trainedInfo.defaults || []).filter((a) =>
-      (trainedInfo.trained || []).includes(a),
-    );
+    const nextDefaults = (trainedInfo.defaults || []).filter((a) => allowedSet.has(a));
     const key = `${runId}:${nextDefaults.join(",")}`;
     if (key === defaultsKey) return;
     setDefaultsKey(key);
@@ -101,6 +104,7 @@ export default function InferenceRunPage() {
   function roleHint(algo: string): string | null {
     if (algo === trainedInfo?.primary) return "주모델";
     if (algo === trainedInfo?.aux) return "보조모델";
+    if (algo === trainedInfo?.reference) return "참조모델";
     return null;
   }
 
@@ -134,9 +138,14 @@ export default function InferenceRunPage() {
       setErr("추론 CSV를 선택 저장한 뒤 실행하세요.");
       return;
     }
-    const allowed = selected.filter((a) => trainedSet.has(a));
+    const allowed = selected.filter((a) => allowedSet.has(a));
     if (!allowed.length) {
-      setErr("이 Run에서 학습된 알고리즘을 1개 이상 선택하세요.");
+      setErr("08 순위 주·보·참 중 1개 이상 선택하세요.");
+      return;
+    }
+    const bad = selected.filter((a) => !allowedSet.has(a));
+    if (bad.length) {
+      setErr("추론은 08 순위 주·보·참 모델만 선택할 수 있습니다.");
       return;
     }
     const missing = selected.filter((a) => !trainedSet.has(a));
@@ -183,7 +192,8 @@ export default function InferenceRunPage() {
       </Card>
 
       <Alert>
-        현재 Run에서 학습된 알고리즘만 선택할 수 있습니다. 기본값은 평가순위 주모델(1위)·보조모델(2위)입니다.
+        08 순위에서 선정된 주·보·참 모델만 추론할 수 있습니다. 기본값은 학습된 주·보(·참) 전체입니다.
+        2개만 선택하면 결과 화면에서 주/참·보/참 케이스는 표시되지 않습니다.
       </Alert>
 
       {!trainedInfo?.train_succeeded || !hasTrained ? (
@@ -196,54 +206,53 @@ export default function InferenceRunPage() {
         </Alert>
       ) : trainedInfo.primary || trainedInfo.aux ? (
         <p className="text-sm text-muted-foreground">
-          기본 선택: 주 {trainedInfo.primary_label || trainedInfo.primary || "-"}
+          08 순위: 주 {trainedInfo.primary_label || trainedInfo.primary || "-"}
           {" · "}
           보 {trainedInfo.aux_label || trainedInfo.aux || "-"}
+          {trainedInfo.reference
+            ? ` · 참 ${trainedInfo.reference_label || trainedInfo.reference}`
+            : " · 참 (없음)"}
         </p>
       ) : null}
 
       <div>
-        <p className="text-sm font-medium">알고리즘 선택</p>
+        <p className="text-sm font-medium">알고리즘 선택 (주·보·참)</p>
         <div className="mt-2 space-y-2">
-          {(meta?.algorithms || []).map((a) => {
-            const ok = trainedSet.has(a);
-            const role = roleHint(a);
-            return (
-              <label
-                key={a}
-                className={`flex items-center gap-2 text-sm ${ok ? "" : "opacity-50"}`}
-              >
-                <input
-                  type="checkbox"
-                  disabled={!ok}
-                  checked={ok && selected.includes(a)}
-                  onChange={(e) => {
-                    if (!ok) return;
-                    setSelected(
-                      e.target.checked
-                        ? [...selected.filter((x) => trainedSet.has(x)), a]
-                        : selected.filter((x) => x !== a),
-                    );
-                  }}
-                />
-                <span>{labelOf(a)}</span>
-                {role ? (
-                  <span className="text-xs text-emerald-700">({role})</span>
-                ) : (
-                  <span className="text-xs text-muted-foreground">
-                    {ok ? "(이 Run 학습됨)" : "(미학습 · 선택 불가)"}
-                  </span>
-                )}
-              </label>
-            );
-          })}
+          {allowedAlgos.length ? (
+            allowedAlgos.map((a) => {
+              const role = roleHint(a);
+              return (
+                <label key={a} className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={selected.includes(a)}
+                    onChange={(e) => {
+                      setSelected(
+                        e.target.checked
+                          ? [...selected.filter((x) => allowedSet.has(x)), a]
+                          : selected.filter((x) => x !== a),
+                      );
+                    }}
+                  />
+                  <span>{labelOf(a)}</span>
+                  {role ? (
+                    <span className="text-xs text-emerald-700">({role})</span>
+                  ) : null}
+                </label>
+              );
+            })
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              08 순위 주·보·참 모델이 이 Run에서 학습되지 않았습니다.
+            </p>
+          )}
         </div>
       </div>
 
       {err ? <p className="text-sm text-red-600">{err}</p> : null}
       <Button
         onClick={run}
-        disabled={busy || !hasTrained || !hasInferData}
+        disabled={busy || !hasTrained || !hasInferData || allowedAlgos.length === 0}
         onFocus={() => void refetchPrereq()}
       >
         {busy ? <LoadingSpinner /> : null}

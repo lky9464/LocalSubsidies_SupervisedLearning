@@ -40,7 +40,7 @@
 
 추론(11)은 별도 메뉴 — **실행** / **결과 조회** 탭.  
 산출: `scores/inference/{algo}_inference_scores.csv` · `_top.xlsx` (Test는 `scores/test/`).
-점검 우선순위표 Excel: `{data_root}/algorithms/operations/ops_queue_inference.xlsx`.
+점검 우선순위표 Excel: `{data_root}/algorithms/operations/ops_queue_inference_pk.xlsx` · `ops_queue_inference_entity.xlsx`.
 
 ## 5. 학습 옵션
 

@@ -1,6 +1,6 @@
 """Test 타겟 포착 분포 — 3케이스(PK·엔티티) pair queue · 4×4.
 
-`ops_queue.py`의 percentile·양성 판별을 재사용. 추론(11)은 기존 build_ops_queue 유지.
+`ops_queue.py`의 percentile·양성 판별을 재사용. 추론(11)은 `inference_capture` 모듈.
 """
 
 from __future__ import annotations
@@ -298,13 +298,44 @@ def _any_positive(series: pd.Series) -> int:
     return 1 if bool(is_positive_label(series).any()) else 0
 
 
+def _is_blank_label_value(v: Any) -> bool:
+    if v is None or (isinstance(v, float) and np.isnan(v)):
+        return True
+    try:
+        if pd.isna(v):
+            return True
+    except (TypeError, ValueError):
+        pass
+    text = str(v).strip().lower()
+    return text in {"", "nan", "none", "null", "<na>"}
+
+
+def _aggregate_actual_label(series: pd.Series) -> object:
+    """엔티티 실제라벨: 양성 있으면 1, 알려진 음성만 있으면 0, 전부 공란이면 공란.
+
+    추론(라벨 미지)에서 `_any_positive`가 공란→0으로 바꾸지 않도록 한다.
+    """
+    if series.empty:
+        return ""
+    if all(_is_blank_label_value(v) for v in series):
+        return ""
+    return 1 if bool(is_positive_label(series).any()) else 0
+
+
 def aggregate_entity_queue(
     pk_queue: pd.DataFrame,
     entity_keys: tuple[str, ...],
     ops_cfg: dict[str, Any],
     spec: OpsPairSpec,
+    *,
+    preserve_blank_actual: bool = False,
 ) -> pd.DataFrame:
-    """PK queue → 엔티티 queue (평균·round(2) percentile · any-positive 라벨)."""
+    """PK queue → 엔티티 queue (평균·round(2) percentile · any-positive 라벨).
+
+    preserve_blank_actual:
+      - False (Test/10 기본): 실제라벨 any-positive → 0 또는 1
+      - True (추론/11): PK가 전부 공란이면 엔티티도 공란 유지
+    """
     if pk_queue is None or pk_queue.empty:
         return pd.DataFrame()
 
@@ -337,7 +368,10 @@ def aggregate_entity_queue(
     if PRED_COL in work.columns:
         agg[PRED_COL] = (PRED_COL, _any_positive)
     if ACTUAL_COL in work.columns:
-        agg[ACTUAL_COL] = (ACTUAL_COL, _any_positive)
+        agg[ACTUAL_COL] = (
+            ACTUAL_COL,
+            _aggregate_actual_label if preserve_blank_actual else _any_positive,
+        )
 
     grouped = work.groupby(list(entity_keys), dropna=False).agg(**agg).reset_index()
 

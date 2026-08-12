@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Literal
-
 from fastapi import APIRouter, Depends, Query
 
 from api.constants import METRIC_HELP
@@ -11,10 +9,7 @@ from api.deps import get_cfg, get_repo
 from api.serializers import df_to_records
 from api.services.metrics import build_compare_frame, radar_chart_data
 from api.services.model_insights import build_role_insight_panels, role_algos_from_ranking
-from api.services.score_distribution import (
-    build_feature_distribution_response,
-    build_score_distribution_panels,
-)
+from api.services.score_distribution import build_score_distribution_panels
 from src.io.config import resolve_data_path
 from src.models.registry import build_algo_labels_map, resolve_algo_label
 from src.pipeline.ranking import load_ranking_artifact
@@ -101,27 +96,3 @@ def models_score_distribution(
         "bin_labels": score_bin_labels(),
         "panels": panels,
     }
-
-
-@router.get("/api/runs/{run_id}/models/feature-distribution")
-def models_feature_distribution(
-    run_id: str,
-    role: str = Query(..., pattern="^(primary|aux|reference)$"),
-    rank: int = Query(1, ge=1, le=10),
-    unit: Literal["pk", "entity"] = Query("pk"),
-    cfg=Depends(get_cfg),
-    repo=Depends(get_repo),
-) -> dict:
-    ranking = repo.get_ranking(run_id)
-    labels_map = build_algo_labels_map(cfg)
-    top_n = int(cfg.get("feature_importance", {}).get("top_n", 10))
-    return build_feature_distribution_response(
-        cfg,
-        ranking,
-        run_id=run_id,
-        role_key=role,
-        rank=rank,
-        unit=unit,
-        labels_map=labels_map,
-        top_n=top_n,
-    )

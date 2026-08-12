@@ -4,17 +4,19 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query
 
-from api.constants import ALGO_LABELS, PREVIEW_OPTIONS
+from api.constants import ALGO_LABELS
 from api.deps import get_cfg, get_job_manager, get_repo
 from api.schemas.common import JobStart
 from api.services.inference import (
-    do_export,
-    inference_algo_scores,
-    inference_ops_queue_payload,
     inference_prereq,
     inference_results_meta,
     inference_trained_payload,
     missing_trained_algos,
+)
+from api.services.inference_capture import (
+    build_inference_case_payload,
+    build_inference_queue_payload,
+    validate_inference_algo_selection,
 )
 from api.state import set_pipeline_abandon
 from src.pipeline.run_config import freeze_raw_selection, save_inference_algorithms
@@ -40,49 +42,40 @@ def results(run_id: str, cfg=Depends(get_cfg)) -> dict:
 @router.get("/ops-queue")
 def ops_queue(
     run_id: str,
-    grade: str | None = None,
-    limit: int = Query(30, ge=1, le=100),
+    full: bool = Query(
+        False,
+        description="True면 3케이스 매트릭스 일괄. 기본은 메타만(지연 로드).",
+    ),
     cfg=Depends(get_cfg),
 ) -> dict:
-    if limit not in PREVIEW_OPTIONS:
-        limit = min(PREVIEW_OPTIONS, key=lambda x: abs(x - limit))
-    payload = inference_ops_queue_payload(cfg, run_id, grade=grade, limit=limit)
-    primary = payload.get("primary", "")
-    aux = payload.get("aux", "")
-    payload["primary_label"] = ALGO_LABELS.get(primary, primary)
-    payload["aux_label"] = ALGO_LABELS.get(aux, aux)
-    payload["preview_limit"] = limit
-    return payload
-
-
-@router.get("/scores/{algo}")
-def algo_scores(
-    algo: str,
-    run_id: str | None = None,
-    limit: int = Query(30, ge=1, le=100),
-    sort_desc: bool = Query(True),
-    cfg=Depends(get_cfg),
-) -> dict:
-    if limit not in PREVIEW_OPTIONS:
-        limit = min(PREVIEW_OPTIONS, key=lambda x: abs(x - limit))
-    return inference_algo_scores(
-        cfg, algo, run_id=run_id, limit=limit, sort_desc=sort_desc
-    )
-
-
-@router.post("/export")
-def export_queue(run_id: str, cfg=Depends(get_cfg)) -> dict:
-    """Deprecated: 추론 완료 시 11_score_inference 가 자동 저장. 호환용 유지."""
     try:
-        return do_export(cfg, run_id)
-    except FileNotFoundError as exc:
-        from fastapi import HTTPException
+        return build_inference_queue_payload(cfg, run_id, include_matrices=full)
+    except Exception:  # noqa: BLE001
+        return {
+            "run_id": run_id,
+            "empty": True,
+            "band_help": {},
+            "roles": {},
+            "cases": [],
+            "lazy": True,
+        }
 
-        raise HTTPException(404, str(exc)) from exc
-    except Exception as exc:  # noqa: BLE001
-        from fastapi import HTTPException
 
-        raise HTTPException(500, str(exc)) from exc
+@router.get("/ops-queue/cases/{case_id}")
+def ops_queue_case(
+    run_id: str,
+    case_id: str,
+    cfg=Depends(get_cfg),
+) -> dict:
+    try:
+        return build_inference_case_payload(cfg, run_id, case_id)
+    except Exception:  # noqa: BLE001
+        return {
+            "id": case_id,
+            "available": False,
+            "reason": "추론 점검 데이터를 불러오지 못했습니다.",
+            "loaded": True,
+        }
 
 
 @router.post("/run")
@@ -96,10 +89,7 @@ def run_inference(
         from fastapi import HTTPException
 
         raise HTTPException(400, "Run ID가 없습니다.")
-    algos = body.extra_args_by_step.get("inference") if body.extra_args_by_step else None
-    if not algos:
-        # extract from --algo flags in step_ids path - use algorithms from body
-        pass
+
     algo_list = []
     if body.extra_args_by_step and "inference" in body.extra_args_by_step:
         args = body.extra_args_by_step["inference"]
@@ -110,6 +100,12 @@ def run_inference(
         from fastapi import HTTPException
 
         raise HTTPException(400, "알고리즘을 1개 이상 선택하세요.")
+
+    role_err = validate_inference_algo_selection(cfg, body.run_id, algo_list)
+    if role_err:
+        from fastapi import HTTPException
+
+        raise HTTPException(400, role_err)
 
     missing = missing_trained_algos(cfg, body.run_id, algo_list)
     if missing:

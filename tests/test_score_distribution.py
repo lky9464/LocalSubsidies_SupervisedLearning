@@ -1,17 +1,21 @@
-"""score_distribution — bins · feature charts."""
+"""score_distribution — bins · slim load · cache."""
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pandas as pd
 
-from src.scoring.ops_queue import ACTUAL_COL, SCORE_COL
+from src.scoring.ops_queue import ACTUAL_COL
+from src.scoring.score_table import SCORE_COL
 from src.scoring.score_distribution import (
     aggregate_entity_single_score,
-    build_categorical_feature_distribution,
-    build_numeric_feature_distribution,
     compute_score_distribution,
-    resolve_feature_kind,
+    get_or_build_score_distribution_payload,
+    load_test_scores_slim,
+    read_score_distribution_cache,
     score_bin_labels,
+    score_distribution_cache_path,
 )
 
 
@@ -57,20 +61,38 @@ def test_entity_aggregate_and_bins():
     assert dist["total"] == 2
 
 
-def test_numeric_and_categorical_feature():
-    df = pd.DataFrame(
+def test_slim_load_and_cache(tmp_path: Path):
+    csv_path = tmp_path / "algo_test_scores.csv"
+    wide = pd.DataFrame(
         {
-            SCORE_COL: [100, 200, 300, 400],
-            "기여도TOP01_수치(FNUM)": ["1", "2", "3", "4"],
-            "기여도TOP02_코드(CD)": ["A", "A", "B", "C"],
+            "CRTR_YM": ["202501", "202501"],
+            "PFM_BIZ_ID": ["B1", "B2"],
+            "INST_ID": ["I1", "I2"],
+            SCORE_COL: ["100", "900"],
+            ACTUAL_COL: ["0", "1"],
+            "기여도TOP01_큰열(BIG)": ["x" * 20, "y" * 20],
+            "불필요열": ["a", "b"],
         }
     )
-    num = build_numeric_feature_distribution(df, feature_col="기여도TOP01_수치(FNUM)", max_points=10)
-    assert len(num["scatter"]) == 4
-    assert len(num["regression"]["points"]) > 0
+    wide.to_csv(csv_path, index=False, encoding="EUC-KR")
 
-    cat = build_categorical_feature_distribution(df, feature_col="기여도TOP02_코드(CD)")
-    assert len(cat["bars"]) >= 2
+    slim = load_test_scores_slim(
+        csv_path,
+        "EUC-KR",
+        entity_keys=("PFM_BIZ_ID", "INST_ID"),
+    )
+    assert slim is not None
+    assert "불필요열" not in slim.columns
+    assert SCORE_COL in slim.columns
 
-    cfg = {"categorical_candidates": ["CD"]}
-    assert resolve_feature_kind("CD", cfg, df["기여도TOP02_코드(CD)"]) == "categorical"
+    cfg = {"split": {"group_key": "PFM_BIZ_ID+INST_ID"}, "encoding": "EUC-KR"}
+    payload = get_or_build_score_distribution_payload(csv_path, cfg)
+    assert payload is not None
+    assert payload["pk"]["total"] == 2
+    assert score_distribution_cache_path(csv_path).exists()
+
+    cached = read_score_distribution_cache(csv_path)
+    assert cached is not None
+    assert cached["pk"]["total"] == 2
+    again = get_or_build_score_distribution_payload(csv_path, cfg)
+    assert again == cached

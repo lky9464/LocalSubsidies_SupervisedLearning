@@ -132,7 +132,7 @@ def main() -> int:
             f"/api/runs/{rid}/ops-queue",
             f"/api/runs/{rid}/history",
             f"/api/inference/results?run_id={rid}",
-            f"/api/inference/ops-queue?run_id={rid}&limit=10",
+            f"/api/inference/ops-queue?run_id={rid}",
         ):
             st, payload, _ = fetch(path)
             mark = "OK" if ok(st) or st == 404 else "FAIL"

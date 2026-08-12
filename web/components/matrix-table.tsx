@@ -238,13 +238,65 @@ export function CaptureMatrixPanel({
   colAxis,
   pk,
   entity,
+  variant = "test",
 }: {
   rowAxis: string;
   colAxis: string;
   pk?: MatrixUnitBlock | null;
   entity?: MatrixUnitBlock | null;
+  variant?: "test" | "inference";
 }) {
   const topRow = `${rowAxis}A~${rowAxis}C`;
+  const showPositive = variant === "test";
+  const totalLabel = variant === "inference" ? "추론 전체" : "평가 전체";
+  const pkTitle = variant === "inference" ? "(A-1) 추론 데이터 전체 (PK)" : "(A-1) 평가 데이터 전체 (PK)";
+  const entTitle =
+    variant === "inference"
+      ? "(B-1) 추론 데이터 전체 (엔티티)"
+      : "(B-1) 평가 데이터 전체 (엔티티)";
+
+  if (variant === "inference") {
+    return (
+      <div className="grid gap-6 xl:grid-cols-2">
+        {pk?.meta ? (
+          <div className="space-y-3">
+            <p className="text-sm font-medium">PK 단위 (행)</p>
+            <div className="flex gap-6 text-sm">
+              <div>
+                <span className="text-muted-foreground">{totalLabel} </span>
+                <span className="font-semibold">{formatDisplayValue(pk.meta.total ?? 0)}</span>
+              </div>
+            </div>
+            <MatrixTable
+              matrix={pk.all}
+              title={pkTitle}
+              rowAxis={rowAxis}
+              colAxis={colAxis}
+            />
+          </div>
+        ) : null}
+
+        {entity?.meta ? (
+          <div className="space-y-3">
+            <p className="text-sm font-medium">엔티티 단위 (PFM_BIZ_ID · INST_ID)</p>
+            <div className="flex gap-6 text-sm">
+              <div>
+                <span className="text-muted-foreground">{totalLabel} </span>
+                <span className="font-semibold">{formatDisplayValue(entity.meta.total ?? 0)}</span>
+              </div>
+            </div>
+            <MatrixTable
+              matrix={entity.all}
+              title={entTitle}
+              rowAxis={rowAxis}
+              colAxis={colAxis}
+            />
+          </div>
+        ) : null}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {pk?.meta ? (
@@ -252,29 +304,33 @@ export function CaptureMatrixPanel({
           <p className="text-sm font-medium">PK 단위 (행)</p>
           <div className="flex gap-6 text-sm">
             <div>
-              <span className="text-muted-foreground">평가 전체 </span>
+              <span className="text-muted-foreground">{totalLabel} </span>
               <span className="font-semibold">{formatDisplayValue(pk.meta.total ?? 0)}</span>
             </div>
-            <div>
-              <span className="text-muted-foreground">실제 타겟=1 </span>
-              <span className="font-semibold">{formatDisplayValue(pk.meta.positive ?? 0)}</span>
-            </div>
+            {showPositive ? (
+              <div>
+                <span className="text-muted-foreground">실제 타겟=1 </span>
+                <span className="font-semibold">{formatDisplayValue(pk.meta.positive ?? 0)}</span>
+              </div>
+            ) : null}
           </div>
-          <div className="grid gap-4 xl:grid-cols-2">
+          <div className={cn("grid gap-4", showPositive ? "xl:grid-cols-2" : "max-w-xl")}>
             <MatrixTable
               matrix={pk.all}
-              title="(A-1) 평가 데이터 전체 (PK)"
+              title={pkTitle}
               rowAxis={rowAxis}
               colAxis={colAxis}
             />
-            <MatrixTable
-              matrix={pk.positive}
-              title="(A-2) 실제 타겟 분포 (PK)"
-              rowAxis={rowAxis}
-              colAxis={colAxis}
-            />
+            {showPositive ? (
+              <MatrixTable
+                matrix={pk.positive}
+                title="(A-2) 실제 타겟 분포 (PK)"
+                rowAxis={rowAxis}
+                colAxis={colAxis}
+              />
+            ) : null}
           </div>
-          {pk.positive_in_abc_pct != null && pk.meta.positive ? (
+          {showPositive && pk.positive_in_abc_pct != null && pk.meta.positive ? (
             <p className="text-xs text-muted-foreground">
               실제 타겟(PK)의 약 {formatDisplayValue(pk.positive_in_abc_pct)}%가{" "}
               <span className="font-semibold text-slate-800">{topRow}</span> 구간에 포함됩니다.
@@ -288,31 +344,35 @@ export function CaptureMatrixPanel({
           <p className="text-sm font-medium">엔티티 단위 (PFM_BIZ_ID · INST_ID)</p>
           <div className="flex gap-6 text-sm">
             <div>
-              <span className="text-muted-foreground">평가 전체 </span>
+              <span className="text-muted-foreground">{totalLabel} </span>
               <span className="font-semibold">{formatDisplayValue(entity.meta.total ?? 0)}</span>
             </div>
-            <div>
-              <span className="text-muted-foreground">실제 타겟=1 </span>
-              <span className="font-semibold">
-                {formatDisplayValue(entity.meta.positive ?? 0)}
-              </span>
-            </div>
+            {showPositive ? (
+              <div>
+                <span className="text-muted-foreground">실제 타겟=1 </span>
+                <span className="font-semibold">
+                  {formatDisplayValue(entity.meta.positive ?? 0)}
+                </span>
+              </div>
+            ) : null}
           </div>
-          <div className="grid gap-4 xl:grid-cols-2">
+          <div className={cn("grid gap-4", showPositive ? "xl:grid-cols-2" : "max-w-xl")}>
             <MatrixTable
               matrix={entity.all}
-              title="(B-1) 평가 데이터 전체 (엔티티)"
+              title={entTitle}
               rowAxis={rowAxis}
               colAxis={colAxis}
             />
-            <MatrixTable
-              matrix={entity.positive}
-              title="(B-2) 실제 타겟 분포 (엔티티)"
-              rowAxis={rowAxis}
-              colAxis={colAxis}
-            />
+            {showPositive ? (
+              <MatrixTable
+                matrix={entity.positive}
+                title="(B-2) 실제 타겟 분포 (엔티티)"
+                rowAxis={rowAxis}
+                colAxis={colAxis}
+              />
+            ) : null}
           </div>
-          {entity.positive_in_abc_pct != null && entity.meta.positive ? (
+          {showPositive && entity.positive_in_abc_pct != null && entity.meta.positive ? (
             <p className="text-xs text-muted-foreground">
               실제 타겟(엔티티)의 약 {formatDisplayValue(entity.positive_in_abc_pct)}%가{" "}
               <span className="font-semibold text-slate-800">{topRow}</span> 구간에 포함됩니다.

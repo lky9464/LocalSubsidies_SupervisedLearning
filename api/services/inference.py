@@ -5,27 +5,21 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-import pandas as pd
-
+from src.scoring.inference_capture import allowed_inference_role_algos
 from src.scoring.inference_helpers import (
     available_inference_algos,
-    export_inference_ops_queue,
     file_meta,
-    inference_export_paths,
     inference_score_path,
     inference_top_xlsx_path,
-    load_inference_queue,
-    load_inference_queue_lite,
     resolve_inference_primary_aux,
     run_has_inference_step,
 )
 from api.constants import ALGO_LABELS
-from api.serializers import df_to_records, matrix_to_payload
+from api.serializers import matrix_to_payload
 from src.io.config import resolve_algo_dir
 from src.ops_db.repository import OpsRepository
 from src.pipeline.run_config import load_run_config
-from src.scoring.ops_queue import GRADE_COL, PRIMARY_LABELS, summarize_matrix, summarize_ops_queue
-from src.scoring.score_table import SCORE_COL
+from src.scoring.ops_capture import CASE_PRIMARY_AUX
 
 
 def inference_prereq(cfg: dict[str, Any], repo: OpsRepository | None = None) -> dict[str, Any]:
@@ -76,15 +70,14 @@ def inference_trained_payload(cfg: dict[str, Any], run_id: str) -> dict[str, Any
     repo = OpsRepository(cfg)
     train_ok = bool(run_id) and repo.step_succeeded(run_id, "train")
     trained_set = set(trained)
-    primary, aux = ("", "")
-    if run_id:
-        primary, aux = repo.get_primary_aux(run_id)
-    # 평가순위 주(1위)·보(2위) 중 이 Run에서 학습된 것만 기본 선택
-    defaults: list[str] = []
-    if primary in trained_set:
-        defaults.append(primary)
-    if aux in trained_set and aux not in defaults:
-        defaults.append(aux)
+    roles = repo.get_roles(run_id) if run_id else {}
+    primary = roles.get("primary") or ""
+    aux = roles.get("aux") or ""
+    reference = roles.get("reference") or ""
+
+    allowed = allowed_inference_role_algos(cfg, run_id)
+    defaults = [a for a in allowed if a in trained_set]
+
     return {
         "run_id": run_id,
         "train_succeeded": train_ok,
@@ -92,8 +85,13 @@ def inference_trained_payload(cfg: dict[str, Any], run_id: str) -> dict[str, Any
         "trained_labels": {a: ALGO_LABELS.get(a, a) for a in trained},
         "primary": primary if primary in trained_set else None,
         "aux": aux if aux in trained_set else None,
+        "reference": reference if reference in trained_set else None,
         "primary_label": ALGO_LABELS.get(primary, primary) if primary in trained_set else None,
         "aux_label": ALGO_LABELS.get(aux, aux) if aux in trained_set else None,
+        "reference_label": ALGO_LABELS.get(reference, reference)
+        if reference in trained_set
+        else None,
+        "allowed": allowed,
         "defaults": defaults,
     }
 
@@ -143,7 +141,7 @@ def inference_results_meta(cfg: dict[str, Any], run_id: str) -> dict[str, Any]:
 
 
 def dashboard_inference_block(cfg: dict[str, Any], run_id: str) -> dict[str, Any]:
-    """대시보드용 — 4×4 매트릭스만 (키·점수 컬럼만 읽음)."""
+    """대시보드용 — primary_aux PK 4×4 (DB 우선)."""
     primary, aux = resolve_inference_primary_aux(cfg, run_id)
     if not run_has_inference_step(cfg, run_id):
         return {
@@ -152,6 +150,26 @@ def dashboard_inference_block(cfg: dict[str, Any], run_id: str) -> dict[str, Any
             "aux": aux,
             "run_inference_missing": True,
         }
+
+    repo = OpsRepository(cfg)
+    try:
+        mat_all, _, meta = repo.inference_capture_matrices(
+            run_id, CASE_PRIMARY_AUX, unit="pk"
+        )
+        if meta.get("total", 0) > 0:
+            return {
+                "empty": False,
+                "total": meta["total"],
+                "primary": primary,
+                "aux": aux,
+                "matrix": matrix_to_payload(mat_all),
+            }
+    except Exception:  # noqa: BLE001
+        pass
+
+    from src.scoring.inference_helpers import load_inference_queue_lite
+    from src.scoring.ops_queue import summarize_matrix
+
     try:
         queue = load_inference_queue_lite(cfg, run_id)
     except Exception:  # noqa: BLE001
@@ -166,94 +184,4 @@ def dashboard_inference_block(cfg: dict[str, Any], run_id: str) -> dict[str, Any
         "primary": primary,
         "aux": aux,
         "matrix": matrix_to_payload(summarize_matrix(queue)),
-    }
-
-
-def inference_ops_queue_payload(
-    cfg: dict[str, Any],
-    run_id: str,
-    *,
-    grade: str | None = None,
-    limit: int = 30,
-) -> dict[str, Any]:
-    primary, aux = resolve_inference_primary_aux(cfg, run_id)
-    try:
-        queue = load_inference_queue(cfg, run_id)
-    except Exception as exc:  # noqa: BLE001
-        return {"error": str(exc), "primary": primary, "aux": aux}
-
-    if queue is None or queue.empty:
-        return {"empty": True, "primary": primary, "aux": aux}
-
-    matrix_df = summarize_matrix(queue)
-    summary_df = summarize_ops_queue(queue)
-
-    preview = queue
-    if grade and grade != "(전체)":
-        preview = preview[preview[GRADE_COL] == grade]
-    preview = preview.head(limit)
-
-    return {
-        "primary": primary,
-        "aux": aux,
-        "total": len(queue),
-        "matrix": matrix_to_payload(matrix_df),
-        "summary": df_to_records(summary_df),
-        "preview_columns": list(preview.columns),
-        "preview_rows": preview.where(pd.notnull(preview), None).to_dict(orient="records"),
-        "grade_counts": {
-            g: int((queue[GRADE_COL] == g).sum()) for g in PRIMARY_LABELS if GRADE_COL in queue.columns
-        },
-    }
-
-
-def inference_algo_scores(
-    cfg: dict[str, Any],
-    algo: str,
-    *,
-    run_id: str | None = None,
-    limit: int = 30,
-    sort_desc: bool = True,
-) -> dict[str, Any]:
-    path = inference_score_path(cfg, algo, run_id=run_id)
-    if not path.exists():
-        return {"empty": True}
-
-    encoding = cfg.get("encoding", "EUC-KR")
-    df = pd.read_csv(path, encoding=encoding, dtype=str, low_memory=False)
-    n = len(df)
-    scores = pd.to_numeric(df.get(SCORE_COL), errors="coerce")
-    avg = float(scores.mean()) if scores.notna().any() else None
-    mx = float(scores.max()) if scores.notna().any() else None
-    top1 = int(max(1, n // 100)) if n else 0
-
-    crtr = None
-    if "CRTR_YM" in df.columns:
-        vc = df["CRTR_YM"].value_counts().head(20)
-        crtr = [{"CRTR_YM": str(k), "건수": int(v)} for k, v in vc.items()]
-
-    if sort_desc and SCORE_COL in df.columns:
-        df = df.copy()
-        df["_sort"] = pd.to_numeric(df[SCORE_COL], errors="coerce")
-        df = df.sort_values("_sort", ascending=False, na_position="last").drop(columns=["_sort"])
-
-    preview = df.head(limit)
-    return {
-        "row_count": n,
-        "avg_score": avg,
-        "max_score": mx,
-        "top1_est": top1,
-        "crtr_ym": crtr,
-        "preview_columns": list(preview.columns),
-        "preview_rows": preview.where(pd.notnull(preview), None).to_dict(orient="records"),
-    }
-
-
-def do_export(cfg: dict[str, Any], run_id: str) -> dict[str, Any]:
-    csv_path, xlsx_path, n = export_inference_ops_queue(cfg, run_id)
-    return {
-        "row_count": n,
-        "csv_basename": csv_path.name,
-        "xlsx_basename": xlsx_path.name,
-        "export_dir_hint": "runs/{run_id}/algorithms/operations/",
     }

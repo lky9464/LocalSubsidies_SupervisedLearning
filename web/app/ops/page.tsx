@@ -3,7 +3,7 @@
 import { AppLink } from "@/components/app-link";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { apiGet } from "@/lib/api";
+import { apiGet, ApiError } from "@/lib/api";
 import { useRun } from "@/components/run-context";
 import { Alert } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,6 +17,7 @@ type CaptureCase = {
   col_axis: string;
   available: boolean;
   reason?: string | null;
+  loaded?: boolean;
   matrices?: {
     pk?: {
       all?: unknown;
@@ -47,9 +48,13 @@ export default function OpsPage() {
   const { runId } = useRun();
   const [caseTab, setCaseTab] = useState("primary_aux");
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error } = useQuery({
     queryKey: ["ops", runId],
-    queryFn: () => apiGet<Record<string, unknown>>(`/api/runs/${runId}/ops-queue`),
+    queryFn: ({ signal }) =>
+      apiGet<Record<string, unknown>>(`/api/runs/${runId}/ops-queue`, {
+        signal,
+        timeoutMs: 60_000,
+      }),
     enabled: !!runId,
   });
 
@@ -57,6 +62,22 @@ export default function OpsPage() {
   const roles = (data?.roles as Roles) || {};
   const cases = (data?.cases as CaptureCase[]) || [];
   const hasData = cases.some((c) => c.available);
+
+  const activeMeta = cases.find((c) => c.id === caseTab);
+  const {
+    data: caseDetail,
+    isLoading: caseLoading,
+    isError: caseError,
+    error: caseErr,
+  } = useQuery({
+    queryKey: ["ops", runId, "case", caseTab],
+    queryFn: ({ signal }) =>
+      apiGet<CaptureCase>(`/api/runs/${runId}/ops-queue/cases/${caseTab}`, {
+        signal,
+        timeoutMs: 90_000,
+      }),
+    enabled: !!runId && !!activeMeta?.available,
+  });
 
   return (
     <div className="space-y-6">
@@ -89,6 +110,10 @@ export default function OpsPage() {
         <Alert>Run을 선택하세요.</Alert>
       ) : isLoading ? (
         <p className="text-sm text-muted-foreground">불러오는 중...</p>
+      ) : isError ? (
+        <Alert variant="destructive">
+          {error instanceof ApiError ? error.message : "타겟 포착 목록을 불러오지 못했습니다."}
+        </Alert>
       ) : !hasData ? (
         <p className="text-sm text-muted-foreground">10 단계를 실행하면 표시됩니다.</p>
       ) : (
@@ -127,20 +152,32 @@ export default function OpsPage() {
               <TabsContent key={c.id} value={c.id} className="space-y-4">
                 {!c.available ? (
                   <p className="text-sm text-muted-foreground">{c.reason || "해당 없음"}</p>
+                ) : caseTab !== c.id ? null : caseLoading ? (
+                  <p className="text-sm text-muted-foreground">매트릭스 불러오는 중...</p>
+                ) : caseError ? (
+                  <Alert variant="destructive">
+                    {caseErr instanceof ApiError
+                      ? caseErr.message
+                      : "케이스 데이터를 불러오지 못했습니다."}
+                  </Alert>
+                ) : caseDetail && !caseDetail.available ? (
+                  <p className="text-sm text-muted-foreground">
+                    {caseDetail.reason || "해당 없음"}
+                  </p>
                 ) : (
                   <>
                     <CaptureMatrixPanel
-                      rowAxis={c.row_axis}
-                      colAxis={c.col_axis}
-                      pk={c.matrices?.pk as never}
-                      entity={c.matrices?.entity as never}
+                      rowAxis={caseDetail?.row_axis || c.row_axis}
+                      colAxis={caseDetail?.col_axis || c.col_axis}
+                      pk={caseDetail?.matrices?.pk as never}
+                      entity={caseDetail?.matrices?.entity as never}
                     />
                     <details className="text-sm">
                       <summary className="cursor-pointer font-medium">
                         조합별 건수·우선순위 (상세) — {c.title}
                       </summary>
                       <div className="mt-3">
-                        <DataTable rows={c.summary || []} />
+                        <DataTable rows={caseDetail?.summary || []} />
                       </div>
                     </details>
                   </>

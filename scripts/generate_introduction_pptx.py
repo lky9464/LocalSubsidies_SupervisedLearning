@@ -669,7 +669,7 @@ def build_pptx(out_path: Path | None = None) -> Path:
             ["Test 점수", "data_root/algorithms/{algo}/scores/test/"],
             ["추론 점수", "data_root/algorithms/{algo}/scores/inference/"],
             ["Test 포착", "operations/ops_queue_test_pk.xlsx"],
-            ["추론 우선순위", "operations/ops_queue_inference.xlsx"],
+            ["추론 우선순위", "operations/ops_queue_inference_pk.xlsx"],
             ["집계 리포트", "프로젝트/outputs/reports/"],
         ],
         top=Inches(1.3),
